@@ -1,0 +1,63 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{3F1A2B00-4C5D-4E6F-8A9B-1C2D3E4F5A01}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{3F1A2B01-4C5D-4E6F-8A9B-1C2D3E4F5A02}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ReeTrack.Api", "src\ReeTrack.Api\ReeTrack.Api.csproj", "{3F1A2B10-4C5D-4E6F-8A9B-1C2D3E4F5A61}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ReeTrack.Application", "src\ReeTrack.Application\ReeTrack.Application.csproj", "{3F1A2B11-4C5D-4E6F-8A9B-1C2D3E4F5A62}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ReeTrack.Domain", "src\ReeTrack.Domain\ReeTrack.Domain.csproj", "{3F1A2B12-4C5D-4E6F-8A9B-1C2D3E4F5A63}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ReeTrack.Infrastructure", "src\ReeTrack.Infrastructure\ReeTrack.Infrastructure.csproj", "{3F1A2B13-4C5D-4E6F-8A9B-1C2D3E4F5A64}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ReeTrack.UnitTests", "tests\ReeTrack.UnitTests\ReeTrack.UnitTests.csproj", "{3F1A2B14-4C5D-4E6F-8A9B-1C2D3E4F5A65}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ReeTrack.IntegrationTests", "tests\ReeTrack.IntegrationTests\ReeTrack.IntegrationTests.csproj", "{3F1A2B15-4C5D-4E6F-8A9B-1C2D3E4F5A66}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{3F1A2B10-4C5D-4E6F-8A9B-1C2D3E4F5A61}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3F1A2B10-4C5D-4E6F-8A9B-1C2D3E4F5A61}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3F1A2B10-4C5D-4E6F-8A9B-1C2D3E4F5A61}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3F1A2B10-4C5D-4E6F-8A9B-1C2D3E4F5A61}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3F1A2B11-4C5D-4E6F-8A9B-1C2D3E4F5A62}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3F1A2B11-4C5D-4E6F-8A9B-1C2D3E4F5A62}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3F1A2B11-4C5D-4E6F-8A9B-1C2D3E4F5A62}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3F1A2B11-4C5D-4E6F-8A9B-1C2D3E4F5A62}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3F1A2B12-4C5D-4E6F-8A9B-1C2D3E4F5A63}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3F1A2B12-4C5D-4E6F-8A9B-1C2D3E4F5A63}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3F1A2B12-4C5D-4E6F-8A9B-1C2D3E4F5A63}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3F1A2B12-4C5D-4E6F-8A9B-1C2D3E4F5A63}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3F1A2B13-4C5D-4E6F-8A9B-1C2D3E4F5A64}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3F1A2B13-4C5D-4E6F-8A9B-1C2D3E4F5A64}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3F1A2B13-4C5D-4E6F-8A9B-1C2D3E4F5A64}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3F1A2B13-4C5D-4E6F-8A9B-1C2D3E4F5A64}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3F1A2B14-4C5D-4E6F-8A9B-1C2D3E4F5A65}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3F1A2B14-4C5D-4E6F-8A9B-1C2D3E4F5A65}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3F1A2B14-4C5D-4E6F-8A9B-1C2D3E4F5A65}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3F1A2B14-4C5D-4E6F-8A9B-1C2D3E4F5A65}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3F1A2B15-4C5D-4E6F-8A9B-1C2D3E4F5A66}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3F1A2B15-4C5D-4E6F-8A9B-1C2D3E4F5A66}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3F1A2B15-4C5D-4E6F-8A9B-1C2D3E4F5A66}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3F1A2B15-4C5D-4E6F-8A9B-1C2D3E4F5A66}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{3F1A2B10-4C5D-4E6F-8A9B-1C2D3E4F5A61} = {3F1A2B00-4C5D-4E6F-8A9B-1C2D3E4F5A01}
+		{3F1A2B11-4C5D-4E6F-8A9B-1C2D3E4F5A62} = {3F1A2B00-4C5D-4E6F-8A9B-1C2D3E4F5A01}
+		{3F1A2B12-4C5D-4E6F-8A9B-1C2D3E4F5A63} = {3F1A2B00-4C5D-4E6F-8A9B-1C2D3E4F5A01}
+		{3F1A2B13-4C5D-4E6F-8A9B-1C2D3E4F5A64} = {3F1A2B00-4C5D-4E6F-8A9B-1C2D3E4F5A01}
+		{3F1A2B14-4C5D-4E6F-8A9B-1C2D3E4F5A65} = {3F1A2B01-4C5D-4E6F-8A9B-1C2D3E4F5A02}
+		{3F1A2B15-4C5D-4E6F-8A9B-1C2D3E4F5A66} = {3F1A2B01-4C5D-4E6F-8A9B-1C2D3E4F5A02}
+	EndGlobalSection
+EndGlobal

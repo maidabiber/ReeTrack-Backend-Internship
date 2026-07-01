@@ -1,0 +1,44 @@
+# Build results
+bin/
+obj/
+out/
+
+# Visual Studio / Rider / VS Code
+.vs/
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Test results
+[Tt]est[Rr]esult*/
+*.trx
+*.coverage
+*.coveragexml
+
+# Publish output
+*.publish.xml
+*.pubxml
+*.pubxml.user
+publish/
+
+# NuGet
+*.nupkg
+**/[Pp]ackages/*
+!**/[Pp]ackages/build/
+.nuget/
+
+# Rider / ReSharper
+*.DotSettings.user
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Environment variables / local secrets
+.env
+.env.*
+!.env.example
