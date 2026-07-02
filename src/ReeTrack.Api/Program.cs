@@ -1,12 +1,15 @@
 using Microsoft.EntityFrameworkCore;
+using ReeTrack.Application.Common.Interfaces;
+using ReeTrack.Infrastructure.Persistence;
 using Scalar.AspNetCore;
 
 LoadDotEnvFile();
 
 var builder = WebApplication.CreateBuilder(args);
 
-// builder.Services.AddDbContext<AppDbContext>(o =>
-//o.UseNpgsql(builder.Configuration.GetConnectionString("Default")));
+builder.Services.AddDbContext<AppDbContext>(options =>
+    options.UseNpgsql(builder.Configuration.GetConnectionString("Default")));
+builder.Services.AddScoped<IApplicationDbContext>(provider => provider.GetRequiredService<AppDbContext>());
 
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();                          // native doc at /openapi/v1.json

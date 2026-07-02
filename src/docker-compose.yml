@@ -1,0 +1,18 @@
+# Usage (from reetrack-backend/):
+#   docker compose --env-file .env -f src/docker-compose.yml up -d
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: reetrack-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-reetrack}
+      POSTGRES_USER: ${POSTGRES_USER:-reetrack_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-reetrack_pass}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - reetrack_pgdata:/var/lib/postgresql/data
+
+volumes:
+  reetrack_pgdata:
