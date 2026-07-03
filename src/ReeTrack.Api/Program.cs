@@ -1,5 +1,10 @@
+using System.Text;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
 using ReeTrack.Application.Common.Interfaces;
+using ReeTrack.Application.Common.Options;
+using ReeTrack.Infrastructure;
 using ReeTrack.Infrastructure.Persistence;
 using Scalar.AspNetCore;
 
@@ -11,38 +16,55 @@ builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("Default")));
 builder.Services.AddScoped<IApplicationDbContext>(provider => provider.GetRequiredService<AppDbContext>());
 
+builder.Services.AddInfrastructure(builder.Configuration);
+
+var jwtOptions = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>()
+    ?? new JwtOptions();
+
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            ValidIssuer = jwtOptions.Issuer,
+            ValidAudience = jwtOptions.Audience,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtOptions.SigningKey)),
+            ClockSkew = TimeSpan.FromMinutes(1)
+        };
+    });
+
+builder.Services.AddAuthorization();
+
 builder.Services.AddControllers();
-builder.Services.AddOpenApi();                          // native doc at /openapi/v1.json
+builder.Services.AddOpenApi();
 
 var frontendOrigin = builder.Configuration["Frontend:Origin"] ?? "http://localhost:5173";
 builder.Services.AddCors(o => o.AddPolicy("frontend", p => p
-    .WithOrigins(frontendOrigin)                        // Vite dev server
-    .AllowAnyHeader().AllowAnyMethod()));
-
-// builder.Services.AddAuthentication(...).AddJwtBearer(...);  // Google, later
-// builder.Services.AddAuthorization();
+    .WithOrigins(frontendOrigin)
+    .AllowAnyHeader()
+    .AllowAnyMethod()));
 
 var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
-    app.MapScalarApiReference();                         // UI at /scalar
+    app.MapScalarApiReference();
 }
 
 app.UseHttpsRedirection();
 app.UseCors("frontend");
-// app.UseAuthentication();
-// app.UseAuthorization();
+app.UseAuthentication();
+app.UseAuthorization();
 app.MapControllers();
 app.MapGet("/api/health", () => Results.Ok(new { status = "ok" }));
 
 app.Run();
 
-// Loads KEY=VALUE pairs from a ".env" file (searched for from the app's base
-// directory upward) into process environment variables, so they flow into
-// IConfiguration via the built-in environment variables provider. Existing
-// environment variables always take precedence over the file.
 static void LoadDotEnvFile()
 {
     var directory = new DirectoryInfo(AppContext.BaseDirectory);
