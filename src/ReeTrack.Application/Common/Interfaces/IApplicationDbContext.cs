@@ -9,6 +9,12 @@ public interface IApplicationDbContext
     DbSet<Role> Roles { get; }
     DbSet<UserRole> UserRoles { get; }
     DbSet<Invitation> Invitations { get; }
+    DbSet<Client> Clients { get; }
+    DbSet<Project> Projects { get; }
+    DbSet<ProjectTask> ProjectTasks { get; }
+    DbSet<Tag> Tags { get; }
+    DbSet<TimeEntry> TimeEntries { get; }
+    DbSet<TimeEntryTag> TimeEntryTags { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

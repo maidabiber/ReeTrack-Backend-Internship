@@ -14,6 +14,12 @@ public class AppDbContext : DbContext, IApplicationDbContext
     public DbSet<Role> Roles => Set<Role>();
     public DbSet<UserRole> UserRoles => Set<UserRole>();
     public DbSet<Invitation> Invitations => Set<Invitation>();
+    public DbSet<Client> Clients => Set<Client>();
+    public DbSet<Project> Projects => Set<Project>();
+    public DbSet<ProjectTask> ProjectTasks => Set<ProjectTask>();
+    public DbSet<Tag> Tags => Set<Tag>();
+    public DbSet<TimeEntry> TimeEntries => Set<TimeEntry>();
+    public DbSet<TimeEntryTag> TimeEntryTags => Set<TimeEntryTag>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

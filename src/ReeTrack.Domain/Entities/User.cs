@@ -17,4 +17,6 @@ public class User : BaseEntity
     public ICollection<UserRole> AssignedRoles { get; set; } = [];
     public ICollection<Invitation> SentInvitations { get; set; } = [];
     public ICollection<Invitation> AcceptedInvitations { get; set; } = [];
+    public ICollection<TimeEntry> TimeEntries { get; set; } = [];
+    public ICollection<ProjectTask> AssignedTasks { get; set; } = [];
 }
