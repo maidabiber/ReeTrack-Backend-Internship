@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using ReeTrack.Application.Common.Constants;
 using ReeTrack.Application.Common.Interfaces;
+using ReeTrack.Application.Common.Models;
 using ReeTrack.Application.Common.Options;
 using ReeTrack.Domain.Entities;
 using ReeTrack.Domain.Enums;
@@ -11,25 +12,25 @@ namespace ReeTrack.Infrastructure.Auth;
 public class AuthService : IAuthService
 {
     private readonly IApplicationDbContext _db;
-    private readonly IGoogleTokenValidator _googleTokenValidator;
+    private readonly IGoogleCodeExchanger _googleCodeExchanger;
     private readonly IJwtTokenService _jwtTokenService;
     private readonly GoogleAuthOptions _googleOptions;
 
     public AuthService(
         IApplicationDbContext db,
-        IGoogleTokenValidator googleTokenValidator,
+        IGoogleCodeExchanger googleCodeExchanger,
         IJwtTokenService jwtTokenService,
         IOptions<GoogleAuthOptions> googleOptions)
     {
         _db = db;
-        _googleTokenValidator = googleTokenValidator;
+        _googleCodeExchanger = googleCodeExchanger;
         _jwtTokenService = jwtTokenService;
         _googleOptions = googleOptions.Value;
     }
 
-    public async Task<AuthResult> SignInWithGoogleAsync(string idToken, CancellationToken cancellationToken = default)
+    public async Task<AuthResult> SignInWithGoogleAsync(string code, CancellationToken cancellationToken = default)
     {
-        var googleUser = await _googleTokenValidator.ValidateAsync(idToken, cancellationToken);
+        var googleUser = await _googleCodeExchanger.ExchangeAsync(code, cancellationToken);
         var isFirstRun = !await _db.Users.AnyAsync(cancellationToken);
 
         if (isFirstRun)
@@ -53,6 +54,24 @@ public class AuthService : IAuthService
         await UpdateUserFromGoogleAsync(user, googleUser, cancellationToken);
 
         return BuildAuthResult(user);
+    }
+
+    public async Task<AuthenticatedUser> GetCurrentUserAsync(
+        Guid userId,
+        CancellationToken cancellationToken = default)
+    {
+        var user = await _db.Users
+            .Include(u => u.UserRoles)
+            .ThenInclude(ur => ur.Role)
+            .FirstOrDefaultAsync(u => u.Id == userId, cancellationToken);
+
+        if (user is null)
+            throw new AuthException("User not found.", 401);
+
+        if (user.Status == UserStatus.Disabled)
+            throw new AuthException("This account has been disabled.", 403);
+
+        return MapToAuthenticatedUser(user);
     }
 
     private async Task<AuthResult> CreateFirstAdminAsync(
@@ -129,14 +148,21 @@ public class AuthService : IAuthService
         {
             AccessToken = accessToken,
             ExpiresAtUtc = expiresAtUtc,
-            User = new AuthenticatedUser
-            {
-                Id = user.Id,
-                Email = user.Email,
-                DisplayName = user.DisplayName,
-                AvatarUrl = user.AvatarUrl,
-                Roles = roles
-            }
+            User = MapToAuthenticatedUser(user, roles)
+        };
+    }
+
+    private static AuthenticatedUser MapToAuthenticatedUser(User user, IReadOnlyList<string>? roles = null)
+    {
+        roles ??= user.UserRoles.Select(ur => ur.Role.Name).ToList();
+
+        return new AuthenticatedUser
+        {
+            Id = user.Id,
+            Email = user.Email,
+            DisplayName = user.DisplayName,
+            AvatarUrl = user.AvatarUrl,
+            Roles = roles
         };
     }
 }

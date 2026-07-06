@@ -13,7 +13,8 @@ public static class DependencyInjection
         services.Configure<GoogleAuthOptions>(configuration.GetSection(GoogleAuthOptions.SectionName));
         services.Configure<JwtOptions>(configuration.GetSection(JwtOptions.SectionName));
 
-        services.AddScoped<IGoogleTokenValidator, GoogleTokenValidator>();
+        services.AddHttpClient<IGoogleCodeExchanger, GoogleCodeExchanger>();
+        services.AddScoped<IGoogleOAuthService, GoogleOAuthService>();
         services.AddScoped<IJwtTokenService, JwtTokenService>();
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<ISetupService, SetupService>();

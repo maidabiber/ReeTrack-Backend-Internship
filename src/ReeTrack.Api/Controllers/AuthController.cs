@@ -1,6 +1,11 @@
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.WebUtilities;
+using ReeTrack.Api.Auth;
 using ReeTrack.Application.Common.Interfaces;
+using ReeTrack.Application.Common.Models;
 
 namespace ReeTrack.Api.Controllers;
 
@@ -9,67 +14,120 @@ namespace ReeTrack.Api.Controllers;
 public class AuthController : ControllerBase
 {
     private readonly IAuthService _authService;
+    private readonly IGoogleOAuthService _googleOAuthService;
+    private readonly IWebHostEnvironment _environment;
 
-    public AuthController(IAuthService authService)
+    public AuthController(
+        IAuthService authService,
+        IGoogleOAuthService googleOAuthService,
+        IWebHostEnvironment environment)
     {
         _authService = authService;
+        _googleOAuthService = googleOAuthService;
+        _environment = environment;
     }
 
     [AllowAnonymous]
-    [HttpPost("google")]
-    public async Task<ActionResult<GoogleSignInResponse>> SignInWithGoogle(
-        [FromBody] GoogleSignInRequest request,
-        CancellationToken cancellationToken)
+    [HttpGet("google")]
+    public IActionResult StartGoogleSignIn([FromQuery] string? returnUrl)
     {
-        if (string.IsNullOrWhiteSpace(request.IdToken))
-            return BadRequest(new { message = "Google ID token is required." });
-
         try
         {
-            var result = await _authService.SignInWithGoogleAsync(request.IdToken, cancellationToken);
+            var validatedReturnUrl = _googleOAuthService.ValidateReturnUrl(returnUrl);
+            var state = _googleOAuthService.GenerateState();
 
-            return Ok(new GoogleSignInResponse
-            {
-                AccessToken = result.AccessToken,
-                ExpiresAtUtc = result.ExpiresAtUtc,
-                User = new AuthenticatedUserResponse
-                {
-                    Id = result.User.Id,
-                    Email = result.User.Email,
-                    DisplayName = result.User.DisplayName,
-                    AvatarUrl = result.User.AvatarUrl,
-                    Roles = result.User.Roles
-                }
-            });
-        }
-        catch (AuthException ex)
-        {
-            return StatusCode(ex.StatusCode, new { message = ex.Message });
+            AuthCookies.SetOAuthCookies(Response, state, validatedReturnUrl, UseSecureCookies());
+
+            var authorizationUrl = _googleOAuthService.BuildAuthorizationUrl(state);
+            return Redirect(authorizationUrl);
         }
         catch (InvalidOperationException ex)
         {
             return StatusCode(StatusCodes.Status500InternalServerError, new { message = ex.Message });
         }
     }
-}
 
-public sealed class GoogleSignInRequest
-{
-    public string IdToken { get; set; } = string.Empty;
-}
+    [AllowAnonymous]
+    [HttpGet("google/callback")]
+    public async Task<IActionResult> GoogleCallback(
+        [FromQuery] string? code,
+        [FromQuery] string? state,
+        [FromQuery] string? error,
+        CancellationToken cancellationToken)
+    {
+        var returnUrl = Request.Cookies[AuthCookies.OAuthReturnUrlCookieName] ?? "/";
+        returnUrl = _googleOAuthService.ValidateReturnUrl(returnUrl);
 
-public sealed class GoogleSignInResponse
-{
-    public required string AccessToken { get; init; }
-    public required DateTime ExpiresAtUtc { get; init; }
-    public required AuthenticatedUserResponse User { get; init; }
-}
+        var storedState = Request.Cookies[AuthCookies.OAuthStateCookieName];
+        AuthCookies.ClearOAuthCookies(Response, UseSecureCookies());
 
-public sealed class AuthenticatedUserResponse
-{
-    public required Guid Id { get; init; }
-    public required string Email { get; init; }
-    public string? DisplayName { get; init; }
-    public string? AvatarUrl { get; init; }
-    public required IReadOnlyList<string> Roles { get; init; }
+        if (!string.IsNullOrWhiteSpace(error))
+            return RedirectWithAuthError(returnUrl, "Google sign-in was cancelled or failed.");
+
+        if (string.IsNullOrWhiteSpace(code))
+            return RedirectWithAuthError(returnUrl, "Authorization code is missing.");
+
+        if (string.IsNullOrWhiteSpace(state) || storedState is null || !string.Equals(state, storedState, StringComparison.Ordinal))
+            return RedirectWithAuthError(returnUrl, "Invalid OAuth state. Please try signing in again.");
+
+        try
+        {
+            var result = await _authService.SignInWithGoogleAsync(code, cancellationToken);
+
+            AuthCookies.SetSessionCookie(Response, result.AccessToken, result.ExpiresAtUtc, UseSecureCookies());
+
+            return Redirect("/");
+        }
+        catch (AuthException ex)
+        {
+            return RedirectWithAuthError(returnUrl, ex.Message);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return StatusCode(StatusCodes.Status500InternalServerError, new { message = ex.Message });
+        }
+    }
+
+    [Authorize]
+    [HttpGet("me")]
+    public async Task<ActionResult<AuthenticatedUser>> GetCurrentUser(CancellationToken cancellationToken)
+    {
+        if (!TryGetUserId(out var userId))
+            return Unauthorized();
+
+        try
+        {
+            var user = await _authService.GetCurrentUserAsync(userId, cancellationToken);
+            return Ok(user);
+        }
+        catch (AuthException ex)
+        {
+            return StatusCode(ex.StatusCode, new { message = ex.Message });
+        }
+    }
+
+    [AllowAnonymous]
+    [HttpPost("logout")]
+    public IActionResult Logout()
+    {
+        AuthCookies.ClearSessionCookie(Response, UseSecureCookies());
+        return Ok(new { message = "Signed out successfully." });
+    }
+
+    private bool TryGetUserId(out Guid userId)
+    {
+        var claim =
+            User.FindFirstValue(ClaimTypes.NameIdentifier) ??
+            User.FindFirstValue(JwtRegisteredClaimNames.Sub);
+
+        return Guid.TryParse(claim, out userId);
+    }
+
+    private RedirectResult RedirectWithAuthError(string returnUrl, string message)
+    {
+        var redirectUrl = QueryHelpers.AddQueryString(returnUrl, "authError", message);
+        return Redirect(redirectUrl);
+    }
+
+    private bool UseSecureCookies() => !_environment.IsDevelopment();
 }

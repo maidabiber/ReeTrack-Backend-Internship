@@ -1,8 +1,12 @@
+using ReeTrack.Application.Common.Models;
+
 namespace ReeTrack.Application.Common.Interfaces;
 
 public interface IAuthService
 {
-    Task<AuthResult> SignInWithGoogleAsync(string idToken, CancellationToken cancellationToken = default);
+    Task<AuthResult> SignInWithGoogleAsync(string code, CancellationToken cancellationToken = default);
+
+    Task<AuthenticatedUser> GetCurrentUserAsync(Guid userId, CancellationToken cancellationToken = default);
 }
 
 public sealed class AuthResult
@@ -10,15 +14,6 @@ public sealed class AuthResult
     public required string AccessToken { get; init; }
     public required DateTime ExpiresAtUtc { get; init; }
     public required AuthenticatedUser User { get; init; }
-}
-
-public sealed class AuthenticatedUser
-{
-    public required Guid Id { get; init; }
-    public required string Email { get; init; }
-    public string? DisplayName { get; init; }
-    public string? AvatarUrl { get; init; }
-    public required IReadOnlyList<string> Roles { get; init; }
 }
 
 public sealed class AuthException : Exception

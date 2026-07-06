@@ -1,8 +1,8 @@
 namespace ReeTrack.Application.Common.Interfaces;
 
-public interface IGoogleTokenValidator
+public interface IGoogleCodeExchanger
 {
-    Task<GoogleTokenPayload> ValidateAsync(string idToken, CancellationToken cancellationToken = default);
+    Task<GoogleTokenPayload> ExchangeAsync(string code, CancellationToken cancellationToken = default);
 }
 
 public sealed class GoogleTokenPayload
