@@ -51,9 +51,54 @@ public class AuthService : IAuthService
         if (user.Status == UserStatus.Disabled)
             throw new AuthException("This account has been disabled.", 403);
 
+        if (user.Status == UserStatus.Invited)
+            await AcceptPendingInvitationAsync(user, cancellationToken);
+
         await UpdateUserFromGoogleAsync(user, googleUser, cancellationToken);
 
         return BuildAuthResult(user);
+    }
+
+    /// <summary>
+    /// First sign-in of an invited user: enforces invitation expiry and marks the
+    /// pending invitation as accepted so its link stops resolving. Users without
+    /// invitation rows (pre-invitations data) are let through unchanged.
+    /// </summary>
+    private async Task AcceptPendingInvitationAsync(User user, CancellationToken cancellationToken)
+    {
+        var pendingInvitations = await _db.Invitations
+            .Where(i => i.Email == user.Email && i.Status == InvitationStatus.Pending)
+            .ToListAsync(cancellationToken);
+
+        if (pendingInvitations.Count == 0)
+            return;
+
+        var now = DateTime.UtcNow;
+        var current = pendingInvitations
+            .Where(i => i.ExpiresAtUtc > now)
+            .OrderByDescending(i => i.ExpiresAtUtc)
+            .FirstOrDefault();
+
+        if (current is null)
+            throw new AuthException(
+                "Your invitation has expired. Ask an administrator to send a new one.",
+                403);
+
+        foreach (var invitation in pendingInvitations)
+        {
+            if (invitation == current)
+            {
+                invitation.Status = InvitationStatus.Accepted;
+                invitation.AcceptedAtUtc = now;
+                invitation.AcceptedByUserId = user.Id;
+            }
+            else
+            {
+                invitation.Status = InvitationStatus.Revoked;
+            }
+
+            invitation.UpdatedAtUtc = now;
+        }
     }
 
     public async Task<AuthenticatedUser> GetCurrentUserAsync(

@@ -1,6 +1,7 @@
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.IdentityModel.Tokens;
 using ReeTrack.Application.Common.Interfaces;
 using ReeTrack.Application.Common.Options;
@@ -13,7 +14,17 @@ LoadDotEnvFile();
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("Default")));
+{
+    if (builder.Environment.IsEnvironment("Testing"))
+    {
+        options.UseInMemoryDatabase(builder.Configuration["Testing:DatabaseName"] ?? "ReeTrackTests")
+            .ConfigureWarnings(w => w.Ignore(InMemoryEventId.TransactionIgnoredWarning));
+    }
+    else
+    {
+        options.UseNpgsql(builder.Configuration.GetConnectionString("Default"));
+    }
+});
 builder.Services.AddScoped<IApplicationDbContext>(provider => provider.GetRequiredService<AppDbContext>());
 
 builder.Services.AddInfrastructure(builder.Configuration);
