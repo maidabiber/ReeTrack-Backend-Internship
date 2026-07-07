@@ -42,4 +42,33 @@ public class InvitationTokenHelperTests
     {
         Assert.Equal(expected, InvitationTokenHelper.DisplayNameFromEmail(email));
     }
+
+    [Theory]
+    [InlineData("alice@reeinvent.com", "reeinvent.com")]
+    [InlineData("BOB@ReeInvent.com", "reeinvent.com")]
+    [InlineData("no-domain", "")]
+    [InlineData("trailing@", "")]
+    public void GetEmailDomain_ReturnsLowercasedDomain(string email, string expected)
+    {
+        Assert.Equal(expected, InvitationTokenHelper.GetEmailDomain(email));
+    }
+
+    [Fact]
+    public void IsEmailDomainAllowed_EmptyList_AllowsAnyDomain()
+    {
+        Assert.True(InvitationTokenHelper.IsEmailDomainAllowed("anyone@gmail.com", []));
+    }
+
+    [Theory]
+    [InlineData("alice@reeinvent.com", true)]
+    [InlineData("ALICE@ReeInvent.COM", true)]
+    [InlineData("bob@reeinvent.io", true)]
+    [InlineData("mallory@gmail.com", false)]
+    [InlineData("no-domain", false)]
+    public void IsEmailDomainAllowed_EnforcesConfiguredDomains(string email, bool expected)
+    {
+        string[] allowed = ["reeinvent.com", "@reeinvent.io"];
+
+        Assert.Equal(expected, InvitationTokenHelper.IsEmailDomainAllowed(email, allowed));
+    }
 }
