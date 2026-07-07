@@ -18,6 +18,11 @@ public class TimeEntryTagConfiguration : IEntityTypeConfiguration<TimeEntryTag>
         builder.Property(tet => tet.TagId)
             .HasColumnName("tag_id");
 
+        // Must mirror the principals' soft-delete filters, or EF warns and joins
+        // through this table would surface rows pointing at hidden entities.
+        builder.HasQueryFilter(tet =>
+            tet.TimeEntry.DeletedAtUtc == null && tet.Tag.DeletedAtUtc == null);
+
         builder.HasOne(tet => tet.TimeEntry)
             .WithMany(te => te.TimeEntryTags)
             .HasForeignKey(tet => tet.TimeEntryId)

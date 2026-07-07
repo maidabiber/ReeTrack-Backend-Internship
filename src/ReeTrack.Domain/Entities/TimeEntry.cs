@@ -3,7 +3,7 @@ using ReeTrack.Domain.Enums;
 
 namespace ReeTrack.Domain.Entities;
 
-public class TimeEntry : BaseEntity
+public class TimeEntry : BaseEntity, ISoftDeletable
 {
     public Guid UserId { get; set; }
 
@@ -17,6 +17,9 @@ public class TimeEntry : BaseEntity
     public DateTime? StartedAtUtc { get; set; }
     public DateTime? EndedAtUtc { get; set; }
     public int DurationSeconds { get; set; }
+
+    public DateTime? DeletedAtUtc { get; set; }
+    public Guid? DeletedByUserId { get; set; }
 
     public User User { get; set; } = null!;
     public Client? Client { get; set; }

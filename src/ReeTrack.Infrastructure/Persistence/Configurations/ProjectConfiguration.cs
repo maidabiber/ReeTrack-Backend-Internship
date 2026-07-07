@@ -65,6 +65,14 @@ public class ProjectConfiguration : IEntityTypeConfiguration<Project>
             .HasColumnName("updated_at_utc")
             .IsRequired();
 
+        builder.Property(p => p.DeletedAtUtc)
+            .HasColumnName("deleted_at_utc");
+
+        builder.Property(p => p.DeletedByUserId)
+            .HasColumnName("deleted_by_user_id");
+
+        builder.HasQueryFilter(p => p.DeletedAtUtc == null);
+
         builder.HasIndex(p => p.ClientId)
             .HasDatabaseName("ix_projects_client_id");
 

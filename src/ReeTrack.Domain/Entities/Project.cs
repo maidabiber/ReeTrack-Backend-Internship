@@ -3,7 +3,7 @@ using ReeTrack.Domain.Enums;
 
 namespace ReeTrack.Domain.Entities;
 
-public class Project : BaseEntity
+public class Project : BaseEntity, ISoftDeletable
 {
     public Guid ClientId { get; set; }
     public string Name { get; set; } = string.Empty;
@@ -15,6 +15,9 @@ public class Project : BaseEntity
     public decimal? FixedFeeAmount { get; set; }
     public decimal? HourlyRate { get; set; }
     public decimal? TimeEstimateHours { get; set; }
+
+    public DateTime? DeletedAtUtc { get; set; }
+    public Guid? DeletedByUserId { get; set; }
 
     public Client Client { get; set; } = null!;
     public ICollection<ProjectTask> Tasks { get; set; } = [];

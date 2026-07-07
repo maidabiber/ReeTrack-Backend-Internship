@@ -2,6 +2,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using ReeTrack.Application.Common.Interfaces;
 using ReeTrack.Application.Common.Options;
+using ReeTrack.Infrastructure.Auditing;
 using ReeTrack.Infrastructure.Auth;
 using ReeTrack.Infrastructure.Email;
 using ReeTrack.Infrastructure.Invitations;
@@ -28,6 +29,8 @@ public static class DependencyInjection
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<ISetupService, SetupService>();
         services.AddScoped<ICurrentUserService, CurrentUserService>();
+        services.AddScoped<AuditSaveChangesInterceptor>();
+        services.AddScoped<IAuditLogService, AuditLogService>();
 
         var smtpConfigured = !string.IsNullOrWhiteSpace(configuration[$"{EmailOptions.SectionName}:SmtpHost"]);
         if (smtpConfigured)

@@ -63,6 +63,14 @@ public class TimeEntryConfiguration : IEntityTypeConfiguration<TimeEntry>
             .HasColumnName("updated_at_utc")
             .IsRequired();
 
+        builder.Property(e => e.DeletedAtUtc)
+            .HasColumnName("deleted_at_utc");
+
+        builder.Property(e => e.DeletedByUserId)
+            .HasColumnName("deleted_by_user_id");
+
+        builder.HasQueryFilter(e => e.DeletedAtUtc == null);
+
         builder.HasIndex(e => e.UserId)
             .HasDatabaseName("ix_time_entries_user_id");
 
@@ -75,7 +83,7 @@ public class TimeEntryConfiguration : IEntityTypeConfiguration<TimeEntry>
         builder.HasIndex(e => e.UserId)
             .IsUnique()
             .HasDatabaseName("ix_time_entries_user_running")
-            .HasFilter($"mode = {(short)TimeEntryMode.Timer} AND ended_at_utc IS NULL");
+            .HasFilter($"mode = {(short)TimeEntryMode.Timer} AND ended_at_utc IS NULL AND deleted_at_utc IS NULL");
 
         builder.HasOne(e => e.User)
             .WithMany(u => u.TimeEntries)

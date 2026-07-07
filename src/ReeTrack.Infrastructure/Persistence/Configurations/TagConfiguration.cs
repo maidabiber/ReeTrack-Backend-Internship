@@ -33,8 +33,18 @@ public class TagConfiguration : IEntityTypeConfiguration<Tag>
             .HasColumnName("updated_at_utc")
             .IsRequired();
 
+        builder.Property(t => t.DeletedAtUtc)
+            .HasColumnName("deleted_at_utc");
+
+        builder.Property(t => t.DeletedByUserId)
+            .HasColumnName("deleted_by_user_id");
+
+        builder.HasQueryFilter(t => t.DeletedAtUtc == null);
+
+        // Filtered so a soft-deleted tag does not block reusing its name.
         builder.HasIndex(t => t.Name)
             .IsUnique()
-            .HasDatabaseName("ix_tags_name");
+            .HasDatabaseName("ix_tags_name")
+            .HasFilter("deleted_at_utc IS NULL");
     }
 }

@@ -43,6 +43,9 @@ public class ReeTrackWebApplicationFactory : WebApplicationFactory<Program>
                 ["Email:SmtpHost"] = "smtp.test.invalid",
                 ["Email:From"] = "ReeTrack <no-reply@reetrack.test>",
                 ["Invitation:ExpiryDays"] = "7",
+                // Pin the allowed domain so tests do not inherit the developer's
+                // .env (Program.cs loads it from any ancestor directory).
+                ["Invitation:AllowedDomains:0"] = "reetrack.test",
                 ["App:Name"] = "ReeTrack"
             });
         });

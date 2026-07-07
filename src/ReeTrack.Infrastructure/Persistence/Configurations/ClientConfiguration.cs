@@ -34,8 +34,18 @@ public class ClientConfiguration : IEntityTypeConfiguration<Client>
             .HasColumnName("updated_at_utc")
             .IsRequired();
 
+        builder.Property(c => c.DeletedAtUtc)
+            .HasColumnName("deleted_at_utc");
+
+        builder.Property(c => c.DeletedByUserId)
+            .HasColumnName("deleted_by_user_id");
+
+        builder.HasQueryFilter(c => c.DeletedAtUtc == null);
+
+        // Filtered so a soft-deleted client does not block reusing its name.
         builder.HasIndex(c => c.Name)
             .IsUnique()
-            .HasDatabaseName("ix_clients_name");
+            .HasDatabaseName("ix_clients_name")
+            .HasFilter("deleted_at_utc IS NULL");
     }
 }

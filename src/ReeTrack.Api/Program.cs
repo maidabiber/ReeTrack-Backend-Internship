@@ -6,6 +6,7 @@ using Microsoft.IdentityModel.Tokens;
 using ReeTrack.Application.Common.Interfaces;
 using ReeTrack.Application.Common.Options;
 using ReeTrack.Infrastructure;
+using ReeTrack.Infrastructure.Auditing;
 using ReeTrack.Infrastructure.Persistence;
 using Scalar.AspNetCore;
 
@@ -13,8 +14,10 @@ LoadDotEnvFile();
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddDbContext<AppDbContext>(options =>
+builder.Services.AddDbContext<AppDbContext>((serviceProvider, options) =>
 {
+    options.AddInterceptors(serviceProvider.GetRequiredService<AuditSaveChangesInterceptor>());
+
     if (builder.Environment.IsEnvironment("Testing"))
     {
         options.UseInMemoryDatabase(builder.Configuration["Testing:DatabaseName"] ?? "ReeTrackTests")
