@@ -84,38 +84,6 @@ public class InvitedSignInTests : IClassFixture<InvitedSignInTests.AuthTestFacto
         Assert.Equal(UserStatus.Invited, user.Status);
     }
 
-    [Fact]
-    public async Task InvitedUser_AllInvitationsRevoked_CannotSignIn()
-    {
-        var (_, token) = await _factory.SeedAdminAsync();
-        var client = _factory.CreateAuthenticatedClient(token);
-
-        var email = "revoked.invite@reetrack.test";
-        var response = await client.PostAsJsonAsync("/api/invitations", new { email, roleId = 2 });
-        response.EnsureSuccessStatusCode();
-
-        using (var setupScope = _factory.Services.CreateScope())
-        {
-            var setupDb = setupScope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var invitation = await setupDb.Invitations.SingleAsync(i => i.Email == email);
-            invitation.Status = InvitationStatus.Revoked;
-            await setupDb.SaveChangesAsync();
-        }
-
-        _factory.Exchanger.Payload = GooglePayload(email);
-
-        using var scope = _factory.Services.CreateScope();
-        var authService = scope.ServiceProvider.GetRequiredService<IAuthService>();
-
-        var exception = await Assert.ThrowsAsync<AuthException>(
-            () => authService.SignInWithGoogleAsync("fake-code"));
-        Assert.Equal(403, exception.StatusCode);
-
-        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var user = await db.Users.SingleAsync(u => u.Email == email);
-        Assert.Equal(UserStatus.Invited, user.Status);
-    }
-
     private static GoogleTokenPayload GooglePayload(string email) => new()
     {
         Subject = $"google-sub-{email}",

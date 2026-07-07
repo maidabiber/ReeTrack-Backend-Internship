@@ -23,36 +23,6 @@ public static class InvitationTokenHelper
     public static string NormalizeEmail(string email) =>
         email.Trim().ToLowerInvariant();
 
-    /// <summary>Returns the lowercased domain of an email, or empty if it has none.</summary>
-    public static string GetEmailDomain(string email)
-    {
-        var atIndex = email.LastIndexOf('@');
-        return atIndex < 0 || atIndex == email.Length - 1
-            ? string.Empty
-            : email[(atIndex + 1)..].Trim().ToLowerInvariant();
-    }
-
-    /// <summary>
-    /// Whether an email is allowed given the configured domains. An empty list
-    /// allows everything so the restriction stays opt-in. Leading '@' on a
-    /// configured domain is tolerated (e.g. "@reeinvent.com").
-    /// </summary>
-    public static bool IsEmailDomainAllowed(string email, IReadOnlyCollection<string> allowedDomains)
-    {
-        if (allowedDomains.Count == 0)
-            return true;
-
-        var domain = GetEmailDomain(email);
-        if (domain.Length == 0)
-            return false;
-
-        return allowedDomains.Any(allowed =>
-            string.Equals(
-                allowed.Trim().TrimStart('@'),
-                domain,
-                StringComparison.OrdinalIgnoreCase));
-    }
-
     public static string DisplayNameFromEmail(string email)
     {
         var localPart = email.Split('@')[0];
