@@ -62,16 +62,22 @@ public class AuthService : IAuthService
     /// <summary>
     /// First sign-in of an invited user: enforces invitation expiry and marks the
     /// pending invitation as accepted so its link stops resolving. Users without
-    /// invitation rows (pre-invitations data) are let through unchanged.
+    /// any invitation rows (pre-invitations data) are let through unchanged; users
+    /// whose invitations were all revoked or expired are rejected so a revoke
+    /// actually removes access.
     /// </summary>
     private async Task AcceptPendingInvitationAsync(User user, CancellationToken cancellationToken)
     {
-        var pendingInvitations = await _db.Invitations
-            .Where(i => i.Email == user.Email && i.Status == InvitationStatus.Pending)
+        var invitations = await _db.Invitations
+            .Where(i => i.Email == user.Email)
             .ToListAsync(cancellationToken);
 
-        if (pendingInvitations.Count == 0)
+        if (invitations.Count == 0)
             return;
+
+        var pendingInvitations = invitations
+            .Where(i => i.Status == InvitationStatus.Pending)
+            .ToList();
 
         var now = DateTime.UtcNow;
         var current = pendingInvitations
@@ -81,7 +87,9 @@ public class AuthService : IAuthService
 
         if (current is null)
             throw new AuthException(
-                "Your invitation has expired. Ask an administrator to send a new one.",
+                pendingInvitations.Count > 0
+                    ? "Your invitation has expired. Ask an administrator to send a new one."
+                    : "Your invitation is no longer valid. Ask an administrator to send a new one.",
                 403);
 
         foreach (var invitation in pendingInvitations)

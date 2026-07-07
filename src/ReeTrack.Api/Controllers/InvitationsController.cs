@@ -39,6 +39,79 @@ public class InvitationsController : ControllerBase
     }
 
     [Authorize(Roles = "Admin")]
+    [HttpPost("batch")]
+    public async Task<ActionResult<BatchInvitationResponse>> CreateBatch(
+        [FromBody] BatchInvitationRequest request,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var results = await _invitationService.CreateManyAsync(
+                request.Emails ?? [],
+                request.RoleId,
+                cancellationToken);
+
+            return Ok(new BatchInvitationResponse
+            {
+                Results = results.Select(row => new BatchInvitationRowResponse
+                {
+                    Email = row.Email,
+                    Status = row.Status.ToString(),
+                    Message = row.Message,
+                    Member = row.Member is null ? null : MapMember(row.Member)
+                }).ToList()
+            });
+        }
+        catch (AppException ex)
+        {
+            return StatusCode(ex.StatusCode, new { message = ex.Message });
+        }
+    }
+
+    [Authorize(Roles = "Admin")]
+    [HttpGet]
+    public async Task<ActionResult<IReadOnlyList<InvitationListItemResponse>>> List(
+        CancellationToken cancellationToken)
+    {
+        var invitations = await _invitationService.ListAsync(cancellationToken);
+
+        return Ok(invitations.Select(invitation => new InvitationListItemResponse
+        {
+            Id = invitation.Id,
+            Email = invitation.Email,
+            Role = invitation.Role,
+            RoleId = invitation.RoleId,
+            Status = invitation.Status,
+            CreatedAtUtc = invitation.CreatedAtUtc,
+            ExpiresAtUtc = invitation.ExpiresAtUtc,
+            InvitedByName = invitation.InvitedByName,
+            AcceptedAtUtc = invitation.AcceptedAtUtc
+        }).ToList());
+    }
+
+    [Authorize(Roles = "Admin")]
+    [HttpPost("{id:guid}/revoke")]
+    public async Task<ActionResult<RevokeInvitationResponse>> Revoke(
+        Guid id,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result = await _invitationService.RevokeAsync(id, cancellationToken);
+
+            return Ok(new RevokeInvitationResponse
+            {
+                Invitation = MapInvitation(result.Invitation),
+                RemovedUserId = result.RemovedUserId
+            });
+        }
+        catch (AppException ex)
+        {
+            return StatusCode(ex.StatusCode, new { message = ex.Message });
+        }
+    }
+
+    [Authorize(Roles = "Admin")]
     [HttpPost("{id:guid}/resend")]
     public async Task<ActionResult<InvitationResponse>> Resend(
         Guid id,
@@ -54,6 +127,11 @@ public class InvitationsController : ControllerBase
             return StatusCode(ex.StatusCode, new { message = ex.Message });
         }
     }
+
+    [Authorize(Roles = "Admin")]
+    [HttpGet("allowed-domains")]
+    public ActionResult<AllowedDomainsResponse> AllowedDomains() =>
+        Ok(new AllowedDomainsResponse { Domains = _invitationService.GetAllowedDomains() });
 
     [AllowAnonymous]
     [HttpGet("preview")]
@@ -113,6 +191,44 @@ public sealed class CreateInvitationRequest
     public short RoleId { get; set; }
 }
 
+public sealed class BatchInvitationRequest
+{
+    public List<string>? Emails { get; set; }
+    public short RoleId { get; set; }
+}
+
+public sealed class BatchInvitationResponse
+{
+    public required IReadOnlyList<BatchInvitationRowResponse> Results { get; init; }
+}
+
+public sealed class BatchInvitationRowResponse
+{
+    public required string Email { get; init; }
+    public required string Status { get; init; }
+    public string? Message { get; init; }
+    public MemberResponse? Member { get; init; }
+}
+
+public sealed class InvitationListItemResponse
+{
+    public required Guid Id { get; init; }
+    public required string Email { get; init; }
+    public required string Role { get; init; }
+    public required short RoleId { get; init; }
+    public required string Status { get; init; }
+    public required DateTime CreatedAtUtc { get; init; }
+    public required DateTime ExpiresAtUtc { get; init; }
+    public required string InvitedByName { get; init; }
+    public DateTime? AcceptedAtUtc { get; init; }
+}
+
+public sealed class RevokeInvitationResponse
+{
+    public required InvitationResponse Invitation { get; init; }
+    public Guid? RemovedUserId { get; init; }
+}
+
 public sealed class CreateInvitationResponse
 {
     public required MemberResponse Member { get; init; }
@@ -128,6 +244,11 @@ public sealed class InvitationResponse
     public required string Status { get; init; }
     public required DateTime ExpiresAtUtc { get; init; }
     public required Guid InvitedByUserId { get; init; }
+}
+
+public sealed class AllowedDomainsResponse
+{
+    public required IReadOnlyList<string> Domains { get; init; }
 }
 
 public sealed class InvitationPreviewResponse

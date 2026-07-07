@@ -50,6 +50,11 @@ public class InvitationService : IInvitationService
         if (string.IsNullOrWhiteSpace(normalizedEmail) || !normalizedEmail.Contains('@'))
             throw new AppException("A valid email address is required.");
 
+        if (!InvitationTokenHelper.IsEmailDomainAllowed(normalizedEmail, _invitationOptions.AllowedDomains))
+            throw new AppException(
+                $"{normalizedEmail} cannot be invited. Only addresses from these domains can sign in: " +
+                $"{string.Join(", ", _invitationOptions.AllowedDomains)}.");
+
         if (roleId is not (RoleIds.Admin or RoleIds.Member))
             throw new AppException("Role must be Admin or Member.");
 
@@ -123,9 +128,16 @@ public class InvitationService : IInvitationService
             }
             else if (userRole.RoleId != roleId)
             {
-                userRole.RoleId = roleId;
-                userRole.AssignedAtUtc = now;
-                userRole.AssignedByUserId = adminId;
+                // RoleId is part of the user_roles primary key, so the row is
+                // replaced rather than mutated.
+                _db.UserRoles.Remove(userRole);
+                _db.UserRoles.Add(new UserRole
+                {
+                    UserId = user.Id,
+                    RoleId = roleId,
+                    AssignedAtUtc = now,
+                    AssignedByUserId = adminId
+                });
             }
 
             invitation = new Invitation
@@ -173,6 +185,166 @@ public class InvitationService : IInvitationService
         {
             Member = member,
             Invitation = MapInvitation(invitation, role.Name)
+        };
+    }
+
+    public async Task<IReadOnlyList<BatchInvitationRowResult>> CreateManyAsync(
+        IReadOnlyList<string> emails,
+        short roleId,
+        CancellationToken cancellationToken = default)
+    {
+        const int maxBatchSize = 50;
+
+        if (emails.Count == 0)
+            throw new AppException("At least one email address is required.");
+
+        if (emails.Count > maxBatchSize)
+            throw new AppException($"You can invite at most {maxBatchSize} emails at once.");
+
+        if (roleId is not (RoleIds.Admin or RoleIds.Member))
+            throw new AppException("Role must be Admin or Member.");
+
+        var results = new List<BatchInvitationRowResult>(emails.Count);
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var rawEmail in emails)
+        {
+            var email = InvitationTokenHelper.NormalizeEmail(rawEmail);
+            if (email.Length == 0)
+                continue;
+
+            if (!seen.Add(email))
+            {
+                results.Add(new BatchInvitationRowResult
+                {
+                    Email = email,
+                    Status = BatchInvitationRowStatus.Duplicate,
+                    Message = "Duplicate email in this batch."
+                });
+                continue;
+            }
+
+            try
+            {
+                var created = await CreateAsync(email, roleId, cancellationToken);
+                results.Add(new BatchInvitationRowResult
+                {
+                    Email = email,
+                    Status = BatchInvitationRowStatus.Invited,
+                    Member = created.Member
+                });
+            }
+            catch (AppException ex) when (ex.StatusCode == 409)
+            {
+                results.Add(new BatchInvitationRowResult
+                {
+                    Email = email,
+                    Status = BatchInvitationRowStatus.AlreadyActive,
+                    Message = ex.Message
+                });
+            }
+            catch (AppException ex) when (ex.StatusCode == 502)
+            {
+                results.Add(new BatchInvitationRowResult
+                {
+                    Email = email,
+                    Status = BatchInvitationRowStatus.EmailFailed,
+                    Message = ex.Message
+                });
+            }
+            catch (AppException ex)
+            {
+                results.Add(new BatchInvitationRowResult
+                {
+                    Email = email,
+                    Status = BatchInvitationRowStatus.Invalid,
+                    Message = ex.Message
+                });
+            }
+        }
+
+        if (results.Count == 0)
+            throw new AppException("At least one email address is required.");
+
+        return results;
+    }
+
+    public async Task<IReadOnlyList<InvitationListItemDto>> ListAsync(CancellationToken cancellationToken = default)
+    {
+        var invitations = await _db.Invitations
+            .AsNoTracking()
+            .Include(i => i.Role)
+            .Include(i => i.InvitedByUser)
+            .OrderByDescending(i => i.CreatedAtUtc)
+            .ToListAsync(cancellationToken);
+
+        var now = DateTime.UtcNow;
+
+        return invitations
+            .Select(i => new InvitationListItemDto
+            {
+                Id = i.Id,
+                Email = i.Email,
+                Role = i.Role.Name,
+                RoleId = i.RoleId,
+                Status = EffectiveStatus(i, now).ToString(),
+                CreatedAtUtc = i.CreatedAtUtc,
+                ExpiresAtUtc = i.ExpiresAtUtc,
+                InvitedByName = i.InvitedByUser.DisplayName ?? i.InvitedByUser.Email,
+                AcceptedAtUtc = i.AcceptedAtUtc
+            })
+            .ToList();
+    }
+
+    public async Task<RevokeInvitationResult> RevokeAsync(Guid invitationId, CancellationToken cancellationToken = default)
+    {
+        RequireAdminId();
+
+        var invitation = await _db.Invitations
+            .Include(i => i.Role)
+            .FirstOrDefaultAsync(i => i.Id == invitationId, cancellationToken)
+            ?? throw new AppException("Invitation was not found.", 404);
+
+        if (invitation.Status != InvitationStatus.Pending)
+        {
+            throw new AppException(
+                invitation.Status == InvitationStatus.Accepted
+                    ? "This invitation was already accepted. Deactivate the member instead."
+                    : "This invitation was already revoked.",
+                409);
+        }
+
+        var now = DateTime.UtcNow;
+        invitation.Status = InvitationStatus.Revoked;
+        invitation.UpdatedAtUtc = now;
+
+        // If the invitee never signed in, their placeholder user row is all that
+        // grants access — remove it so the revoke actually removes access.
+        Guid? removedUserId = null;
+        var user = await _db.Users
+            .FirstOrDefaultAsync(u => u.Email == invitation.Email, cancellationToken);
+
+        if (user is not null && user.Status == UserStatus.Invited && user.GoogleSub is null)
+        {
+            var hasOtherPending = await _db.Invitations.AnyAsync(
+                i => i.Email == invitation.Email &&
+                     i.Id != invitation.Id &&
+                     i.Status == InvitationStatus.Pending,
+                cancellationToken);
+
+            if (!hasOtherPending)
+            {
+                _db.Users.Remove(user);
+                removedUserId = user.Id;
+            }
+        }
+
+        await _db.SaveChangesAsync(cancellationToken);
+
+        return new RevokeInvitationResult
+        {
+            Invitation = MapInvitation(invitation, invitation.Role.Name),
+            RemovedUserId = removedUserId
         };
     }
 
@@ -278,6 +450,13 @@ public class InvitationService : IInvitationService
         };
     }
 
+    public IReadOnlyList<string> GetAllowedDomains() =>
+        _invitationOptions.AllowedDomains
+            .Select(domain => domain.Trim().TrimStart('@').ToLowerInvariant())
+            .Where(domain => domain.Length > 0)
+            .Distinct()
+            .ToList();
+
     private Guid RequireAdminId()
     {
         if (_currentUser.UserId is not Guid adminId)
@@ -334,6 +513,11 @@ public class InvitationService : IInvitationService
 
     private string BuildInviteUrl(string rawToken) =>
         $"{_frontendOrigin.TrimEnd('/')}/signin?token={Uri.EscapeDataString(rawToken)}";
+
+    private static InvitationStatus EffectiveStatus(Invitation invitation, DateTime now) =>
+        invitation.Status == InvitationStatus.Pending && invitation.ExpiresAtUtc <= now
+            ? InvitationStatus.Expired
+            : invitation.Status;
 
     private static InvitationDto MapInvitation(Invitation invitation, string roleName) =>
         new()
