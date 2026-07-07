@@ -6,6 +6,7 @@ using ReeTrack.Infrastructure.Auth;
 using ReeTrack.Infrastructure.Email;
 using ReeTrack.Infrastructure.Invitations;
 using ReeTrack.Infrastructure.Members;
+using ReeTrack.Infrastructure.TimeEntries;
 
 namespace ReeTrack.Infrastructure;
 
@@ -36,6 +37,7 @@ public static class DependencyInjection
 
         services.AddScoped<IInvitationService, InvitationService>();
         services.AddScoped<IMemberService, MemberService>();
+        services.AddScoped<ITimeEntryService, TimeEntryService>();
 
         return services;
     }
