@@ -71,6 +71,62 @@ public class TimeEntriesController : ControllerBase
         }
     }
 
+    [HttpPost("manual")]
+    public async Task<ActionResult<CreateManualEntryResponse>> CreateManualEntry(
+        [FromBody] CreateManualEntryRequest request,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result = await _timeEntryService.CreateManualEntryAsync(
+                request.Description,
+                request.StartedAtUtc,
+                request.EndedAtUtc,
+                request.IsBillable ?? true,
+                request.ConfirmOverlap,
+                cancellationToken);
+
+            return Ok(new CreateManualEntryResponse
+            {
+                Entry = MapTimeEntry(result.Entry),
+                OverlapWarning = result.OverlapWarning
+            });
+        }
+        catch (AppException ex)
+        {
+            return StatusCode(ex.StatusCode, new { message = ex.Message });
+        }
+    }
+
+    [HttpPut("{id:guid}")]
+    public async Task<ActionResult<UpdateTimeEntryResponse>> UpdateTimeEntry(
+        Guid id,
+        [FromBody] UpdateTimeEntryRequest request,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result = await _timeEntryService.UpdateTimeEntryAsync(
+                id,
+                request.Description,
+                request.StartedAtUtc,
+                request.EndedAtUtc,
+                request.IsBillable ?? true,
+                request.ConfirmOverlap,
+                cancellationToken);
+
+            return Ok(new UpdateTimeEntryResponse
+            {
+                Entry = MapTimeEntry(result.Entry),
+                OverlapWarning = result.OverlapWarning
+            });
+        }
+        catch (AppException ex)
+        {
+            return StatusCode(ex.StatusCode, new { message = ex.Message });
+        }
+    }
+
     internal static TimeEntryResponse MapTimeEntry(TimeEntryDto entry) =>
         new()
         {
@@ -94,6 +150,36 @@ public sealed class StartTimerRequest
 public sealed class StopTimerRequest
 {
     public string? Description { get; set; }
+}
+
+public sealed class CreateManualEntryRequest
+{
+    public string? Description { get; set; }
+    public bool? IsBillable { get; set; }
+    public required DateTime StartedAtUtc { get; set; }
+    public required DateTime EndedAtUtc { get; set; }
+    public bool ConfirmOverlap { get; set; }
+}
+
+public sealed class CreateManualEntryResponse
+{
+    public required TimeEntryResponse Entry { get; init; }
+    public string? OverlapWarning { get; init; }
+}
+
+public sealed class UpdateTimeEntryRequest
+{
+    public string? Description { get; set; }
+    public bool? IsBillable { get; set; }
+    public required DateTime StartedAtUtc { get; set; }
+    public required DateTime EndedAtUtc { get; set; }
+    public bool ConfirmOverlap { get; set; }
+}
+
+public sealed class UpdateTimeEntryResponse
+{
+    public required TimeEntryResponse Entry { get; init; }
+    public string? OverlapWarning { get; init; }
 }
 
 public sealed class TimeEntryResponse

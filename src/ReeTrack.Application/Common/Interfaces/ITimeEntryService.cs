@@ -16,4 +16,21 @@ public interface ITimeEntryService
         CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<TimeEntryDto>> ListAsync(CancellationToken cancellationToken = default);
+
+    Task<CreateManualEntryResult> CreateManualEntryAsync(
+        string? description,
+        DateTime startedAtUtc,
+        DateTime endedAtUtc,
+        bool isBillable = true,
+        bool confirmOverlap = false,
+        CancellationToken cancellationToken = default);
+
+    Task<UpdateTimeEntryResult> UpdateTimeEntryAsync(
+        Guid entryId,
+        string? description,
+        DateTime startedAtUtc,
+        DateTime endedAtUtc,
+        bool isBillable,
+        bool confirmOverlap = false,
+        CancellationToken cancellationToken = default);
 }

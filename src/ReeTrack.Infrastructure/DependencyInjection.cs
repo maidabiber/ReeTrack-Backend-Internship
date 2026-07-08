@@ -20,6 +20,7 @@ public static class DependencyInjection
         services.Configure<EmailOptions>(configuration.GetSection(EmailOptions.SectionName));
         services.Configure<InvitationOptions>(configuration.GetSection(InvitationOptions.SectionName));
         services.Configure<AppOptions>(configuration.GetSection(AppOptions.SectionName));
+        services.Configure<TimeEntryOptions>(configuration.GetSection(TimeEntryOptions.SectionName));
 
         services.AddHttpContextAccessor();
 
@@ -40,6 +41,7 @@ public static class DependencyInjection
 
         services.AddScoped<IInvitationService, InvitationService>();
         services.AddScoped<IMemberService, MemberService>();
+        services.AddScoped<ILockedPeriodService, LockedPeriodService>();
         services.AddScoped<ITimeEntryService, TimeEntryService>();
 
         return services;
