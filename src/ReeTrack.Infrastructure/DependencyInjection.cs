@@ -4,6 +4,7 @@ using ReeTrack.Application.Common.Interfaces;
 using ReeTrack.Application.Common.Options;
 using ReeTrack.Infrastructure.Auditing;
 using ReeTrack.Infrastructure.Auth;
+using ReeTrack.Infrastructure.Clients;
 using ReeTrack.Infrastructure.Email;
 using ReeTrack.Infrastructure.Invitations;
 using ReeTrack.Infrastructure.Members;
@@ -43,6 +44,7 @@ public static class DependencyInjection
         services.AddScoped<IMemberService, MemberService>();
         services.AddScoped<ILockedPeriodService, LockedPeriodService>();
         services.AddScoped<ITimeEntryService, TimeEntryService>();
+        services.AddScoped<IClientService, ClientService>();
 
         return services;
     }
