@@ -55,6 +55,18 @@ public class TimeEntryConfiguration : IEntityTypeConfiguration<TimeEntry>
             .HasDefaultValue(0)
             .IsRequired();
 
+        builder.Property(e => e.Status)
+            .HasColumnName("status")
+            .HasConversion<short>()
+            .HasDefaultValue(TimeEntryStatus.Confirmed)
+            .IsRequired();
+
+        builder.Property(e => e.SubmittedByUserId)
+            .HasColumnName("submitted_by_user_id");
+
+        builder.Property(e => e.ShareGroupId)
+            .HasColumnName("share_group_id");
+
         builder.Property(e => e.CreatedAtUtc)
             .HasColumnName("created_at_utc")
             .IsRequired();
@@ -74,6 +86,12 @@ public class TimeEntryConfiguration : IEntityTypeConfiguration<TimeEntry>
         builder.HasIndex(e => e.UserId)
             .HasDatabaseName("ix_time_entries_user_id");
 
+        builder.HasIndex(e => new { e.UserId, e.Status })
+            .HasDatabaseName("ix_time_entries_user_status");
+
+        builder.HasIndex(e => e.ShareGroupId)
+            .HasDatabaseName("ix_time_entries_share_group_id");
+
         builder.HasIndex(e => e.ProjectId)
             .HasDatabaseName("ix_time_entries_project_id");
 
@@ -89,6 +107,11 @@ public class TimeEntryConfiguration : IEntityTypeConfiguration<TimeEntry>
             .WithMany(u => u.TimeEntries)
             .HasForeignKey(e => e.UserId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne(e => e.SubmittedByUser)
+            .WithMany()
+            .HasForeignKey(e => e.SubmittedByUserId)
+            .OnDelete(DeleteBehavior.SetNull);
 
         builder.HasOne(e => e.Client)
             .WithMany()

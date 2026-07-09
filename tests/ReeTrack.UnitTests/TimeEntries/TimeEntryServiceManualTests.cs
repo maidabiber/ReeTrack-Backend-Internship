@@ -26,7 +26,15 @@ public class TimeEntryServiceManualTests : IDisposable
         _db.Database.EnsureCreated();
         SeedUser();
 
-        _service = new TimeEntryService(_db, new FakeCurrentUser(_userId), new PermissiveLockedPeriodService());
+        var deps = TimeEntryServiceTestDependencies.Create();
+        _service = new TimeEntryService(
+            _db,
+            new FakeCurrentUser(_userId),
+            new PermissiveLockedPeriodService(),
+            deps.EmailSender,
+            deps.Logger,
+            deps.Configuration,
+            deps.AppOptions);
     }
 
     [Fact]
@@ -152,6 +160,48 @@ public class TimeEntryServiceManualTests : IDisposable
     public void Dispose()
     {
         _db.Dispose();
+    }
+
+    [Fact]
+    public async Task CreateSharedManualEntry_WhenMentionEmailFails_StillReturnsCreatedEntry()
+    {
+        var assigneeId = Guid.NewGuid();
+        var now = DateTime.UtcNow;
+        _db.Users.Add(new User
+        {
+            Id = assigneeId,
+            Email = "assignee@reetrack.test",
+            DisplayName = "Assignee",
+            Status = UserStatus.Active,
+            EmailVerified = true,
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now,
+        });
+        await _db.SaveChangesAsync();
+
+        var deps = TimeEntryServiceTestDependencies.Create();
+        deps.EmailSender.ThrowOnMentionEmail = true;
+        var service = new TimeEntryService(
+            _db,
+            new FakeCurrentUser(_userId),
+            new PermissiveLockedPeriodService(),
+            deps.EmailSender,
+            deps.Logger,
+            deps.Configuration,
+            deps.AppOptions);
+
+        var startedAtUtc = DateTime.UtcNow.AddHours(-3);
+        var endedAtUtc = DateTime.UtcNow.AddHours(-2);
+
+        var result = await service.CreateSharedManualEntryAsync(
+            [assigneeId],
+            "Shared despite email failure",
+            startedAtUtc,
+            endedAtUtc);
+
+        Assert.Single(result.Entries);
+        Assert.Equal("Pending", result.Entries[0].Status);
+        Assert.Equal(1, await _db.TimeEntries.CountAsync());
     }
 
     private void SeedUser()

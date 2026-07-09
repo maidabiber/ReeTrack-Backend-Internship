@@ -30,10 +30,15 @@ public class TimeEntryServiceUpdateTests : IDisposable
         _db.Database.EnsureCreated();
         SeedUsers();
 
+        var deps = TimeEntryServiceTestDependencies.Create();
         _service = new TimeEntryService(
             _db,
             new FakeCurrentUser(_userId),
-            new LockedPeriodService(Options.Create(new TimeEntryOptions())));
+            new LockedPeriodService(Options.Create(new TimeEntryOptions())),
+            deps.EmailSender,
+            deps.Logger,
+            deps.Configuration,
+            deps.AppOptions);
     }
 
     [Fact]
@@ -173,7 +178,15 @@ public class TimeEntryServiceUpdateTests : IDisposable
         {
             LockedBeforeUtc = DateTime.UtcNow.AddDays(-1)
         }));
-        var service = new TimeEntryService(_db, new FakeCurrentUser(_userId), lockedService);
+        var deps = TimeEntryServiceTestDependencies.Create();
+        var service = new TimeEntryService(
+            _db,
+            new FakeCurrentUser(_userId),
+            lockedService,
+            deps.EmailSender,
+            deps.Logger,
+            deps.Configuration,
+            deps.AppOptions);
 
         var entryId = await SeedManualEntry(
             DateTime.UtcNow.AddDays(-3),

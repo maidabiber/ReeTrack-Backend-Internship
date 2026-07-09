@@ -76,6 +76,13 @@ builder.Services.AddCors(o => o.AddPolicy("frontend", p => p
 
 var app = builder.Build();
 
+if (app.Environment.IsDevelopment() && !app.Environment.IsEnvironment("Testing"))
+{
+    using var scope = app.Services.CreateScope();
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    db.Database.Migrate();
+}
+
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();

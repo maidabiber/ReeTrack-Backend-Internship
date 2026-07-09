@@ -57,4 +57,49 @@ public class SmtpEmailSender : IEmailSender
         await client.SendAsync(message, cancellationToken);
         await client.DisconnectAsync(quit: true, cancellationToken);
     }
+
+    public async Task SendTimeEntryMentionEmailAsync(
+        string toEmail,
+        string assigneeName,
+        string submitterName,
+        string? description,
+        string reviewUrl,
+        string appName,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(_options.SmtpHost))
+            throw new InvalidOperationException("SMTP host is not configured.");
+
+        var subject = $"{submitterName} shared a time entry with you on {appName}";
+        var descriptionLine = string.IsNullOrWhiteSpace(description)
+            ? "No description provided."
+            : description.Trim();
+
+        var textBody =
+            $"{submitterName} logged time on your behalf in {appName}.\n\n" +
+            $"Description: {descriptionLine}\n\n" +
+            $"Review and approve: {reviewUrl}";
+
+        var htmlBody =
+            $"""
+            <p><strong>{WebUtility.HtmlEncode(submitterName)}</strong> logged time on your behalf in <strong>{WebUtility.HtmlEncode(appName)}</strong>.</p>
+            <p><strong>Description:</strong> {WebUtility.HtmlEncode(descriptionLine)}</p>
+            <p><a href="{WebUtility.HtmlEncode(reviewUrl)}">Review and approve</a></p>
+            """;
+
+        var message = new MimeMessage();
+        message.From.Add(MailboxAddress.Parse(_options.From));
+        message.To.Add(MailboxAddress.Parse(toEmail));
+        message.Subject = subject;
+        message.Body = new BodyBuilder { TextBody = textBody, HtmlBody = htmlBody }.ToMessageBody();
+
+        using var client = new SmtpClient();
+        await client.ConnectAsync(_options.SmtpHost, _options.SmtpPort, SecureSocketOptions.StartTlsWhenAvailable, cancellationToken);
+
+        if (!string.IsNullOrWhiteSpace(_options.SmtpUsername))
+            await client.AuthenticateAsync(_options.SmtpUsername, _options.SmtpPassword, cancellationToken);
+
+        await client.SendAsync(message, cancellationToken);
+        await client.DisconnectAsync(quit: true, cancellationToken);
+    }
 }

@@ -9,4 +9,13 @@ public interface IEmailSender
         string roleName,
         string appName,
         CancellationToken cancellationToken = default);
+
+    Task SendTimeEntryMentionEmailAsync(
+        string toEmail,
+        string assigneeName,
+        string submitterName,
+        string? description,
+        string reviewUrl,
+        string appName,
+        CancellationToken cancellationToken = default);
 }

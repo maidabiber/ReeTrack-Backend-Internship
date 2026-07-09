@@ -31,4 +31,21 @@ public class NoOpEmailSender : IEmailSender
 
         return Task.CompletedTask;
     }
+
+    public Task SendTimeEntryMentionEmailAsync(
+        string toEmail,
+        string assigneeName,
+        string submitterName,
+        string? description,
+        string reviewUrl,
+        string appName,
+        CancellationToken cancellationToken = default)
+    {
+        _logger.LogWarning(
+            "Email delivery is not configured (Email__SmtpHost is empty). " +
+            "Time entry mention for {ToEmail} from {SubmitterName}: {ReviewUrl}",
+            toEmail, submitterName, reviewUrl);
+
+        return Task.CompletedTask;
+    }
 }

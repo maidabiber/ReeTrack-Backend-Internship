@@ -18,10 +18,15 @@ public class TimeEntry : BaseEntity, ISoftDeletable
     public DateTime? EndedAtUtc { get; set; }
     public int DurationSeconds { get; set; }
 
+    public TimeEntryStatus Status { get; set; } = TimeEntryStatus.Confirmed;
+    public Guid? SubmittedByUserId { get; set; }
+    public Guid? ShareGroupId { get; set; }
+
     public DateTime? DeletedAtUtc { get; set; }
     public Guid? DeletedByUserId { get; set; }
 
     public User User { get; set; } = null!;
+    public User? SubmittedByUser { get; set; }
     public Client? Client { get; set; }
     public Project? Project { get; set; }
     public ProjectTask? ProjectTask { get; set; }

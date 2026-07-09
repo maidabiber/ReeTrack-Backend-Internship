@@ -102,6 +102,51 @@ public class ReeTrackWebApplicationFactory : WebApplicationFactory<Program>
         return (admin, token);
     }
 
+    public async Task<(User Member, string AccessToken)> SeedMemberAsync(
+        string email = "member@reetrack.test",
+        string displayName = "Test Member")
+    {
+        using var scope = Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
+
+        await db.Database.EnsureCreatedAsync();
+
+        if (!await db.Roles.AnyAsync())
+        {
+            var seedTimestamp = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+            db.Roles.AddRange(
+                new Role { Id = RoleIds.Admin, Name = "Admin", CreatedAtUtc = seedTimestamp, UpdatedAtUtc = seedTimestamp },
+                new Role { Id = RoleIds.Member, Name = "Member", CreatedAtUtc = seedTimestamp, UpdatedAtUtc = seedTimestamp });
+            await db.SaveChangesAsync();
+        }
+
+        var now = DateTime.UtcNow;
+        var member = new User
+        {
+            Email = email,
+            DisplayName = displayName,
+            Status = UserStatus.Active,
+            EmailVerified = true,
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now,
+            UserRoles =
+            [
+                new UserRole
+                {
+                    RoleId = RoleIds.Member,
+                    AssignedAtUtc = now
+                }
+            ]
+        };
+
+        db.Users.Add(member);
+        await db.SaveChangesAsync();
+
+        var token = jwt.CreateAccessToken(member, ["Member"], out _);
+        return (member, token);
+    }
+
     public HttpClient CreateAuthenticatedClient(string accessToken)
     {
         var client = CreateClient();

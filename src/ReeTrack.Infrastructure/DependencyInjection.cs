@@ -12,6 +12,7 @@ using ReeTrack.Infrastructure.Invitations;
 using ReeTrack.Infrastructure.Members;
 using ReeTrack.Infrastructure.Projects;
 using ReeTrack.Infrastructure.Tags;
+using ReeTrack.Infrastructure.Teammates;
 using ReeTrack.Infrastructure.TimeEntries;
 using ReeTrack.Infrastructure.Background;
 using ReeTrack.Infrastructure.Calendar;
@@ -29,6 +30,7 @@ public static class DependencyInjection
         services.Configure<EmailOptions>(configuration.GetSection(EmailOptions.SectionName));
         services.Configure<InvitationOptions>(configuration.GetSection(InvitationOptions.SectionName));
         services.Configure<AppOptions>(configuration.GetSection(AppOptions.SectionName));
+        services.Configure<TimeEntryOptions>(configuration.GetSection(TimeEntryOptions.SectionName));
         services.Configure<TimeEntryOptions>(configuration.GetSection(TimeEntryOptions.SectionName));
 
         services.AddHttpContextAccessor();
@@ -53,6 +55,7 @@ public static class DependencyInjection
 
         services.AddScoped<IInvitationService, InvitationService>();
         services.AddScoped<IMemberService, MemberService>();
+        services.AddScoped<ITeammateService, TeammateService>();
         services.AddScoped<ILockedPeriodService, LockedPeriodService>();
         services.AddScoped<ITimeEntryService, TimeEntryService>();
         services.AddScoped<IProjectService, ProjectService>();

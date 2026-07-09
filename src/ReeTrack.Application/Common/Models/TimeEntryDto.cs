@@ -10,4 +10,11 @@ public sealed class TimeEntryDto
     public DateTime? EndedAtUtc { get; init; }
     public required int DurationSeconds { get; init; }
     public required bool IsRunning { get; init; }
+    public required string Status { get; init; }
+    public Guid? SubmittedByUserId { get; init; }
+    public string? SubmittedByDisplayName { get; init; }
+    public Guid? AssigneeUserId { get; init; }
+    public string? AssigneeDisplayName { get; init; }
+    public Guid? ShareGroupId { get; init; }
+    public IReadOnlyList<TimeEntryParticipantDto> Participants { get; init; } = [];
 }
