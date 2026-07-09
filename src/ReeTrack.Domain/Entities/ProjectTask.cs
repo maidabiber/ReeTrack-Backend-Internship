@@ -9,6 +9,7 @@ public class ProjectTask : BaseEntity, ISoftDeletable
     public string Name { get; set; } = string.Empty;
     public ProjectTaskStatus Status { get; set; }
     public Guid? AssignedToUserId { get; set; }
+    public decimal? TimeEstimateHours { get; set; }
 
     public DateTime? DeletedAtUtc { get; set; }
     public Guid? DeletedByUserId { get; set; }

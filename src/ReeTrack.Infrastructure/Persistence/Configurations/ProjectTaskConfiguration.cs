@@ -33,6 +33,10 @@ public class ProjectTaskConfiguration : IEntityTypeConfiguration<ProjectTask>
         builder.Property(t => t.AssignedToUserId)
             .HasColumnName("assigned_to_user_id");
 
+        builder.Property(t => t.TimeEstimateHours)
+            .HasColumnName("time_estimate_hours")
+            .HasPrecision(10, 2);
+
         builder.Property(t => t.CreatedAtUtc)
             .HasColumnName("created_at_utc")
             .IsRequired();
@@ -54,6 +58,11 @@ public class ProjectTaskConfiguration : IEntityTypeConfiguration<ProjectTask>
 
         builder.HasIndex(t => t.AssignedToUserId)
             .HasDatabaseName("ix_project_tasks_assigned_to_user_id");
+
+        builder.HasIndex(t => new { t.ProjectId, t.Name })
+            .IsUnique()
+            .HasDatabaseName("ix_project_tasks_project_id_name")
+            .HasFilter("deleted_at_utc IS NULL");
 
         builder.HasOne(t => t.Project)
             .WithMany(p => p.Tasks)

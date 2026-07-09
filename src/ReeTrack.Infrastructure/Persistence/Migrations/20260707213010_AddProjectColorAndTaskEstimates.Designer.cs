@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using ReeTrack.Infrastructure.Persistence;
@@ -11,9 +12,11 @@ using ReeTrack.Infrastructure.Persistence;
 namespace ReeTrack.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260707213010_AddProjectColorAndTaskEstimates")]
+    partial class AddProjectColorAndTaskEstimates
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -342,76 +345,6 @@ namespace ReeTrack.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("ReeTrack.Domain.Entities.SyncedCalendarEvent", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id")
-                        .HasDefaultValueSql("gen_random_uuid()");
-
-                    b.Property<Guid>("ConnectionId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("connection_id");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at_utc");
-
-                    b.Property<string>("Description")
-                        .HasColumnType("text")
-                        .HasColumnName("description");
-
-                    b.Property<DateTime>("EndAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("end_at_utc");
-
-                    b.Property<string>("ExternalEventId")
-                        .IsRequired()
-                        .HasMaxLength(512)
-                        .HasColumnType("character varying(512)")
-                        .HasColumnName("external_event_id");
-
-                    b.Property<string>("HtmlLink")
-                        .HasColumnType("text")
-                        .HasColumnName("html_link");
-
-                    b.Property<bool>("IsAllDay")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_all_day");
-
-                    b.Property<string>("Location")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)")
-                        .HasColumnName("location");
-
-                    b.Property<DateTime?>("RawUpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("raw_updated_at_utc");
-
-                    b.Property<DateTime>("StartAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("start_at_utc");
-
-                    b.Property<string>("Title")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)")
-                        .HasColumnName("title");
-
-                    b.Property<DateTime>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at_utc");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ConnectionId", "ExternalEventId")
-                        .IsUnique()
-                        .HasDatabaseName("ix_synced_calendar_events_connection_id_external_event_id");
-
-                    b.ToTable("synced_calendar_events", (string)null);
-                });
-
             modelBuilder.Entity("ReeTrack.Domain.Entities.Tag", b =>
                 {
                     b.Property<Guid>("Id")
@@ -627,71 +560,6 @@ namespace ReeTrack.Infrastructure.Persistence.Migrations
                     b.ToTable("users", (string)null);
                 });
 
-            modelBuilder.Entity("ReeTrack.Domain.Entities.UserCalendarConnection", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id")
-                        .HasDefaultValueSql("gen_random_uuid()");
-
-                    b.Property<string>("AccessToken")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("access_token");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at_utc");
-
-                    b.Property<DateTime>("ExpirationDateTime")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("expiration_date_time");
-
-                    b.Property<string>("LastSyncError")
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)")
-                        .HasColumnName("last_sync_error");
-
-                    b.Property<DateTime?>("LastSyncedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("last_synced_at_utc");
-
-                    b.Property<string>("ProviderAccountId")
-                        .HasMaxLength(320)
-                        .HasColumnType("character varying(320)")
-                        .HasColumnName("provider_account_id");
-
-                    b.Property<short>("ProviderType")
-                        .HasColumnType("smallint")
-                        .HasColumnName("provider_type");
-
-                    b.Property<string>("RefreshToken")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("refresh_token");
-
-                    b.Property<short>("SyncStatus")
-                        .HasColumnType("smallint")
-                        .HasColumnName("sync_status");
-
-                    b.Property<DateTime>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at_utc");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("user_id");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("UserId", "ProviderType")
-                        .IsUnique()
-                        .HasDatabaseName("ix_user_calendar_connections_user_id_provider_type");
-
-                    b.ToTable("user_calendar_connections", (string)null);
-                });
-
             modelBuilder.Entity("ReeTrack.Domain.Entities.UserRole", b =>
                 {
                     b.Property<Guid>("UserId")
@@ -828,17 +696,6 @@ namespace ReeTrack.Infrastructure.Persistence.Migrations
                     b.Navigation("Project");
                 });
 
-            modelBuilder.Entity("ReeTrack.Domain.Entities.SyncedCalendarEvent", b =>
-                {
-                    b.HasOne("ReeTrack.Domain.Entities.UserCalendarConnection", "Connection")
-                        .WithMany("SyncedEvents")
-                        .HasForeignKey("ConnectionId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Connection");
-                });
-
             modelBuilder.Entity("ReeTrack.Domain.Entities.TimeEntry", b =>
                 {
                     b.HasOne("ReeTrack.Domain.Entities.Client", "Client")
@@ -888,17 +745,6 @@ namespace ReeTrack.Infrastructure.Persistence.Migrations
                     b.Navigation("Tag");
 
                     b.Navigation("TimeEntry");
-                });
-
-            modelBuilder.Entity("ReeTrack.Domain.Entities.UserCalendarConnection", b =>
-                {
-                    b.HasOne("ReeTrack.Domain.Entities.User", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("ReeTrack.Domain.Entities.UserRole", b =>
@@ -967,11 +813,6 @@ namespace ReeTrack.Infrastructure.Persistence.Migrations
                     b.Navigation("TimeEntries");
 
                     b.Navigation("UserRoles");
-                });
-
-            modelBuilder.Entity("ReeTrack.Domain.Entities.UserCalendarConnection", b =>
-                {
-                    b.Navigation("SyncedEvents");
                 });
 #pragma warning restore 612, 618
         }

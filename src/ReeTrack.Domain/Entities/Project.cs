@@ -15,6 +15,7 @@ public class Project : BaseEntity, ISoftDeletable
     public decimal? FixedFeeAmount { get; set; }
     public decimal? HourlyRate { get; set; }
     public decimal? TimeEstimateHours { get; set; }
+    public string? Color { get; set; }
 
     public DateTime? DeletedAtUtc { get; set; }
     public Guid? DeletedByUserId { get; set; }

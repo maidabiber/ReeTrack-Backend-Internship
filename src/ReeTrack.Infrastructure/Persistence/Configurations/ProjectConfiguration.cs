@@ -57,6 +57,10 @@ public class ProjectConfiguration : IEntityTypeConfiguration<Project>
             .HasColumnName("time_estimate_hours")
             .HasPrecision(10, 2);
 
+        builder.Property(p => p.Color)
+            .HasColumnName("color")
+            .HasMaxLength(7);
+
         builder.Property(p => p.CreatedAtUtc)
             .HasColumnName("created_at_utc")
             .IsRequired();
@@ -75,6 +79,11 @@ public class ProjectConfiguration : IEntityTypeConfiguration<Project>
 
         builder.HasIndex(p => p.ClientId)
             .HasDatabaseName("ix_projects_client_id");
+
+        builder.HasIndex(p => p.Name)
+            .IsUnique()
+            .HasDatabaseName("ix_projects_name")
+            .HasFilter("deleted_at_utc IS NULL");
 
         builder.HasOne(p => p.Client)
             .WithMany(c => c.Projects)
