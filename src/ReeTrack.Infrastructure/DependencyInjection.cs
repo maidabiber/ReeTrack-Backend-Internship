@@ -11,6 +11,7 @@ using ReeTrack.Infrastructure.Email;
 using ReeTrack.Infrastructure.Invitations;
 using ReeTrack.Infrastructure.Members;
 using ReeTrack.Infrastructure.Projects;
+using ReeTrack.Infrastructure.Tags;
 using ReeTrack.Infrastructure.TimeEntries;
 using ReeTrack.Infrastructure.Background;
 using ReeTrack.Infrastructure.Calendar;
@@ -54,9 +55,9 @@ public static class DependencyInjection
         services.AddScoped<IMemberService, MemberService>();
         services.AddScoped<ILockedPeriodService, LockedPeriodService>();
         services.AddScoped<ITimeEntryService, TimeEntryService>();
-        services.AddScoped<IClientService, ClientService>();
         services.AddScoped<IProjectService, ProjectService>();
         services.AddScoped<IProjectTaskService, ProjectTaskService>();
+        services.AddScoped<ITagService, TagService>();
         services.AddScoped<IClientService, ClientService>();
 
         services.AddScoped<ICalendarProvider, GoogleCalendarProvider>();
