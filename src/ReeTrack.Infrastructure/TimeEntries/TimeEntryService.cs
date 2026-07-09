@@ -246,6 +246,24 @@ public class TimeEntryService : ITimeEntryService
         return "This entry overlaps with an existing time entry. Save anyway?";
     }
 
+    public async Task<IReadOnlyList<TimeEntryDto>> ListByDateRangeAsync(
+        DateTime fromUtc,
+        DateTime toUtc,
+        CancellationToken cancellationToken = default)
+    {
+        var userId = RequireUserId();
+        var now = DateTime.UtcNow;
+
+        var entries = await _db.TimeEntries
+            .AsNoTracking()
+            .Where(e => e.UserId == userId && e.StartedAtUtc != null)
+            .Where(e => e.StartedAtUtc < toUtc && (e.EndedAtUtc ?? now) > fromUtc)
+            .OrderBy(e => e.StartedAtUtc)
+            .ToListAsync(cancellationToken);
+
+        return entries.Select(MapTimeEntry).ToList();
+    }
+
     private Guid RequireUserId() =>
         _currentUser.UserId ?? throw new AppException("Authentication is required.", 401);
 

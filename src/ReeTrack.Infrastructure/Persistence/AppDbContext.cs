@@ -20,6 +20,8 @@ public class AppDbContext : DbContext, IApplicationDbContext
     public DbSet<Tag> Tags => Set<Tag>();
     public DbSet<TimeEntry> TimeEntries => Set<TimeEntry>();
     public DbSet<TimeEntryTag> TimeEntryTags => Set<TimeEntryTag>();
+    public DbSet<UserCalendarConnection> UserCalendarConnections => Set<UserCalendarConnection>();
+    public DbSet<SyncedCalendarEvent> SyncedCalendarEvents => Set<SyncedCalendarEvent>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

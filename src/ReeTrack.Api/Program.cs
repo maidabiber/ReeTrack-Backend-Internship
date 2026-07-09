@@ -32,6 +32,8 @@ builder.Services.AddScoped<IApplicationDbContext>(provider => provider.GetRequir
 
 builder.Services.AddInfrastructure(builder.Configuration);
 
+builder.Services.AddDataProtection();
+
 var jwtOptions = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>()
     ?? new JwtOptions();
 

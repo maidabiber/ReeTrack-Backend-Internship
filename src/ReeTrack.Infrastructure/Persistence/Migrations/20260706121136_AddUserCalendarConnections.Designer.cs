@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using ReeTrack.Infrastructure.Persistence;
@@ -11,13 +12,15 @@ using ReeTrack.Infrastructure.Persistence;
 namespace ReeTrack.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260706121136_AddUserCalendarConnections")]
+    partial class AddUserCalendarConnections
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.9")
+                .HasAnnotation("ProductVersion", "10.0.4")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -33,14 +36,6 @@ namespace ReeTrack.Infrastructure.Persistence.Migrations
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at_utc");
-
-                    b.Property<DateTime?>("DeletedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("deleted_at_utc");
-
-                    b.Property<Guid?>("DeletedByUserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("deleted_by_user_id");
 
                     b.Property<bool>("IsActive")
                         .ValueGeneratedOnAdd()
@@ -62,8 +57,7 @@ namespace ReeTrack.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("Name")
                         .IsUnique()
-                        .HasDatabaseName("ix_clients_name")
-                        .HasFilter("deleted_at_utc IS NULL");
+                        .HasDatabaseName("ix_clients_name");
 
                     b.ToTable("clients", (string)null);
                 });
@@ -172,14 +166,6 @@ namespace ReeTrack.Infrastructure.Persistence.Migrations
                         .HasDefaultValue("EUR")
                         .HasColumnName("currency_code");
 
-                    b.Property<DateTime?>("DeletedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("deleted_at_utc");
-
-                    b.Property<Guid?>("DeletedByUserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("deleted_by_user_id");
-
                     b.Property<decimal?>("FixedFeeAmount")
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)")
@@ -232,14 +218,6 @@ namespace ReeTrack.Infrastructure.Persistence.Migrations
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at_utc");
-
-                    b.Property<DateTime?>("DeletedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("deleted_at_utc");
-
-                    b.Property<Guid?>("DeletedByUserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("deleted_by_user_id");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -409,14 +387,6 @@ namespace ReeTrack.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at_utc");
 
-                    b.Property<DateTime?>("DeletedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("deleted_at_utc");
-
-                    b.Property<Guid?>("DeletedByUserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("deleted_by_user_id");
-
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -431,8 +401,7 @@ namespace ReeTrack.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("Name")
                         .IsUnique()
-                        .HasDatabaseName("ix_tags_name")
-                        .HasFilter("deleted_at_utc IS NULL");
+                        .HasDatabaseName("ix_tags_name");
 
                     b.ToTable("tags", (string)null);
                 });
@@ -452,14 +421,6 @@ namespace ReeTrack.Infrastructure.Persistence.Migrations
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at_utc");
-
-                    b.Property<DateTime?>("DeletedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("deleted_at_utc");
-
-                    b.Property<Guid?>("DeletedByUserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("deleted_by_user_id");
 
                     b.Property<string>("Description")
                         .HasMaxLength(1000)
@@ -521,7 +482,7 @@ namespace ReeTrack.Infrastructure.Persistence.Migrations
                     b.HasIndex("UserId")
                         .IsUnique()
                         .HasDatabaseName("ix_time_entries_user_running")
-                        .HasFilter("mode = 0 AND ended_at_utc IS NULL AND deleted_at_utc IS NULL");
+                        .HasFilter("mode = 0 AND ended_at_utc IS NULL");
 
                     b.ToTable("time_entries", (string)null);
                 });
@@ -698,59 +659,6 @@ namespace ReeTrack.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_user_roles_role_id");
 
                     b.ToTable("user_roles", (string)null);
-                });
-
-            modelBuilder.Entity("ReeTrack.Infrastructure.Auditing.AuditLog", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<short>("Action")
-                        .HasColumnType("smallint")
-                        .HasColumnName("action");
-
-                    b.Property<Guid?>("ActorUserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("actor_user_id");
-
-                    b.Property<string>("EntityId")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("entity_id");
-
-                    b.Property<string>("EntityType")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("entity_type");
-
-                    b.Property<string>("NewValuesJson")
-                        .HasColumnType("jsonb")
-                        .HasColumnName("new_values");
-
-                    b.Property<DateTime>("OccurredAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("occurred_at_utc");
-
-                    b.Property<string>("OldValuesJson")
-                        .HasColumnType("jsonb")
-                        .HasColumnName("old_values");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ActorUserId")
-                        .HasDatabaseName("ix_audit_logs_actor_user_id");
-
-                    b.HasIndex("OccurredAtUtc")
-                        .HasDatabaseName("ix_audit_logs_occurred_at_utc");
-
-                    b.HasIndex("EntityType", "EntityId")
-                        .HasDatabaseName("ix_audit_logs_entity");
-
-                    b.ToTable("audit_logs", (string)null);
                 });
 
             modelBuilder.Entity("ReeTrack.Domain.Entities.Invitation", b =>

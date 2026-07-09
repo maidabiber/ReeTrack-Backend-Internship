@@ -17,4 +17,9 @@ public class GoogleAuthOptions
     /// Optional. When set, only this email may become the first admin on initial setup.
     /// </summary>
     public string? AdminEmail { get; set; }
+
+    /// <summary>
+    /// OAuth redirect URI for Google Calendar integration (separate from sign-in).
+    /// </summary>
+    public string CalendarRedirectUri { get; set; } = string.Empty;
 }

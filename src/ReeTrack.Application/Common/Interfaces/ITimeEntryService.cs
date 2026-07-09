@@ -33,4 +33,9 @@ public interface ITimeEntryService
         bool isBillable,
         bool confirmOverlap = false,
         CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<TimeEntryDto>> ListByDateRangeAsync(
+        DateTime fromUtc,
+        DateTime toUtc,
+        CancellationToken cancellationToken = default);
 }

@@ -1,14 +1,20 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using ReeTrack.Application.Calendar;
 using ReeTrack.Application.Common.Interfaces;
 using ReeTrack.Application.Common.Options;
 using ReeTrack.Infrastructure.Auditing;
+using ReeTrack.Application.Integrations.Calendar;
 using ReeTrack.Infrastructure.Auth;
 using ReeTrack.Infrastructure.Clients;
 using ReeTrack.Infrastructure.Email;
 using ReeTrack.Infrastructure.Invitations;
 using ReeTrack.Infrastructure.Members;
 using ReeTrack.Infrastructure.TimeEntries;
+using ReeTrack.Infrastructure.Background;
+using ReeTrack.Infrastructure.Calendar;
+using ReeTrack.Infrastructure.Integrations.Calendar;
+using ReeTrack.Infrastructure.Integrations.Calendar.Google;
 
 namespace ReeTrack.Infrastructure;
 
@@ -24,8 +30,11 @@ public static class DependencyInjection
         services.Configure<TimeEntryOptions>(configuration.GetSection(TimeEntryOptions.SectionName));
 
         services.AddHttpContextAccessor();
+        services.Configure<CalendarSyncOptions>(configuration.GetSection(CalendarSyncOptions.SectionName));
 
         services.AddHttpClient<IGoogleCodeExchanger, GoogleCodeExchanger>();
+        services.AddHttpClient<GoogleCalendarProvider>();
+
         services.AddScoped<IGoogleOAuthService, GoogleOAuthService>();
         services.AddScoped<IJwtTokenService, JwtTokenService>();
         services.AddScoped<IAuthService, AuthService>();
@@ -45,6 +54,14 @@ public static class DependencyInjection
         services.AddScoped<ILockedPeriodService, LockedPeriodService>();
         services.AddScoped<ITimeEntryService, TimeEntryService>();
         services.AddScoped<IClientService, ClientService>();
+
+        services.AddScoped<ICalendarProvider, GoogleCalendarProvider>();
+        services.AddScoped<ICalendarProviderRegistry, CalendarProviderRegistry>();
+        services.AddScoped<ITokenProtector, DataProtectionTokenProtector>();
+        services.AddScoped<ICalendarIntegrationService, CalendarIntegrationService>();
+        services.AddScoped<ICalendarSyncService, CalendarSyncService>();
+        services.AddScoped<ICalendarViewService, CalendarViewService>();
+        services.AddHostedService<CalendarSyncBackgroundService>();
 
         return services;
     }

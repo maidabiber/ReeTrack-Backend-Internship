@@ -15,6 +15,8 @@ public interface IApplicationDbContext
     DbSet<Tag> Tags { get; }
     DbSet<TimeEntry> TimeEntries { get; }
     DbSet<TimeEntryTag> TimeEntryTags { get; }
+    DbSet<UserCalendarConnection> UserCalendarConnections { get; }
+    DbSet<SyncedCalendarEvent> SyncedCalendarEvents { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }
