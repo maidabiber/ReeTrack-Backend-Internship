@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using ReeTrack.Api.Contracts;
 using ReeTrack.Application.Common.Interfaces;
 
 namespace ReeTrack.Api.Controllers;
@@ -27,10 +28,4 @@ public class SetupController : ControllerBase
             RequiresAdminLogin = status.RequiresAdminLogin
         });
     }
-}
-
-public sealed class SetupStatusResponse
-{
-    public required bool IsFirstRun { get; init; }
-    public required bool RequiresAdminLogin { get; init; }
 }

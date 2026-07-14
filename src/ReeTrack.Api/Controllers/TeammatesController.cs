@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using ReeTrack.Api.Contracts;
 using ReeTrack.Application.Common.Interfaces;
 using ReeTrack.Application.Common.Models;
 
@@ -31,11 +32,4 @@ public class TeammatesController : ControllerBase
             Email = teammate.Email,
             DisplayName = teammate.DisplayName
         };
-}
-
-public sealed class TeammateResponse
-{
-    public required Guid Id { get; init; }
-    public required string Email { get; init; }
-    public string? DisplayName { get; init; }
 }

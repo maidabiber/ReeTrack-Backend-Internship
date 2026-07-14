@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using ReeTrack.Api.Contracts;
 using ReeTrack.Application.Common.Interfaces;
 using ReeTrack.Application.Common.Models;
 
@@ -69,24 +70,4 @@ public class ClientsController : ControllerBase
             ProjectCount = client.ProjectCount,
             CreatedAtUtc = client.CreatedAtUtc
         };
-}
-
-public sealed class CreateClientRequest
-{
-    public string? Name { get; set; }
-}
-
-public sealed class UpdateClientRequest
-{
-    public string? Name { get; set; }
-    public bool? IsActive { get; set; }
-}
-
-public sealed class ClientResponse
-{
-    public required Guid Id { get; init; }
-    public required string Name { get; init; }
-    public required bool IsActive { get; init; }
-    public required int ProjectCount { get; init; }
-    public required DateTime CreatedAtUtc { get; init; }
 }
