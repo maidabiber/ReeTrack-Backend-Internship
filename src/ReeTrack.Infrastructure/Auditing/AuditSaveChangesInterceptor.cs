@@ -8,8 +8,8 @@ using ReeTrack.Domain.Common;
 namespace ReeTrack.Infrastructure.Auditing;
 
 /// <summary>
-/// Writes an <see cref="AuditLog"/> row for every create/update/delete, in the same
-/// SaveChanges (and therefore the same transaction) as the change itself.
+/// Writes an <see cref="AuditLog"/> row for create/update/delete of <see cref="IAuditable"/>
+/// entities, in the same SaveChanges (and therefore the same transaction) as the change itself.
 /// Also centralizes BaseEntity Id/timestamp stamping so services no longer need to.
 /// </summary>
 public class AuditSaveChangesInterceptor : SaveChangesInterceptor
@@ -59,6 +59,9 @@ public class AuditSaveChangesInterceptor : SaveChangesInterceptor
                 continue;
 
             StampBaseEntity(entry, now);
+
+            if (entry.Entity is not IAuditable)
+                continue;
 
             var auditLog = BuildAuditLog(entry, actorId, now);
             if (auditLog is not null)

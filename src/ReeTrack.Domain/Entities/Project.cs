@@ -3,7 +3,7 @@ using ReeTrack.Domain.Enums;
 
 namespace ReeTrack.Domain.Entities;
 
-public class Project : BaseEntity, ISoftDeletable
+public class Project : BaseEntity, ISoftDeletable, IAuditable
 {
     public Guid ClientId { get; set; }
     public string Name { get; set; } = string.Empty;

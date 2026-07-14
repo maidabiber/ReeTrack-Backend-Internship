@@ -3,7 +3,7 @@ using ReeTrack.Domain.Enums;
 
 namespace ReeTrack.Domain.Entities;
 
-public class TimeEntry : BaseEntity, ISoftDeletable
+public class TimeEntry : BaseEntity, ISoftDeletable, IAuditable
 {
     public Guid UserId { get; set; }
 

@@ -3,7 +3,7 @@ using ReeTrack.Domain.Enums;
 
 namespace ReeTrack.Domain.Entities;
 
-public class Invitation : BaseEntity
+public class Invitation : BaseEntity, IAuditable
 {
     public string Email { get; set; } = string.Empty;
     public short RoleId { get; set; }

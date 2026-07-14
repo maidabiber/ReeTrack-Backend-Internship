@@ -1,6 +1,8 @@
+using ReeTrack.Domain.Common;
+
 namespace ReeTrack.Domain.Entities;
 
-public class TimeEntryTag
+public class TimeEntryTag : IAuditable
 {
     public Guid TimeEntryId { get; set; }
     public Guid TagId { get; set; }

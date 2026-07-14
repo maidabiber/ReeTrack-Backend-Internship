@@ -2,7 +2,7 @@ using ReeTrack.Domain.Common;
 
 namespace ReeTrack.Domain.Entities;
 
-public class Client : BaseEntity, ISoftDeletable
+public class Client : BaseEntity, ISoftDeletable, IAuditable
 {
     public string Name { get; set; } = string.Empty;
     public bool IsActive { get; set; } = true;

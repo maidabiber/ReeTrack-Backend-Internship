@@ -3,7 +3,7 @@ using ReeTrack.Domain.Enums;
 
 namespace ReeTrack.Domain.Entities;
 
-public class User : BaseEntity
+public class User : BaseEntity, IAuditable
 {
     public string Email { get; set; } = string.Empty;
     public string? GoogleSub { get; set; }

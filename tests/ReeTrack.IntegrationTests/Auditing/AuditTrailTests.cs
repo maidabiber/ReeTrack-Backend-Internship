@@ -55,6 +55,61 @@ public class AuditTrailTests : IClassFixture<ReeTrackWebApplicationFactory>
     }
 
     [Fact]
+    public async Task NonAuditableEntity_DoesNotWriteAuditRow_WhileAuditableStillDoes()
+    {
+        await _factory.SeedAdminAsync();
+
+        Guid connectionId;
+        Guid entryId;
+        Guid userId;
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            userId = (await db.Users.FirstAsync()).Id;
+            var now = DateTime.UtcNow;
+
+            var connection = new UserCalendarConnection
+            {
+                UserId = userId,
+                ProviderType = CalendarProviderType.Google,
+                AccessToken = "access-token",
+                RefreshToken = "refresh-token",
+                ExpirationDateTime = now.AddHours(1),
+                SyncStatus = CalendarSyncStatus.Idle
+            };
+            db.UserCalendarConnections.Add(connection);
+
+            var entry = new TimeEntry
+            {
+                UserId = userId,
+                Description = "auditable alongside calendar",
+                Mode = TimeEntryMode.Manual,
+                DurationSeconds = 300
+            };
+            db.TimeEntries.Add(entry);
+            await db.SaveChangesAsync();
+
+            connectionId = connection.Id;
+            entryId = entry.Id;
+        }
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+            Assert.False(await db.Set<AuditLog>().AnyAsync(l =>
+                l.EntityType == nameof(UserCalendarConnection) &&
+                l.EntityId == connectionId.ToString()));
+
+            Assert.True(await db.Set<AuditLog>().AnyAsync(l =>
+                l.EntityType == nameof(TimeEntry) &&
+                l.EntityId == entryId.ToString() &&
+                l.Action == AuditAction.Created));
+        }
+    }
+
+    [Fact]
     public async Task SoftDeleteAndRestore_TimeEntry_WritesDeletedAndRestoredRows()
     {
         await _factory.SeedAdminAsync();

@@ -1,6 +1,8 @@
+using ReeTrack.Domain.Common;
+
 namespace ReeTrack.Domain.Entities;
 
-public class UserRole
+public class UserRole : IAuditable
 {
     public Guid UserId { get; set; }
     public short RoleId { get; set; }
