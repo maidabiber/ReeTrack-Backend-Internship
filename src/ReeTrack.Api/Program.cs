@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.IdentityModel.Tokens;
 using ReeTrack.Application.Common.Interfaces;
 using ReeTrack.Application.Common.Options;
+using ReeTrack.Api.Middleware;
 using ReeTrack.Infrastructure;
 using ReeTrack.Infrastructure.Auditing;
 using ReeTrack.Infrastructure.Persistence;
@@ -64,6 +65,9 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 
 builder.Services.AddAuthorization();
 
+builder.Services.AddExceptionHandler<AppExceptionHandler>();
+builder.Services.AddProblemDetails();
+
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 
@@ -89,6 +93,7 @@ if (app.Environment.IsDevelopment())
     app.MapScalarApiReference();
 }
 
+app.UseExceptionHandler();
 app.UseHttpsRedirection();
 app.UseCors("frontend");
 app.UseAuthentication();

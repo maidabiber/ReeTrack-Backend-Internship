@@ -1,6 +1,5 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using ReeTrack.Application.Common.Exceptions;
 using ReeTrack.Application.Common.Interfaces;
 using ReeTrack.Application.Common.Models;
 
@@ -27,29 +26,15 @@ public class ProjectsController : ControllerBase
         [FromQuery] Guid? clientId,
         CancellationToken cancellationToken)
     {
-        try
-        {
-            var projects = await _projectService.ListAsync(status, clientId, cancellationToken);
-            return Ok(projects.Select(MapProject).ToList());
-        }
-        catch (AppException ex)
-        {
-            return StatusCode(ex.StatusCode, new { message = ex.Message });
-        }
+        var projects = await _projectService.ListAsync(status, clientId, cancellationToken);
+        return Ok(projects.Select(MapProject).ToList());
     }
 
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<ProjectResponse>> Get(Guid id, CancellationToken cancellationToken)
     {
-        try
-        {
-            var project = await _projectService.GetAsync(id, cancellationToken);
-            return Ok(MapProject(project));
-        }
-        catch (AppException ex)
-        {
-            return StatusCode(ex.StatusCode, new { message = ex.Message });
-        }
+        var project = await _projectService.GetAsync(id, cancellationToken);
+        return Ok(MapProject(project));
     }
 
     [HttpPost]
@@ -57,28 +42,21 @@ public class ProjectsController : ControllerBase
         [FromBody] CreateProjectRequest? request,
         CancellationToken cancellationToken)
     {
-        try
+        var input = new CreateProjectInput
         {
-            var input = new CreateProjectInput
-            {
-                Name = request?.Name,
-                ClientId = request?.ClientId,
-                BillingType = request?.BillingType,
-                CurrencyCode = request?.CurrencyCode,
-                HourlyRate = request?.HourlyRate,
-                FixedFeeAmount = request?.FixedFeeAmount,
-                BudgetAmount = request?.BudgetAmount,
-                TimeEstimateHours = request?.TimeEstimateHours,
-                Color = request?.Color
-            };
+            Name = request?.Name,
+            ClientId = request?.ClientId,
+            BillingType = request?.BillingType,
+            CurrencyCode = request?.CurrencyCode,
+            HourlyRate = request?.HourlyRate,
+            FixedFeeAmount = request?.FixedFeeAmount,
+            BudgetAmount = request?.BudgetAmount,
+            TimeEstimateHours = request?.TimeEstimateHours,
+            Color = request?.Color
+        };
 
-            var project = await _projectService.CreateAsync(input, cancellationToken);
-            return Ok(MapProject(project));
-        }
-        catch (AppException ex)
-        {
-            return StatusCode(ex.StatusCode, new { message = ex.Message });
-        }
+        var project = await _projectService.CreateAsync(input, cancellationToken);
+        return Ok(MapProject(project));
     }
 
     [HttpPatch("{id:guid}")]
@@ -87,43 +65,29 @@ public class ProjectsController : ControllerBase
         [FromBody] UpdateProjectRequest? request,
         CancellationToken cancellationToken)
     {
-        try
+        var input = new UpdateProjectInput
         {
-            var input = new UpdateProjectInput
-            {
-                Name = request?.Name,
-                ClientId = request?.ClientId,
-                Status = request?.Status,
-                BillingType = request?.BillingType,
-                CurrencyCode = request?.CurrencyCode,
-                HourlyRate = request?.HourlyRate,
-                FixedFeeAmount = request?.FixedFeeAmount,
-                BudgetAmount = request?.BudgetAmount,
-                TimeEstimateHours = request?.TimeEstimateHours,
-                Color = request?.Color
-            };
+            Name = request?.Name,
+            ClientId = request?.ClientId,
+            Status = request?.Status,
+            BillingType = request?.BillingType,
+            CurrencyCode = request?.CurrencyCode,
+            HourlyRate = request?.HourlyRate,
+            FixedFeeAmount = request?.FixedFeeAmount,
+            BudgetAmount = request?.BudgetAmount,
+            TimeEstimateHours = request?.TimeEstimateHours,
+            Color = request?.Color
+        };
 
-            var project = await _projectService.UpdateAsync(id, input, cancellationToken);
-            return Ok(MapProject(project));
-        }
-        catch (AppException ex)
-        {
-            return StatusCode(ex.StatusCode, new { message = ex.Message });
-        }
+        var project = await _projectService.UpdateAsync(id, input, cancellationToken);
+        return Ok(MapProject(project));
     }
 
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)
     {
-        try
-        {
-            await _projectService.DeleteAsync(id, cancellationToken);
-            return NoContent();
-        }
-        catch (AppException ex)
-        {
-            return StatusCode(ex.StatusCode, new { message = ex.Message });
-        }
+        await _projectService.DeleteAsync(id, cancellationToken);
+        return NoContent();
     }
 
     internal static ProjectResponse MapProject(ProjectDto project) =>

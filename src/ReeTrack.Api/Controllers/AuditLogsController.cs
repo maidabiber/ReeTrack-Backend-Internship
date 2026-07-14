@@ -1,6 +1,5 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using ReeTrack.Application.Common.Exceptions;
 using ReeTrack.Application.Common.Interfaces;
 using ReeTrack.Application.Common.Models;
 
@@ -30,25 +29,18 @@ public class AuditLogsController : ControllerBase
         [FromQuery] DateTime? toUtc = null,
         CancellationToken cancellationToken = default)
     {
-        try
+        var result = await _auditLogService.ListAsync(new AuditLogQuery
         {
-            var result = await _auditLogService.ListAsync(new AuditLogQuery
-            {
-                Page = page,
-                PageSize = pageSize,
-                EntityType = entityType,
-                EntityId = entityId,
-                ActorUserId = actorUserId,
-                Action = action,
-                FromUtc = fromUtc,
-                ToUtc = toUtc
-            }, cancellationToken);
+            Page = page,
+            PageSize = pageSize,
+            EntityType = entityType,
+            EntityId = entityId,
+            ActorUserId = actorUserId,
+            Action = action,
+            FromUtc = fromUtc,
+            ToUtc = toUtc
+        }, cancellationToken);
 
-            return Ok(result);
-        }
-        catch (AppException ex)
-        {
-            return StatusCode(ex.StatusCode, new { message = ex.Message });
-        }
+        return Ok(result);
     }
 }

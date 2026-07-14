@@ -1,6 +1,5 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using ReeTrack.Application.Common.Exceptions;
 using ReeTrack.Application.Common.Interfaces;
 using ReeTrack.Application.Common.Models;
 
@@ -27,15 +26,8 @@ public class ProjectTasksController : ControllerBase
         [FromQuery] string? status,
         CancellationToken cancellationToken)
     {
-        try
-        {
-            var tasks = await _taskService.ListAsync(projectId, status, cancellationToken);
-            return Ok(tasks.Select(MapTask).ToList());
-        }
-        catch (AppException ex)
-        {
-            return StatusCode(ex.StatusCode, new { message = ex.Message });
-        }
+        var tasks = await _taskService.ListAsync(projectId, status, cancellationToken);
+        return Ok(tasks.Select(MapTask).ToList());
     }
 
     [HttpPost]
@@ -44,22 +36,15 @@ public class ProjectTasksController : ControllerBase
         [FromBody] CreateTaskRequest? request,
         CancellationToken cancellationToken)
     {
-        try
+        var input = new CreateTaskInput
         {
-            var input = new CreateTaskInput
-            {
-                Name = request?.Name,
-                AssignedToUserId = request?.AssignedToUserId,
-                TimeEstimateHours = request?.TimeEstimateHours
-            };
+            Name = request?.Name,
+            AssignedToUserId = request?.AssignedToUserId,
+            TimeEstimateHours = request?.TimeEstimateHours
+        };
 
-            var task = await _taskService.CreateAsync(projectId, input, cancellationToken);
-            return Ok(MapTask(task));
-        }
-        catch (AppException ex)
-        {
-            return StatusCode(ex.StatusCode, new { message = ex.Message });
-        }
+        var task = await _taskService.CreateAsync(projectId, input, cancellationToken);
+        return Ok(MapTask(task));
     }
 
     [HttpPatch("{taskId:guid}")]
@@ -69,37 +54,23 @@ public class ProjectTasksController : ControllerBase
         [FromBody] UpdateTaskRequest? request,
         CancellationToken cancellationToken)
     {
-        try
+        var input = new UpdateTaskInput
         {
-            var input = new UpdateTaskInput
-            {
-                Name = request?.Name,
-                Status = request?.Status,
-                AssignedToUserId = request?.AssignedToUserId,
-                TimeEstimateHours = request?.TimeEstimateHours
-            };
+            Name = request?.Name,
+            Status = request?.Status,
+            AssignedToUserId = request?.AssignedToUserId,
+            TimeEstimateHours = request?.TimeEstimateHours
+        };
 
-            var task = await _taskService.UpdateAsync(projectId, taskId, input, cancellationToken);
-            return Ok(MapTask(task));
-        }
-        catch (AppException ex)
-        {
-            return StatusCode(ex.StatusCode, new { message = ex.Message });
-        }
+        var task = await _taskService.UpdateAsync(projectId, taskId, input, cancellationToken);
+        return Ok(MapTask(task));
     }
 
     [HttpDelete("{taskId:guid}")]
     public async Task<IActionResult> Delete(Guid projectId, Guid taskId, CancellationToken cancellationToken)
     {
-        try
-        {
-            await _taskService.DeleteAsync(projectId, taskId, cancellationToken);
-            return NoContent();
-        }
-        catch (AppException ex)
-        {
-            return StatusCode(ex.StatusCode, new { message = ex.Message });
-        }
+        await _taskService.DeleteAsync(projectId, taskId, cancellationToken);
+        return NoContent();
     }
 
     internal static TaskResponse MapTask(ProjectTaskDto task) =>

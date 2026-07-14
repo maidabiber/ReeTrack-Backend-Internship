@@ -1,6 +1,5 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using ReeTrack.Application.Common.Exceptions;
 using ReeTrack.Application.Common.Interfaces;
 using ReeTrack.Application.Common.Models;
 
@@ -26,15 +25,8 @@ public class ClientsController : ControllerBase
         [FromQuery] string? status,
         CancellationToken cancellationToken)
     {
-        try
-        {
-            var clients = await _clientService.ListAsync(status, cancellationToken);
-            return Ok(clients.Select(MapClient).ToList());
-        }
-        catch (AppException ex)
-        {
-            return StatusCode(ex.StatusCode, new { message = ex.Message });
-        }
+        var clients = await _clientService.ListAsync(status, cancellationToken);
+        return Ok(clients.Select(MapClient).ToList());
     }
 
     [HttpPost]
@@ -42,15 +34,8 @@ public class ClientsController : ControllerBase
         [FromBody] CreateClientRequest? request,
         CancellationToken cancellationToken)
     {
-        try
-        {
-            var client = await _clientService.CreateAsync(request?.Name, cancellationToken);
-            return Ok(MapClient(client));
-        }
-        catch (AppException ex)
-        {
-            return StatusCode(ex.StatusCode, new { message = ex.Message });
-        }
+        var client = await _clientService.CreateAsync(request?.Name, cancellationToken);
+        return Ok(MapClient(client));
     }
 
     [HttpPatch("{id:guid}")]
@@ -59,34 +44,20 @@ public class ClientsController : ControllerBase
         [FromBody] UpdateClientRequest? request,
         CancellationToken cancellationToken)
     {
-        try
-        {
-            var client = await _clientService.UpdateAsync(
-                id,
-                request?.Name,
-                request?.IsActive,
-                cancellationToken);
+        var client = await _clientService.UpdateAsync(
+            id,
+            request?.Name,
+            request?.IsActive,
+            cancellationToken);
 
-            return Ok(MapClient(client));
-        }
-        catch (AppException ex)
-        {
-            return StatusCode(ex.StatusCode, new { message = ex.Message });
-        }
+        return Ok(MapClient(client));
     }
 
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)
     {
-        try
-        {
-            await _clientService.DeleteAsync(id, cancellationToken);
-            return NoContent();
-        }
-        catch (AppException ex)
-        {
-            return StatusCode(ex.StatusCode, new { message = ex.Message });
-        }
+        await _clientService.DeleteAsync(id, cancellationToken);
+        return NoContent();
     }
 
     internal static ClientResponse MapClient(ClientDto client) =>

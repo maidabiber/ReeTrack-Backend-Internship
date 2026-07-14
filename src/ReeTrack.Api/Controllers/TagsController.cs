@@ -1,6 +1,5 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using ReeTrack.Application.Common.Exceptions;
 using ReeTrack.Application.Common.Interfaces;
 using ReeTrack.Application.Common.Models;
 
@@ -24,15 +23,8 @@ public class TagsController : ControllerBase
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<TagResponse>>> List(CancellationToken cancellationToken)
     {
-        try
-        {
-            var tags = await _tagService.ListAsync(cancellationToken);
-            return Ok(tags.Select(MapTag).ToList());
-        }
-        catch (AppException ex)
-        {
-            return StatusCode(ex.StatusCode, new { message = ex.Message });
-        }
+        var tags = await _tagService.ListAsync(cancellationToken);
+        return Ok(tags.Select(MapTag).ToList());
     }
 
     [HttpPost]
@@ -40,15 +32,8 @@ public class TagsController : ControllerBase
         [FromBody] CreateTagRequest? request,
         CancellationToken cancellationToken)
     {
-        try
-        {
-            var tag = await _tagService.CreateAsync(request?.Name, request?.Color, cancellationToken);
-            return Ok(MapTag(tag));
-        }
-        catch (AppException ex)
-        {
-            return StatusCode(ex.StatusCode, new { message = ex.Message });
-        }
+        var tag = await _tagService.CreateAsync(request?.Name, request?.Color, cancellationToken);
+        return Ok(MapTag(tag));
     }
 
     [HttpPatch("{id:guid}")]
@@ -57,29 +42,15 @@ public class TagsController : ControllerBase
         [FromBody] UpdateTagRequest? request,
         CancellationToken cancellationToken)
     {
-        try
-        {
-            var tag = await _tagService.UpdateAsync(id, request?.Name, request?.Color, cancellationToken);
-            return Ok(MapTag(tag));
-        }
-        catch (AppException ex)
-        {
-            return StatusCode(ex.StatusCode, new { message = ex.Message });
-        }
+        var tag = await _tagService.UpdateAsync(id, request?.Name, request?.Color, cancellationToken);
+        return Ok(MapTag(tag));
     }
 
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)
     {
-        try
-        {
-            await _tagService.DeleteAsync(id, cancellationToken);
-            return NoContent();
-        }
-        catch (AppException ex)
-        {
-            return StatusCode(ex.StatusCode, new { message = ex.Message });
-        }
+        await _tagService.DeleteAsync(id, cancellationToken);
+        return NoContent();
     }
 
     internal static TagResponse MapTag(TagDto tag) =>

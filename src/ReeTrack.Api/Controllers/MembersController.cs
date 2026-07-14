@@ -1,6 +1,5 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using ReeTrack.Application.Common.Exceptions;
 using ReeTrack.Application.Common.Interfaces;
 using ReeTrack.Application.Common.Models;
 using ReeTrack.Domain.Enums;
@@ -41,15 +40,8 @@ public class MembersController : ControllerBase
             status = parsed;
         }
 
-        try
-        {
-            var member = await _memberService.UpdateAsync(id, request.RoleId, status, cancellationToken);
-            return Ok(MapMember(member));
-        }
-        catch (AppException ex)
-        {
-            return StatusCode(ex.StatusCode, new { message = ex.Message });
-        }
+        var member = await _memberService.UpdateAsync(id, request.RoleId, status, cancellationToken);
+        return Ok(MapMember(member));
     }
 
     internal static MemberResponse MapMember(MemberDto member) =>

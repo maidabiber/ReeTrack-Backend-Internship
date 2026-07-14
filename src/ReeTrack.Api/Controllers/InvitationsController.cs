@@ -1,6 +1,5 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using ReeTrack.Application.Common.Exceptions;
 using ReeTrack.Application.Common.Interfaces;
 
 namespace ReeTrack.Api.Controllers;
@@ -22,20 +21,13 @@ public class InvitationsController : ControllerBase
         [FromBody] CreateInvitationRequest request,
         CancellationToken cancellationToken)
     {
-        try
-        {
-            var result = await _invitationService.CreateAsync(request.Email, request.RoleId, cancellationToken);
+        var result = await _invitationService.CreateAsync(request.Email, request.RoleId, cancellationToken);
 
-            return Ok(new CreateInvitationResponse
-            {
-                Member = MapMember(result.Member),
-                Invitation = MapInvitation(result.Invitation)
-            });
-        }
-        catch (AppException ex)
+        return Ok(new CreateInvitationResponse
         {
-            return StatusCode(ex.StatusCode, new { message = ex.Message });
-        }
+            Member = MapMember(result.Member),
+            Invitation = MapInvitation(result.Invitation)
+        });
     }
 
     [Authorize(Roles = "Admin")]
@@ -44,28 +36,21 @@ public class InvitationsController : ControllerBase
         [FromBody] BatchInvitationRequest request,
         CancellationToken cancellationToken)
     {
-        try
-        {
-            var results = await _invitationService.CreateManyAsync(
-                request.Emails ?? [],
-                request.RoleId,
-                cancellationToken);
+        var results = await _invitationService.CreateManyAsync(
+            request.Emails ?? [],
+            request.RoleId,
+            cancellationToken);
 
-            return Ok(new BatchInvitationResponse
-            {
-                Results = results.Select(row => new BatchInvitationRowResponse
-                {
-                    Email = row.Email,
-                    Status = row.Status.ToString(),
-                    Message = row.Message,
-                    Member = row.Member is null ? null : MapMember(row.Member)
-                }).ToList()
-            });
-        }
-        catch (AppException ex)
+        return Ok(new BatchInvitationResponse
         {
-            return StatusCode(ex.StatusCode, new { message = ex.Message });
-        }
+            Results = results.Select(row => new BatchInvitationRowResponse
+            {
+                Email = row.Email,
+                Status = row.Status.ToString(),
+                Message = row.Message,
+                Member = row.Member is null ? null : MapMember(row.Member)
+            }).ToList()
+        });
     }
 
     [Authorize(Roles = "Admin")]
@@ -95,20 +80,13 @@ public class InvitationsController : ControllerBase
         Guid id,
         CancellationToken cancellationToken)
     {
-        try
-        {
-            var result = await _invitationService.RevokeAsync(id, cancellationToken);
+        var result = await _invitationService.RevokeAsync(id, cancellationToken);
 
-            return Ok(new RevokeInvitationResponse
-            {
-                Invitation = MapInvitation(result.Invitation),
-                RemovedUserId = result.RemovedUserId
-            });
-        }
-        catch (AppException ex)
+        return Ok(new RevokeInvitationResponse
         {
-            return StatusCode(ex.StatusCode, new { message = ex.Message });
-        }
+            Invitation = MapInvitation(result.Invitation),
+            RemovedUserId = result.RemovedUserId
+        });
     }
 
     [Authorize(Roles = "Admin")]
@@ -117,15 +95,8 @@ public class InvitationsController : ControllerBase
         Guid id,
         CancellationToken cancellationToken)
     {
-        try
-        {
-            var invitation = await _invitationService.ResendAsync(id, cancellationToken);
-            return Ok(MapInvitation(invitation));
-        }
-        catch (AppException ex)
-        {
-            return StatusCode(ex.StatusCode, new { message = ex.Message });
-        }
+        var invitation = await _invitationService.ResendAsync(id, cancellationToken);
+        return Ok(MapInvitation(invitation));
     }
 
     [Authorize(Roles = "Admin")]
@@ -139,22 +110,15 @@ public class InvitationsController : ControllerBase
         [FromQuery] string token,
         CancellationToken cancellationToken)
     {
-        try
-        {
-            var preview = await _invitationService.GetPreviewAsync(token, cancellationToken);
+        var preview = await _invitationService.GetPreviewAsync(token, cancellationToken);
 
-            return Ok(new InvitationPreviewResponse
-            {
-                InvitedEmail = preview.InvitedEmail,
-                InviterName = preview.InviterName,
-                Role = preview.Role,
-                AppName = preview.AppName
-            });
-        }
-        catch (AppException ex)
+        return Ok(new InvitationPreviewResponse
         {
-            return StatusCode(ex.StatusCode, new { message = ex.Message });
-        }
+            InvitedEmail = preview.InvitedEmail,
+            InviterName = preview.InviterName,
+            Role = preview.Role,
+            AppName = preview.AppName
+        });
     }
 
     private static MemberResponse MapMember(Application.Common.Models.MemberDto member) =>
