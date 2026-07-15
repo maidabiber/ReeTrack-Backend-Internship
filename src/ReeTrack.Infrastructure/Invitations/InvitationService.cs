@@ -44,7 +44,7 @@ public class InvitationService : IInvitationService
         short roleId,
         CancellationToken cancellationToken = default)
     {
-        var adminId = RequireAdminId();
+        var adminId = _currentUser.UserId;
         var normalizedEmail = InvitationTokenHelper.NormalizeEmail(email);
 
         if (string.IsNullOrWhiteSpace(normalizedEmail) || !normalizedEmail.Contains('@'))
@@ -298,8 +298,6 @@ public class InvitationService : IInvitationService
 
     public async Task<RevokeInvitationResult> RevokeAsync(Guid invitationId, CancellationToken cancellationToken = default)
     {
-        RequireAdminId();
-
         var invitation = await _db.Invitations
             .Include(i => i.Role)
             .FirstOrDefaultAsync(i => i.Id == invitationId, cancellationToken)
@@ -350,7 +348,7 @@ public class InvitationService : IInvitationService
 
     public async Task<InvitationDto> ResendAsync(Guid invitationId, CancellationToken cancellationToken = default)
     {
-        var adminId = RequireAdminId();
+        var adminId = _currentUser.UserId;
 
         var existingInvitation = await _db.Invitations
             .Include(i => i.Role)
@@ -456,14 +454,6 @@ public class InvitationService : IInvitationService
             .Where(domain => domain.Length > 0)
             .Distinct()
             .ToList();
-
-    private Guid RequireAdminId()
-    {
-        if (_currentUser.UserId is not Guid adminId)
-            throw new AppException("Authentication is required.", 401);
-
-        return adminId;
-    }
 
     private async Task RevokePendingInvitationsAsync(
         string normalizedEmail,

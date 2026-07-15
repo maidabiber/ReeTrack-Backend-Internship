@@ -25,7 +25,7 @@ public class SharedTimeEntryApprovalService : ISharedTimeEntryApprovalService
 
     public async Task<IReadOnlyList<TimeEntryDto>> ListPendingAsync(CancellationToken cancellationToken = default)
     {
-        var userId = RequireUserId();
+        var userId = _currentUser.UserId;
 
         var entries = await _db.TimeEntries
             .AsNoTracking()
@@ -51,7 +51,7 @@ public class SharedTimeEntryApprovalService : ISharedTimeEntryApprovalService
         UpdatePendingEntryInput input,
         CancellationToken cancellationToken = default)
     {
-        var userId = RequireUserId();
+        var userId = _currentUser.UserId;
         var entry = await _db.TimeEntries
             .Include(e => e.SubmittedByUser)
             .Include(e => e.User)
@@ -80,7 +80,7 @@ public class SharedTimeEntryApprovalService : ISharedTimeEntryApprovalService
         Guid entryId,
         CancellationToken cancellationToken = default)
     {
-        var userId = RequireUserId();
+        var userId = _currentUser.UserId;
         var entry = await _db.TimeEntries
             .Include(e => e.SubmittedByUser)
             .Include(e => e.User)
@@ -197,6 +197,4 @@ public class SharedTimeEntryApprovalService : ISharedTimeEntryApprovalService
         return "This entry overlaps with an existing time entry. Save anyway?";
     }
 
-    private Guid RequireUserId() =>
-        _currentUser.UserId ?? throw new AppException("Authentication is required.", 401);
 }

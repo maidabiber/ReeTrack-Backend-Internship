@@ -25,7 +25,7 @@ public class TimeEntryService : ITimeEntryService
 
     public async Task<TimeEntryDto?> GetActiveTimerAsync(CancellationToken cancellationToken = default)
     {
-        var userId = RequireUserId();
+        var userId = _currentUser.UserId;
         var entry = await FindRunningTimerAsync(userId, cancellationToken);
         return entry is null ? null : MapEntity(entry);
     }
@@ -34,7 +34,7 @@ public class TimeEntryService : ITimeEntryService
         StartTimerInput input,
         CancellationToken cancellationToken = default)
     {
-        var userId = RequireUserId();
+        var userId = _currentUser.UserId;
         var existing = await FindRunningTimerAsync(userId, cancellationToken);
         if (existing is not null)
             throw new AppException("A timer is already running.", 409);
@@ -72,7 +72,7 @@ public class TimeEntryService : ITimeEntryService
         StopTimerInput? input = null,
         CancellationToken cancellationToken = default)
     {
-        var userId = RequireUserId();
+        var userId = _currentUser.UserId;
         var entry = await FindRunningTimerAsync(userId, cancellationToken, tracked: true)
             ?? throw new AppException("No timer is currently running.", 404);
 
@@ -93,7 +93,7 @@ public class TimeEntryService : ITimeEntryService
         CreateManualEntryInput input,
         CancellationToken cancellationToken = default)
     {
-        var userId = RequireUserId();
+        var userId = _currentUser.UserId;
         ValidateManualRange(input.StartedAtUtc, input.EndedAtUtc);
         await _lockedPeriod.EnsureEntryEditableAsync(input.StartedAtUtc, cancellationToken);
 
@@ -136,7 +136,7 @@ public class TimeEntryService : ITimeEntryService
         CreateDurationOnlyEntryInput input,
         CancellationToken cancellationToken = default)
     {
-        var userId = RequireUserId();
+        var userId = _currentUser.UserId;
         ValidateDurationOnly(input.DurationSeconds);
         var normalizedEntryDateUtc = NormalizeEntryDateUtc(input.EntryDateUtc);
 
@@ -171,7 +171,7 @@ public class TimeEntryService : ITimeEntryService
         UpdateTimeEntryInput input,
         CancellationToken cancellationToken = default)
     {
-        var userId = RequireUserId();
+        var userId = _currentUser.UserId;
         var entry = await _db.TimeEntries
             .FirstOrDefaultAsync(e => e.Id == entryId && e.UserId == userId, cancellationToken)
             ?? throw new AppException("Time entry not found.", 404);
@@ -203,7 +203,7 @@ public class TimeEntryService : ITimeEntryService
         UpdateDurationOnlyEntryInput input,
         CancellationToken cancellationToken = default)
     {
-        var userId = RequireUserId();
+        var userId = _currentUser.UserId;
         var entry = await _db.TimeEntries
             .FirstOrDefaultAsync(e => e.Id == entryId && e.UserId == userId, cancellationToken)
             ?? throw new AppException("Time entry not found.", 404);
@@ -237,7 +237,7 @@ public class TimeEntryService : ITimeEntryService
 
     public async Task<IReadOnlyList<TimeEntryDto>> ListAsync(CancellationToken cancellationToken = default)
     {
-        var userId = RequireUserId();
+        var userId = _currentUser.UserId;
 
         var entries = await _db.TimeEntries
             .AsNoTracking()
@@ -268,7 +268,7 @@ public class TimeEntryService : ITimeEntryService
         DateTime toUtc,
         CancellationToken cancellationToken = default)
     {
-        var userId = RequireUserId();
+        var userId = _currentUser.UserId;
         var now = DateTime.UtcNow;
 
         var entries = await _db.TimeEntries
@@ -280,9 +280,6 @@ public class TimeEntryService : ITimeEntryService
 
         return entries.Select(e => MapEntity(e)).ToList();
     }
-
-    private Guid RequireUserId() =>
-        _currentUser.UserId ?? throw new AppException("Authentication is required.", 401);
 
     private Task<TimeEntry?> FindRunningTimerAsync(
         Guid userId,

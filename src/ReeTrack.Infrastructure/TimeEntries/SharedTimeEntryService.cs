@@ -120,7 +120,7 @@ public class SharedTimeEntryService : ISharedTimeEntryService
         ShareExistingEntryInput input,
         CancellationToken cancellationToken = default)
     {
-        var userId = RequireUserId();
+        var userId = _currentUser.UserId;
         var source = await _db.TimeEntries
             .FirstOrDefaultAsync(e => e.Id == entryId, cancellationToken)
             ?? throw new AppException("Time entry not found.", 404);
@@ -263,7 +263,7 @@ public class SharedTimeEntryService : ISharedTimeEntryService
         string? overlapWarning,
         CancellationToken cancellationToken)
     {
-        var submitterId = RequireUserId();
+        var submitterId = _currentUser.UserId;
         var submitter = await _db.Users
             .AsNoTracking()
             .FirstAsync(u => u.Id == submitterId, cancellationToken);
@@ -349,7 +349,7 @@ public class SharedTimeEntryService : ISharedTimeEntryService
         if (distinctAssigneeIds.Count == 0)
             throw new AppException("At least one teammate is required.", 400);
 
-        var submitterId = RequireUserId();
+        var submitterId = _currentUser.UserId;
         if (distinctAssigneeIds.Contains(submitterId))
             throw new AppException("You cannot share a time entry with yourself.", 400);
 
@@ -413,9 +413,6 @@ public class SharedTimeEntryService : ISharedTimeEntryService
             .Where(e => e.ShareGroupId == shareGroupId)
             .ToListAsync(cancellationToken);
     }
-
-    private Guid RequireUserId() =>
-        _currentUser.UserId ?? throw new AppException("Authentication is required.", 401);
 
     private async Task<string?> BuildOverlapWarningAsync(
         Guid userId,

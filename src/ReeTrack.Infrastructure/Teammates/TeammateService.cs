@@ -1,5 +1,4 @@
 using Microsoft.EntityFrameworkCore;
-using ReeTrack.Application.Common.Exceptions;
 using ReeTrack.Application.Common.Interfaces;
 using ReeTrack.Application.Common.Models;
 using ReeTrack.Domain.Entities;
@@ -20,8 +19,7 @@ public class TeammateService : ITeammateService
 
     public async Task<IReadOnlyList<TeammateDto>> ListAsync(CancellationToken cancellationToken = default)
     {
-        var userId = _currentUser.UserId
-            ?? throw new AppException("Authentication is required.", 401);
+        var userId = _currentUser.UserId;
 
         var teammates = await _db.Users
             .AsNoTracking()

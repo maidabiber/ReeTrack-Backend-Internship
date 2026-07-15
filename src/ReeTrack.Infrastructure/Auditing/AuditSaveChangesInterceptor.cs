@@ -43,7 +43,7 @@ public class AuditSaveChangesInterceptor : SaveChangesInterceptor
         context.ChangeTracker.DetectChanges();
 
         var now = DateTime.UtcNow;
-        var actorId = _currentUser.UserId;
+        Guid? actorId = _currentUser.IsAuthenticated ? _currentUser.UserId : null;
         var auditLogs = new List<AuditLog>();
 
         foreach (var entry in context.ChangeTracker.Entries().ToList())

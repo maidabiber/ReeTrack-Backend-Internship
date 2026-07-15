@@ -48,6 +48,8 @@ public class MemberService : IMemberService
         if (roleId is null && status is null)
             throw new AppException("Nothing to update.");
 
+        var actorId = _currentUser.UserId;
+
         var user = await _db.Users
             .Include(u => u.UserRoles)
             .ThenInclude(ur => ur.Role)
@@ -64,7 +66,7 @@ public class MemberService : IMemberService
             if (user.Status == UserStatus.Invited)
                 throw new AppException("This member has not joined yet. Revoke their invitation instead.");
 
-            if (user.Id == _currentUser.UserId)
+            if (user.Id == actorId)
                 throw new AppException("You cannot change the status of your own account.", 409);
 
             if (status == UserStatus.Disabled)
@@ -95,7 +97,7 @@ public class MemberService : IMemberService
                     UserId = user.Id,
                     RoleId = roleId.Value,
                     AssignedAtUtc = now,
-                    AssignedByUserId = _currentUser.UserId
+                    AssignedByUserId = actorId
                 });
 
                 // Keep any pending invitation consistent so the invitations

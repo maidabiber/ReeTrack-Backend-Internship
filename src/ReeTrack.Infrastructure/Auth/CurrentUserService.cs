@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Http;
+using ReeTrack.Application.Common.Exceptions;
 using ReeTrack.Application.Common.Interfaces;
 
 namespace ReeTrack.Infrastructure.Auth;
@@ -13,18 +14,18 @@ public class CurrentUserService : ICurrentUserService
         _httpContextAccessor = httpContextAccessor;
     }
 
-    public Guid? UserId
+    public Guid UserId
     {
         get
         {
-            var principal = _httpContextAccessor.HttpContext?.User;
-            if (principal is null)
-                return null;
+            var subject = _httpContextAccessor.HttpContext?.User
+                .FindFirst(ClaimTypes.NameIdentifier)?.Value
+                ?? _httpContextAccessor.HttpContext?.User.FindFirst("sub")?.Value;
 
-            var subject = principal.FindFirst(ClaimTypes.NameIdentifier)?.Value
-                ?? principal.FindFirst("sub")?.Value;
+            if (!Guid.TryParse(subject, out var userId))
+                throw new AppException("Authentication is required.", 401);
 
-            return Guid.TryParse(subject, out var userId) ? userId : null;
+            return userId;
         }
     }
 

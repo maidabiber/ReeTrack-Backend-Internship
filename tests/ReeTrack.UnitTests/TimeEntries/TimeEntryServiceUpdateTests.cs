@@ -261,7 +261,7 @@ public class TimeEntryServiceUpdateTests : IDisposable
 
     private sealed class FakeCurrentUser(Guid userId) : ICurrentUserService
     {
-        public Guid? UserId { get; } = userId;
+        public Guid UserId { get; } = userId;
         public IReadOnlyList<string> Roles { get; } = [];
         public bool IsAuthenticated => true;
     }
