@@ -40,7 +40,7 @@ internal static class TimeEntryServiceTestDependencies
         FakeEmailSender EmailSender,
         IConfiguration Configuration,
         IOptions<AppOptions> AppOptions,
-        ILogger<TimeEntryService> Logger) Create()
+        ISharedTimeEntryEmailNotifier EmailNotifier) Create()
     {
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
@@ -49,6 +49,14 @@ internal static class TimeEntryServiceTestDependencies
             })
             .Build();
 
-        return (new FakeEmailSender(), configuration, Options.Create(new AppOptions()), NullLogger<TimeEntryService>.Instance);
+        var emailSender = new FakeEmailSender();
+        var appOptions = Options.Create(new AppOptions());
+        var emailNotifier = new SharedTimeEntryEmailNotifier(
+            emailSender,
+            NullLogger<SharedTimeEntryEmailNotifier>.Instance,
+            configuration,
+            appOptions);
+
+        return (emailSender, configuration, appOptions, emailNotifier);
     }
 }

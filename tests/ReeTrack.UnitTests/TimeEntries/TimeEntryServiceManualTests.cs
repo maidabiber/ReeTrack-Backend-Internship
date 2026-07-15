@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using ReeTrack.Application.Common.Exceptions;
 using ReeTrack.Application.Common.Interfaces;
+using ReeTrack.Application.Common.Models;
 using ReeTrack.Domain.Entities;
 using ReeTrack.Domain.Enums;
 using ReeTrack.Infrastructure.Persistence;
@@ -26,15 +27,10 @@ public class TimeEntryServiceManualTests : IDisposable
         _db.Database.EnsureCreated();
         SeedUser();
 
-        var deps = TimeEntryServiceTestDependencies.Create();
         _service = new TimeEntryService(
             _db,
             new FakeCurrentUser(_userId),
-            new PermissiveLockedPeriodService(),
-            deps.EmailSender,
-            deps.Logger,
-            deps.Configuration,
-            deps.AppOptions);
+            new PermissiveLockedPeriodService());
     }
 
     [Fact]
@@ -43,10 +39,12 @@ public class TimeEntryServiceManualTests : IDisposable
         var startedAtUtc = DateTime.UtcNow.AddHours(-3);
         var endedAtUtc = DateTime.UtcNow.AddHours(-2);
 
-        var result = await _service.CreateManualEntryAsync(
-            "Design review",
-            startedAtUtc,
-            endedAtUtc);
+        var result = await _service.CreateManualEntryAsync(new CreateManualEntryInput
+        {
+            Description = "Design review",
+            StartedAtUtc = startedAtUtc,
+            EndedAtUtc = endedAtUtc
+        });
 
         Assert.Equal("Manual", result.Entry.Mode);
         Assert.Equal(3600, result.Entry.DurationSeconds);
@@ -65,7 +63,11 @@ public class TimeEntryServiceManualTests : IDisposable
         var endedAtUtc = DateTime.UtcNow.AddHours(-2);
 
         var ex = await Assert.ThrowsAsync<AppException>(() =>
-            _service.CreateManualEntryAsync(null, startedAtUtc, endedAtUtc));
+            _service.CreateManualEntryAsync(new CreateManualEntryInput
+            {
+                StartedAtUtc = startedAtUtc,
+                EndedAtUtc = endedAtUtc
+            }));
 
         Assert.Equal("End time must be after start time.", ex.Message);
     }
@@ -76,10 +78,12 @@ public class TimeEntryServiceManualTests : IDisposable
         var startedAtUtc = DateTime.UtcNow.AddHours(1);
         var endedAtUtc = DateTime.UtcNow.AddHours(2);
 
-        var result = await _service.CreateManualEntryAsync(
-            "Future planning",
-            startedAtUtc,
-            endedAtUtc);
+        var result = await _service.CreateManualEntryAsync(new CreateManualEntryInput
+        {
+            Description = "Future planning",
+            StartedAtUtc = startedAtUtc,
+            EndedAtUtc = endedAtUtc
+        });
 
         Assert.Equal("Manual", result.Entry.Mode);
         Assert.Equal(3600, result.Entry.DurationSeconds);
@@ -92,7 +96,11 @@ public class TimeEntryServiceManualTests : IDisposable
         var endedAtUtc = DateTime.UtcNow.AddHours(-5);
 
         var ex = await Assert.ThrowsAsync<AppException>(() =>
-            _service.CreateManualEntryAsync(null, startedAtUtc, endedAtUtc));
+            _service.CreateManualEntryAsync(new CreateManualEntryInput
+            {
+                StartedAtUtc = startedAtUtc,
+                EndedAtUtc = endedAtUtc
+            }));
 
         Assert.Equal("Duration cannot exceed 24 hours.", ex.Message);
     }
@@ -102,13 +110,20 @@ public class TimeEntryServiceManualTests : IDisposable
     {
         var startedAtUtc = DateTime.UtcNow.AddHours(-4);
         var endedAtUtc = DateTime.UtcNow.AddHours(-3);
-        await _service.CreateManualEntryAsync("Existing entry", startedAtUtc, endedAtUtc);
+        await _service.CreateManualEntryAsync(new CreateManualEntryInput
+        {
+            Description = "Existing entry",
+            StartedAtUtc = startedAtUtc,
+            EndedAtUtc = endedAtUtc
+        });
 
         var ex = await Assert.ThrowsAsync<AppException>(() =>
-            _service.CreateManualEntryAsync(
-                "Overlapping entry",
-                startedAtUtc.AddMinutes(30),
-                endedAtUtc.AddMinutes(30)));
+            _service.CreateManualEntryAsync(new CreateManualEntryInput
+            {
+                Description = "Overlapping entry",
+                StartedAtUtc = startedAtUtc.AddMinutes(30),
+                EndedAtUtc = endedAtUtc.AddMinutes(30)
+            }));
 
         Assert.Equal(409, ex.StatusCode);
         Assert.Contains("overlap", ex.Message, StringComparison.OrdinalIgnoreCase);
@@ -131,10 +146,12 @@ public class TimeEntryServiceManualTests : IDisposable
         await _db.SaveChangesAsync();
 
         var ex = await Assert.ThrowsAsync<AppException>(() =>
-            _service.CreateManualEntryAsync(
-                "Overlapping entry",
-                now.AddMinutes(-30),
-                now));
+            _service.CreateManualEntryAsync(new CreateManualEntryInput
+            {
+                Description = "Overlapping entry",
+                StartedAtUtc = now.AddMinutes(-30),
+                EndedAtUtc = now
+            }));
 
         Assert.Equal(409, ex.StatusCode);
         Assert.Contains("overlap", ex.Message, StringComparison.OrdinalIgnoreCase);
@@ -145,13 +162,20 @@ public class TimeEntryServiceManualTests : IDisposable
     {
         var startedAtUtc = DateTime.UtcNow.AddHours(-4);
         var endedAtUtc = DateTime.UtcNow.AddHours(-3);
-        await _service.CreateManualEntryAsync("Existing entry", startedAtUtc, endedAtUtc);
+        await _service.CreateManualEntryAsync(new CreateManualEntryInput
+        {
+            Description = "Existing entry",
+            StartedAtUtc = startedAtUtc,
+            EndedAtUtc = endedAtUtc
+        });
 
-        var result = await _service.CreateManualEntryAsync(
-            "Overlapping entry",
-            startedAtUtc.AddMinutes(30),
-            endedAtUtc.AddMinutes(30),
-            confirmOverlap: true);
+        var result = await _service.CreateManualEntryAsync(new CreateManualEntryInput
+        {
+            Description = "Overlapping entry",
+            StartedAtUtc = startedAtUtc.AddMinutes(30),
+            EndedAtUtc = endedAtUtc.AddMinutes(30),
+            ConfirmOverlap = true
+        });
 
         Assert.NotNull(result.OverlapWarning);
         Assert.Equal(2, await _db.TimeEntries.CountAsync());
@@ -181,27 +205,30 @@ public class TimeEntryServiceManualTests : IDisposable
 
         var deps = TimeEntryServiceTestDependencies.Create();
         deps.EmailSender.ThrowOnMentionEmail = true;
-        var service = new TimeEntryService(
+        var currentUser = new FakeCurrentUser(_userId);
+        var lockedPeriod = new PermissiveLockedPeriodService();
+        var timeEntries = new TimeEntryService(_db, currentUser, lockedPeriod);
+        var service = new SharedTimeEntryService(
             _db,
-            new FakeCurrentUser(_userId),
-            new PermissiveLockedPeriodService(),
-            deps.EmailSender,
-            deps.Logger,
-            deps.Configuration,
-            deps.AppOptions);
+            currentUser,
+            timeEntries,
+            deps.EmailNotifier);
 
         var startedAtUtc = DateTime.UtcNow.AddHours(-3);
         var endedAtUtc = DateTime.UtcNow.AddHours(-2);
 
-        var result = await service.CreateSharedManualEntryAsync(
-            [assigneeId],
-            "Shared despite email failure",
-            startedAtUtc,
-            endedAtUtc);
+        var result = await service.CreateSharedManualEntryAsync(new CreateSharedManualEntryInput
+        {
+            AssigneeUserIds = [assigneeId],
+            Description = "Shared despite email failure",
+            StartedAtUtc = startedAtUtc,
+            EndedAtUtc = endedAtUtc
+        });
 
-        Assert.Single(result.Entries);
-        Assert.Equal("Pending", result.Entries[0].Status);
-        Assert.Equal(1, await _db.TimeEntries.CountAsync());
+        Assert.Equal(2, result.Entries.Count);
+        Assert.Contains(result.Entries, e => e.Status == "Confirmed");
+        Assert.Contains(result.Entries, e => e.Status == "Pending");
+        Assert.Equal(2, await _db.TimeEntries.CountAsync());
     }
 
     private void SeedUser()

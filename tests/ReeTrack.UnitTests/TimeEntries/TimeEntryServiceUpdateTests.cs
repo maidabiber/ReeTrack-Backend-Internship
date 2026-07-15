@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using ReeTrack.Application.Common.Exceptions;
 using ReeTrack.Application.Common.Interfaces;
+using ReeTrack.Application.Common.Models;
 using ReeTrack.Application.Common.Options;
 using ReeTrack.Domain.Entities;
 using ReeTrack.Domain.Enums;
@@ -30,15 +31,10 @@ public class TimeEntryServiceUpdateTests : IDisposable
         _db.Database.EnsureCreated();
         SeedUsers();
 
-        var deps = TimeEntryServiceTestDependencies.Create();
         _service = new TimeEntryService(
             _db,
             new FakeCurrentUser(_userId),
-            new LockedPeriodService(Options.Create(new TimeEntryOptions())),
-            deps.EmailSender,
-            deps.Logger,
-            deps.Configuration,
-            deps.AppOptions);
+            new LockedPeriodService(Options.Create(new TimeEntryOptions())));
     }
 
     [Fact]
@@ -52,12 +48,13 @@ public class TimeEntryServiceUpdateTests : IDisposable
         var newStart = DateTime.UtcNow.AddHours(-5);
         var newEnd = DateTime.UtcNow.AddHours(-3);
 
-        var result = await _service.UpdateTimeEntryAsync(
-            entryId,
-            "Updated task",
-            newStart,
-            newEnd,
-            isBillable: false);
+        var result = await _service.UpdateTimeEntryAsync(entryId, new UpdateTimeEntryInput
+        {
+            Description = "Updated task",
+            StartedAtUtc = newStart,
+            EndedAtUtc = newEnd,
+            IsBillable = false
+        });
 
         Assert.Equal("Updated task", result.Entry.Description);
         Assert.False(result.Entry.IsBillable);
@@ -73,12 +70,13 @@ public class TimeEntryServiceUpdateTests : IDisposable
     public async Task UpdateTimeEntry_NotFound_Throws()
     {
         var ex = await Assert.ThrowsAsync<AppException>(() =>
-            _service.UpdateTimeEntryAsync(
-                Guid.NewGuid(),
-                "Missing",
-                DateTime.UtcNow.AddHours(-2),
-                DateTime.UtcNow.AddHours(-1),
-                isBillable: true));
+            _service.UpdateTimeEntryAsync(Guid.NewGuid(), new UpdateTimeEntryInput
+            {
+                Description = "Missing",
+                StartedAtUtc = DateTime.UtcNow.AddHours(-2),
+                EndedAtUtc = DateTime.UtcNow.AddHours(-1),
+                IsBillable = true
+            }));
 
         Assert.Equal(404, ex.StatusCode);
     }
@@ -92,12 +90,13 @@ public class TimeEntryServiceUpdateTests : IDisposable
             DateTime.UtcNow.AddHours(-1));
 
         var ex = await Assert.ThrowsAsync<AppException>(() =>
-            _service.UpdateTimeEntryAsync(
-                entryId,
-                "Hack",
-                DateTime.UtcNow.AddHours(-2),
-                DateTime.UtcNow.AddHours(-1),
-                isBillable: true));
+            _service.UpdateTimeEntryAsync(entryId, new UpdateTimeEntryInput
+            {
+                Description = "Hack",
+                StartedAtUtc = DateTime.UtcNow.AddHours(-2),
+                EndedAtUtc = DateTime.UtcNow.AddHours(-1),
+                IsBillable = true
+            }));
 
         Assert.Equal(404, ex.StatusCode);
     }
@@ -120,12 +119,13 @@ public class TimeEntryServiceUpdateTests : IDisposable
         await _db.SaveChangesAsync();
 
         var ex = await Assert.ThrowsAsync<AppException>(() =>
-            _service.UpdateTimeEntryAsync(
-                entry.Id,
-                "Still running",
-                now.AddMinutes(-10),
-                now,
-                isBillable: true));
+            _service.UpdateTimeEntryAsync(entry.Id, new UpdateTimeEntryInput
+            {
+                Description = "Still running",
+                StartedAtUtc = now.AddMinutes(-10),
+                EndedAtUtc = now,
+                IsBillable = true
+            }));
 
         Assert.Equal(409, ex.StatusCode);
     }
@@ -143,12 +143,13 @@ public class TimeEntryServiceUpdateTests : IDisposable
             "To move");
 
         var ex = await Assert.ThrowsAsync<AppException>(() =>
-            _service.UpdateTimeEntryAsync(
-                entryId,
-                "To move",
-                startedAtUtc.AddMinutes(30),
-                endedAtUtc.AddMinutes(30),
-                isBillable: true));
+            _service.UpdateTimeEntryAsync(entryId, new UpdateTimeEntryInput
+            {
+                Description = "To move",
+                StartedAtUtc = startedAtUtc.AddMinutes(30),
+                EndedAtUtc = endedAtUtc.AddMinutes(30),
+                IsBillable = true
+            }));
 
         Assert.Equal(409, ex.StatusCode);
     }
@@ -160,12 +161,13 @@ public class TimeEntryServiceUpdateTests : IDisposable
         var endedAtUtc = DateTime.UtcNow.AddHours(-3);
         var entryId = await SeedManualEntry(startedAtUtc, endedAtUtc, "Same entry");
 
-        var result = await _service.UpdateTimeEntryAsync(
-            entryId,
-            "Renamed only",
-            startedAtUtc,
-            endedAtUtc,
-            isBillable: true);
+        var result = await _service.UpdateTimeEntryAsync(entryId, new UpdateTimeEntryInput
+        {
+            Description = "Renamed only",
+            StartedAtUtc = startedAtUtc,
+            EndedAtUtc = endedAtUtc,
+            IsBillable = true
+        });
 
         Assert.Equal("Renamed only", result.Entry.Description);
         Assert.Null(result.OverlapWarning);
@@ -178,15 +180,10 @@ public class TimeEntryServiceUpdateTests : IDisposable
         {
             LockedBeforeUtc = DateTime.UtcNow.AddDays(-1)
         }));
-        var deps = TimeEntryServiceTestDependencies.Create();
         var service = new TimeEntryService(
             _db,
             new FakeCurrentUser(_userId),
-            lockedService,
-            deps.EmailSender,
-            deps.Logger,
-            deps.Configuration,
-            deps.AppOptions);
+            lockedService);
 
         var entryId = await SeedManualEntry(
             DateTime.UtcNow.AddDays(-3),
@@ -194,12 +191,13 @@ public class TimeEntryServiceUpdateTests : IDisposable
             "Locked entry");
 
         var ex = await Assert.ThrowsAsync<AppException>(() =>
-            service.UpdateTimeEntryAsync(
-                entryId,
-                "Try edit",
-                DateTime.UtcNow.AddHours(-2),
-                DateTime.UtcNow.AddHours(-1),
-                isBillable: true));
+            service.UpdateTimeEntryAsync(entryId, new UpdateTimeEntryInput
+            {
+                Description = "Try edit",
+                StartedAtUtc = DateTime.UtcNow.AddHours(-2),
+                EndedAtUtc = DateTime.UtcNow.AddHours(-1),
+                IsBillable = true
+            }));
 
         Assert.Equal(403, ex.StatusCode);
     }

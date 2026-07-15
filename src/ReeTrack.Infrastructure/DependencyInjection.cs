@@ -58,6 +58,9 @@ public static class DependencyInjection
         services.AddScoped<ITeammateService, TeammateService>();
         services.AddScoped<ILockedPeriodService, LockedPeriodService>();
         services.AddScoped<ITimeEntryService, TimeEntryService>();
+        services.AddScoped<ISharedTimeEntryService, SharedTimeEntryService>();
+        services.AddScoped<ISharedTimeEntryEmailNotifier, SharedTimeEntryEmailNotifier>();
+        services.AddScoped<ISharedTimeEntryApprovalService, SharedTimeEntryApprovalService>();
         services.AddScoped<IProjectService, ProjectService>();
         services.AddScoped<IProjectTaskService, ProjectTaskService>();
         services.AddScoped<ITagService, TagService>();

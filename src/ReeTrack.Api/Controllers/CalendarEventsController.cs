@@ -2,6 +2,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using ReeTrack.Api.Contracts;
 using ReeTrack.Application.Calendar;
 using ReeTrack.Application.Integrations.Calendar;
 using ReeTrack.Application.Integrations.Calendar.Models;

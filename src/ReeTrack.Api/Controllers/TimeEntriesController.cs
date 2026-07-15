@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using ReeTrack.Api.Contracts;
 using ReeTrack.Application.Common.Exceptions;
 using ReeTrack.Application.Common.Interfaces;
 using ReeTrack.Application.Common.Models;
@@ -12,10 +13,17 @@ namespace ReeTrack.Api.Controllers;
 public class TimeEntriesController : ControllerBase
 {
     private readonly ITimeEntryService _timeEntryService;
+    private readonly ISharedTimeEntryService _sharedTimeEntryService;
+    private readonly ISharedTimeEntryApprovalService _sharedTimeEntryApprovalService;
 
-    public TimeEntriesController(ITimeEntryService timeEntryService)
+    public TimeEntriesController(
+        ITimeEntryService timeEntryService,
+        ISharedTimeEntryService sharedTimeEntryService,
+        ISharedTimeEntryApprovalService sharedTimeEntryApprovalService)
     {
         _timeEntryService = timeEntryService;
+        _sharedTimeEntryService = sharedTimeEntryService;
+        _sharedTimeEntryApprovalService = sharedTimeEntryApprovalService;
     }
 
     [HttpGet]
@@ -40,19 +48,14 @@ public class TimeEntriesController : ControllerBase
         [FromBody] StartTimerRequest? request,
         CancellationToken cancellationToken)
     {
-        try
+        var input = new StartTimerInput
         {
-            var entry = await _timeEntryService.StartTimerAsync(
-                request?.Description,
-                request?.IsBillable ?? true,
-                cancellationToken);
+            Description = request?.Description,
+            IsBillable = request?.IsBillable ?? true
+        };
+        var entry = await _timeEntryService.StartTimerAsync(input, cancellationToken);
 
-            return Ok(MapTimeEntry(entry));
-        }
-        catch (AppException ex)
-        {
-            return StatusCode(ex.StatusCode, new { message = ex.Message });
-        }
+        return Ok(MapTimeEntry(entry));
     }
 
     [HttpPost("timer/stop")]
@@ -60,35 +63,32 @@ public class TimeEntriesController : ControllerBase
         [FromBody] StopTimerRequest? request,
         CancellationToken cancellationToken)
     {
-        try
-        {
-            var assigneeUserIds = request?.AssigneeUserIds?
-                .Where(id => id != Guid.Empty)
-                .Distinct()
-                .ToList();
+        var assigneeUserIds = request?.AssigneeUserIds?
+            .Where(id => id != Guid.Empty)
+            .ToList() ?? [];
 
-            if (assigneeUserIds is { Count: > 0 })
+        if (assigneeUserIds.Count > 0)
+        {
+            var sharedInput = new StopSharedTimerInput
             {
-                var sharedResult = await _timeEntryService.StopSharedTimerAsync(
-                    assigneeUserIds,
-                    request?.Description,
-                    request?.ConfirmOverlap ?? false,
-                    cancellationToken);
+                AssigneeUserIds = assigneeUserIds,
+                Description = request?.Description,
+                ConfirmOverlap = request?.ConfirmOverlap ?? false
+            };
+            var sharedResult = await _sharedTimeEntryService.StopSharedTimerAsync(
+                sharedInput,
+                cancellationToken);
 
-                return Ok(new CreateSharedManualEntryResponse
-                {
-                    Entries = sharedResult.Entries.Select(MapTimeEntry).ToList(),
-                    OverlapWarning = sharedResult.OverlapWarning
-                });
-            }
+            return Ok(new CreateSharedManualEntryResponse
+            {
+                Entries = sharedResult.Entries.Select(MapTimeEntry).ToList(),
+                OverlapWarning = sharedResult.OverlapWarning
+            });
+        }
 
-            var entry = await _timeEntryService.StopTimerAsync(request?.Description, cancellationToken);
-            return Ok(MapTimeEntry(entry));
-        }
-        catch (AppException ex)
-        {
-            return StatusCode(ex.StatusCode, new { message = ex.Message });
-        }
+        var stopInput = new StopTimerInput { Description = request?.Description };
+        var entry = await _timeEntryService.StopTimerAsync(stopInput, cancellationToken);
+        return Ok(MapTimeEntry(entry));
     }
 
     [HttpPost("manual")]
@@ -96,26 +96,21 @@ public class TimeEntriesController : ControllerBase
         [FromBody] CreateManualEntryRequest request,
         CancellationToken cancellationToken)
     {
-        try
+        var input = new CreateManualEntryInput
         {
-            var result = await _timeEntryService.CreateManualEntryAsync(
-                request.Description,
-                request.StartedAtUtc,
-                request.EndedAtUtc,
-                request.IsBillable ?? true,
-                request.ConfirmOverlap,
-                cancellationToken);
+            Description = request.Description,
+            StartedAtUtc = request.StartedAtUtc,
+            EndedAtUtc = request.EndedAtUtc,
+            IsBillable = request.IsBillable ?? true,
+            ConfirmOverlap = request.ConfirmOverlap
+        };
+        var result = await _timeEntryService.CreateManualEntryAsync(input, cancellationToken);
 
-            return Ok(new CreateManualEntryResponse
-            {
-                Entry = MapTimeEntry(result.Entry),
-                OverlapWarning = result.OverlapWarning
-            });
-        }
-        catch (AppException ex)
+        return Ok(new CreateManualEntryResponse
         {
-            return StatusCode(ex.StatusCode, new { message = ex.Message });
-        }
+            Entry = MapTimeEntry(result.Entry),
+            OverlapWarning = result.OverlapWarning
+        });
     }
 
     [HttpPost("duration")]
@@ -123,25 +118,20 @@ public class TimeEntriesController : ControllerBase
         [FromBody] CreateDurationOnlyEntryRequest request,
         CancellationToken cancellationToken)
     {
-        try
+        var input = new CreateDurationOnlyEntryInput
         {
-            var result = await _timeEntryService.CreateDurationOnlyEntryAsync(
-                request.Description,
-                request.EntryDateUtc,
-                request.DurationSeconds,
-                request.IsBillable ?? true,
-                cancellationToken);
+            Description = request.Description,
+            EntryDateUtc = request.EntryDateUtc,
+            DurationSeconds = request.DurationSeconds,
+            IsBillable = request.IsBillable ?? true
+        };
+        var result = await _timeEntryService.CreateDurationOnlyEntryAsync(input, cancellationToken);
 
-            return Ok(new CreateManualEntryResponse
-            {
-                Entry = MapTimeEntry(result.Entry),
-                OverlapWarning = result.OverlapWarning
-            });
-        }
-        catch (AppException ex)
+        return Ok(new CreateManualEntryResponse
         {
-            return StatusCode(ex.StatusCode, new { message = ex.Message });
-        }
+            Entry = MapTimeEntry(result.Entry),
+            OverlapWarning = result.OverlapWarning
+        });
     }
 
     [HttpPut("{id:guid}")]
@@ -150,27 +140,21 @@ public class TimeEntriesController : ControllerBase
         [FromBody] UpdateTimeEntryRequest request,
         CancellationToken cancellationToken)
     {
-        try
+        var input = new UpdateTimeEntryInput
         {
-            var result = await _timeEntryService.UpdateTimeEntryAsync(
-                id,
-                request.Description,
-                request.StartedAtUtc,
-                request.EndedAtUtc,
-                request.IsBillable ?? true,
-                request.ConfirmOverlap,
-                cancellationToken);
+            Description = request.Description,
+            StartedAtUtc = request.StartedAtUtc,
+            EndedAtUtc = request.EndedAtUtc,
+            IsBillable = request.IsBillable ?? true,
+            ConfirmOverlap = request.ConfirmOverlap
+        };
+        var result = await _timeEntryService.UpdateTimeEntryAsync(id, input, cancellationToken);
 
-            return Ok(new UpdateTimeEntryResponse
-            {
-                Entry = MapTimeEntry(result.Entry),
-                OverlapWarning = result.OverlapWarning
-            });
-        }
-        catch (AppException ex)
+        return Ok(new UpdateTimeEntryResponse
         {
-            return StatusCode(ex.StatusCode, new { message = ex.Message });
-        }
+            Entry = MapTimeEntry(result.Entry),
+            OverlapWarning = result.OverlapWarning
+        });
     }
 
     [HttpPut("{id:guid}/duration")]
@@ -179,26 +163,20 @@ public class TimeEntriesController : ControllerBase
         [FromBody] UpdateDurationOnlyEntryRequest request,
         CancellationToken cancellationToken)
     {
-        try
+        var input = new UpdateDurationOnlyEntryInput
         {
-            var result = await _timeEntryService.UpdateDurationOnlyEntryAsync(
-                id,
-                request.Description,
-                request.EntryDateUtc,
-                request.DurationSeconds,
-                request.IsBillable ?? true,
-                cancellationToken);
+            Description = request.Description,
+            EntryDateUtc = request.EntryDateUtc,
+            DurationSeconds = request.DurationSeconds,
+            IsBillable = request.IsBillable ?? true
+        };
+        var result = await _timeEntryService.UpdateDurationOnlyEntryAsync(id, input, cancellationToken);
 
-            return Ok(new UpdateTimeEntryResponse
-            {
-                Entry = MapTimeEntry(result.Entry),
-                OverlapWarning = result.OverlapWarning
-            });
-        }
-        catch (AppException ex)
+        return Ok(new UpdateTimeEntryResponse
         {
-            return StatusCode(ex.StatusCode, new { message = ex.Message });
-        }
+            Entry = MapTimeEntry(result.Entry),
+            OverlapWarning = result.OverlapWarning
+        });
     }
 
     [HttpPost("shared/manual")]
@@ -206,28 +184,56 @@ public class TimeEntriesController : ControllerBase
         [FromBody] CreateSharedManualEntryRequest request,
         CancellationToken cancellationToken)
     {
-        try
+        var input = new CreateSharedManualEntryInput
         {
-            var assigneeUserIds = ResolveAssigneeUserIds(request);
-            var result = await _timeEntryService.CreateSharedManualEntryAsync(
-                assigneeUserIds,
-                request.Description,
-                request.StartedAtUtc,
-                request.EndedAtUtc,
-                request.IsBillable ?? true,
-                request.ConfirmOverlap,
-                cancellationToken);
+            AssigneeUserIds = ResolveAssigneeUserIds(request),
+            Description = request.Description,
+            StartedAtUtc = request.StartedAtUtc,
+            EndedAtUtc = request.EndedAtUtc,
+            IsBillable = request.IsBillable ?? true,
+            ConfirmOverlap = request.ConfirmOverlap
+        };
+        var result = await _sharedTimeEntryService.CreateSharedManualEntryAsync(input, cancellationToken);
 
-            return Ok(new CreateSharedManualEntryResponse
-            {
-                Entries = result.Entries.Select(MapTimeEntry).ToList(),
-                OverlapWarning = result.OverlapWarning
-            });
-        }
-        catch (AppException ex)
+        return Ok(new CreateSharedManualEntryResponse
         {
-            return StatusCode(ex.StatusCode, new { message = ex.Message });
-        }
+            Entries = result.Entries.Select(MapTimeEntry).ToList(),
+            OverlapWarning = result.OverlapWarning
+        });
+    }
+
+    [HttpPost("shared/duration")]
+    public async Task<ActionResult<CreateSharedManualEntryResponse>> CreateSharedDurationOnlyEntry(
+        [FromBody] CreateSharedDurationOnlyEntryRequest request,
+        CancellationToken cancellationToken)
+    {
+        var assigneeUserIds = request.AssigneeUserIds?
+            .Where(id => id != Guid.Empty)
+            .ToList() ?? [];
+
+        if (assigneeUserIds.Count == 0 && request.AssigneeUserId is Guid singleId && singleId != Guid.Empty)
+            assigneeUserIds = [singleId];
+
+        if (assigneeUserIds.Count == 0)
+            throw new AppException("At least one teammate is required.", 400);
+
+        var input = new CreateSharedDurationOnlyEntryInput
+        {
+            AssigneeUserIds = assigneeUserIds,
+            Description = request.Description,
+            EntryDateUtc = request.EntryDateUtc,
+            DurationSeconds = request.DurationSeconds,
+            IsBillable = request.IsBillable ?? true
+        };
+        var result = await _sharedTimeEntryService.CreateSharedDurationOnlyEntryAsync(
+            input,
+            cancellationToken);
+
+        return Ok(new CreateSharedManualEntryResponse
+        {
+            Entries = result.Entries.Select(MapTimeEntry).ToList(),
+            OverlapWarning = result.OverlapWarning
+        });
     }
 
     [HttpPost("{id:guid}/share")]
@@ -236,32 +242,28 @@ public class TimeEntriesController : ControllerBase
         [FromBody] ShareExistingEntryRequest request,
         CancellationToken cancellationToken)
     {
-        try
+        var assigneeUserIds = request.AssigneeUserIds?
+            .Where(assigneeId => assigneeId != Guid.Empty)
+            .ToList() ?? [];
+
+        if (assigneeUserIds.Count == 0)
+            throw new AppException("At least one teammate is required.", 400);
+
+        var input = new ShareExistingEntryInput
         {
-            var assigneeUserIds = request.AssigneeUserIds?
-                .Where(assigneeId => assigneeId != Guid.Empty)
-                .Distinct()
-                .ToList() ?? [];
+            AssigneeUserIds = assigneeUserIds,
+            ConfirmOverlap = request.ConfirmOverlap
+        };
+        var result = await _sharedTimeEntryService.ShareExistingEntryAsync(
+            id,
+            input,
+            cancellationToken);
 
-            if (assigneeUserIds.Count == 0)
-                throw new AppException("At least one teammate is required.", 400);
-
-            var result = await _timeEntryService.ShareExistingEntryAsync(
-                id,
-                assigneeUserIds,
-                request.ConfirmOverlap,
-                cancellationToken);
-
-            return Ok(new CreateSharedManualEntryResponse
-            {
-                Entries = result.Entries.Select(MapTimeEntry).ToList(),
-                OverlapWarning = result.OverlapWarning
-            });
-        }
-        catch (AppException ex)
+        return Ok(new CreateSharedManualEntryResponse
         {
-            return StatusCode(ex.StatusCode, new { message = ex.Message });
-        }
+            Entries = result.Entries.Select(MapTimeEntry).ToList(),
+            OverlapWarning = result.OverlapWarning
+        });
     }
 
     private static IReadOnlyList<Guid> ResolveAssigneeUserIds(CreateSharedManualEntryRequest request)
@@ -278,7 +280,7 @@ public class TimeEntriesController : ControllerBase
     [HttpGet("pending")]
     public async Task<ActionResult<IReadOnlyList<TimeEntryResponse>>> ListPending(CancellationToken cancellationToken)
     {
-        var entries = await _timeEntryService.ListPendingAsync(cancellationToken);
+        var entries = await _sharedTimeEntryApprovalService.ListPendingAsync(cancellationToken);
         return Ok(entries.Select(MapTimeEntry).ToList());
     }
 
@@ -288,27 +290,24 @@ public class TimeEntriesController : ControllerBase
         [FromBody] UpdateTimeEntryRequest request,
         CancellationToken cancellationToken)
     {
-        try
+        var input = new UpdatePendingEntryInput
         {
-            var result = await _timeEntryService.UpdatePendingEntryAsync(
-                id,
-                request.Description,
-                request.StartedAtUtc,
-                request.EndedAtUtc,
-                request.IsBillable ?? true,
-                request.ConfirmOverlap,
-                cancellationToken);
+            Description = request.Description,
+            StartedAtUtc = request.StartedAtUtc,
+            EndedAtUtc = request.EndedAtUtc,
+            IsBillable = request.IsBillable ?? true,
+            ConfirmOverlap = request.ConfirmOverlap
+        };
+        var result = await _sharedTimeEntryApprovalService.UpdatePendingEntryAsync(
+            id,
+            input,
+            cancellationToken);
 
-            return Ok(new UpdateTimeEntryResponse
-            {
-                Entry = MapTimeEntry(result.Entry),
-                OverlapWarning = result.OverlapWarning
-            });
-        }
-        catch (AppException ex)
+        return Ok(new UpdateTimeEntryResponse
         {
-            return StatusCode(ex.StatusCode, new { message = ex.Message });
-        }
+            Entry = MapTimeEntry(result.Entry),
+            OverlapWarning = result.OverlapWarning
+        });
     }
 
     [HttpPost("pending/{id:guid}/approve")]
@@ -316,15 +315,8 @@ public class TimeEntriesController : ControllerBase
         Guid id,
         CancellationToken cancellationToken)
     {
-        try
-        {
-            var entry = await _timeEntryService.ApprovePendingEntryAsync(id, cancellationToken);
-            return Ok(MapTimeEntry(entry));
-        }
-        catch (AppException ex)
-        {
-            return StatusCode(ex.StatusCode, new { message = ex.Message });
-        }
+        var entry = await _sharedTimeEntryApprovalService.ApprovePendingEntryAsync(id, cancellationToken);
+        return Ok(MapTimeEntry(entry));
     }
 
     internal static TimeEntryResponse MapTimeEntry(TimeEntryDto entry) =>
@@ -354,113 +346,4 @@ public class TimeEntriesController : ControllerBase
                 })
                 .ToList()
         };
-}
-
-public sealed class StartTimerRequest
-{
-    public string? Description { get; set; }
-    public bool? IsBillable { get; set; }
-}
-
-public sealed class StopTimerRequest
-{
-    public string? Description { get; set; }
-    public List<Guid>? AssigneeUserIds { get; set; }
-    public bool ConfirmOverlap { get; set; }
-}
-
-public sealed class CreateManualEntryRequest
-{
-    public string? Description { get; set; }
-    public bool? IsBillable { get; set; }
-    public required DateTime StartedAtUtc { get; set; }
-    public required DateTime EndedAtUtc { get; set; }
-    public bool ConfirmOverlap { get; set; }
-}
-
-public sealed class CreateDurationOnlyEntryRequest
-{
-    public string? Description { get; set; }
-    public bool? IsBillable { get; set; }
-    public required DateTime EntryDateUtc { get; set; }
-    public required int DurationSeconds { get; set; }
-}
-
-public sealed class CreateSharedManualEntryRequest
-{
-    public Guid? AssigneeUserId { get; set; }
-    public List<Guid>? AssigneeUserIds { get; set; }
-    public string? Description { get; set; }
-    public bool? IsBillable { get; set; }
-    public required DateTime StartedAtUtc { get; set; }
-    public required DateTime EndedAtUtc { get; set; }
-    public bool ConfirmOverlap { get; set; }
-}
-
-public sealed class ShareExistingEntryRequest
-{
-    public List<Guid>? AssigneeUserIds { get; set; }
-    public bool ConfirmOverlap { get; set; }
-}
-
-public sealed class CreateSharedManualEntryResponse
-{
-    public required IReadOnlyList<TimeEntryResponse> Entries { get; init; }
-    public string? OverlapWarning { get; init; }
-}
-
-public sealed class CreateManualEntryResponse
-{
-    public required TimeEntryResponse Entry { get; init; }
-    public string? OverlapWarning { get; init; }
-}
-
-public sealed class UpdateTimeEntryRequest
-{
-    public string? Description { get; set; }
-    public bool? IsBillable { get; set; }
-    public required DateTime StartedAtUtc { get; set; }
-    public required DateTime EndedAtUtc { get; set; }
-    public bool ConfirmOverlap { get; set; }
-}
-
-public sealed class UpdateDurationOnlyEntryRequest
-{
-    public string? Description { get; set; }
-    public bool? IsBillable { get; set; }
-    public required DateTime EntryDateUtc { get; set; }
-    public required int DurationSeconds { get; set; }
-}
-
-public sealed class UpdateTimeEntryResponse
-{
-    public required TimeEntryResponse Entry { get; init; }
-    public string? OverlapWarning { get; init; }
-}
-
-public sealed class TimeEntryResponse
-{
-    public required Guid Id { get; init; }
-    public string? Description { get; init; }
-    public required bool IsBillable { get; init; }
-    public required string Mode { get; init; }
-    public DateTime? StartedAtUtc { get; init; }
-    public DateTime? EndedAtUtc { get; init; }
-    public required int DurationSeconds { get; init; }
-    public required bool IsRunning { get; init; }
-    public required string Status { get; init; }
-    public Guid? SubmittedByUserId { get; init; }
-    public string? SubmittedByDisplayName { get; init; }
-    public Guid? AssigneeUserId { get; init; }
-    public string? AssigneeDisplayName { get; init; }
-    public Guid? ShareGroupId { get; init; }
-    public IReadOnlyList<TimeEntryParticipantResponse> Participants { get; init; } = [];
-}
-
-public sealed class TimeEntryParticipantResponse
-{
-    public required Guid UserId { get; init; }
-    public required string DisplayName { get; init; }
-    public required string Email { get; init; }
-    public required string Role { get; init; }
 }
