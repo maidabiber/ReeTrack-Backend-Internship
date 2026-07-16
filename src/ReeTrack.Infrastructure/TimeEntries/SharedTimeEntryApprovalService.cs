@@ -60,7 +60,7 @@ public class SharedTimeEntryApprovalService : ISharedTimeEntryApprovalService
                 cancellationToken)
             ?? throw new AppException("Pending time entry not found.", 404);
 
-        var overlapWarning = await ApplyTimedEntryUpdateAsync(
+        await ApplyTimedEntryUpdateAsync(
             entry,
             input,
             checkPreviousPeriodLock: false,
@@ -71,8 +71,7 @@ public class SharedTimeEntryApprovalService : ISharedTimeEntryApprovalService
             Entry = TimeEntryMapping.MapEntity(
                 entry,
                 entry.SubmittedByUser?.DisplayName ?? entry.SubmittedByUser?.Email,
-                entry.User.DisplayName ?? entry.User.Email),
-            OverlapWarning = overlapWarning
+                entry.User.DisplayName ?? entry.User.Email)
         };
     }
 
@@ -128,7 +127,7 @@ public class SharedTimeEntryApprovalService : ISharedTimeEntryApprovalService
             .ToDictionary(group => group.Key, group => group.ToList());
     }
 
-    private async Task<string?> ApplyTimedEntryUpdateAsync(
+    private async Task ApplyTimedEntryUpdateAsync(
         TimeEntry entry,
         UpdatePendingEntryInput input,
         bool checkPreviousPeriodLock,
@@ -141,15 +140,12 @@ public class SharedTimeEntryApprovalService : ISharedTimeEntryApprovalService
         await _lockedPeriod.EnsureEntryEditableAsync(input.StartedAtUtc, cancellationToken);
 
         var durationSeconds = (int)(input.EndedAtUtc - input.StartedAtUtc).TotalSeconds;
-        var overlapWarning = await BuildOverlapWarningAsync(
+        await EnsureNoOverlapAsync(
             entry.UserId,
             input.StartedAtUtc,
             input.EndedAtUtc,
             excludeEntryId: entry.Id,
             cancellationToken);
-
-        if (overlapWarning is not null && !input.ConfirmOverlap)
-            throw new AppException(overlapWarning, 409);
 
         entry.Description = TimeEntryHelpers.NormalizeDescription(input.Description);
         entry.IsBillable = input.IsBillable;
@@ -159,11 +155,9 @@ public class SharedTimeEntryApprovalService : ISharedTimeEntryApprovalService
         entry.UpdatedAtUtc = DateTime.UtcNow;
 
         await _db.SaveChangesAsync(cancellationToken);
-
-        return input.ConfirmOverlap ? overlapWarning : null;
     }
 
-    private async Task<string?> BuildOverlapWarningAsync(
+    private async Task EnsureNoOverlapAsync(
         Guid userId,
         DateTime startedAtUtc,
         DateTime endedAtUtc,
@@ -183,7 +177,7 @@ public class SharedTimeEntryApprovalService : ISharedTimeEntryApprovalService
             .ToListAsync(cancellationToken);
 
         if (overlapping.Count == 0)
-            return null;
+            return;
 
         var labels = overlapping
             .Select(e => e.Description?.Trim())
@@ -192,9 +186,9 @@ public class SharedTimeEntryApprovalService : ISharedTimeEntryApprovalService
             .ToList();
 
         if (labels.Count > 0)
-            return $"This entry overlaps with: {string.Join(", ", labels)}. Save anyway?";
+            throw new AppException($"This entry overlaps with: {string.Join(", ", labels)}.", 409);
 
-        return "This entry overlaps with an existing time entry. Save anyway?";
+        throw new AppException("This entry overlaps with an existing time entry.", 409);
     }
 
 }

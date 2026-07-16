@@ -31,7 +31,6 @@ public class DurationOnlyEntryEndpointsTests
         Assert.Equal(5400, body.Entry.DurationSeconds);
         Assert.NotNull(body.Entry.StartedAtUtc);
         Assert.Null(body.Entry.EndedAtUtc);
-        Assert.Null(body.OverlapWarning);
 
         var list = await client.GetAsync("/api/time-entries");
         var entries = await list.Content.ReadFromJsonAsync<List<TimeEntryResponse>>();
@@ -132,7 +131,6 @@ public class DurationOnlyEntryEndpointsTests
     private sealed class CreateDurationOnlyEntryResponse
     {
         public TimeEntryResponse Entry { get; set; } = null!;
-        public string? OverlapWarning { get; set; }
     }
 
     private sealed class UpdateDurationOnlyEntryResponse

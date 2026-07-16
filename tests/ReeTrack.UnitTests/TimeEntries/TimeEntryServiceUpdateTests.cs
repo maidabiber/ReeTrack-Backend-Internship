@@ -131,7 +131,7 @@ public class TimeEntryServiceUpdateTests : IDisposable
     }
 
     [Fact]
-    public async Task UpdateTimeEntry_OverlapWithoutConfirm_ThrowsConflict()
+    public async Task UpdateTimeEntry_Overlap_ThrowsConflict()
     {
         var startedAtUtc = DateTime.UtcNow.AddHours(-4);
         var endedAtUtc = DateTime.UtcNow.AddHours(-3);
@@ -170,7 +170,6 @@ public class TimeEntryServiceUpdateTests : IDisposable
         });
 
         Assert.Equal("Renamed only", result.Entry.Description);
-        Assert.Null(result.OverlapWarning);
     }
 
     [Fact]

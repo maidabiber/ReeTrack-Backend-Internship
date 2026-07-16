@@ -313,19 +313,16 @@ internal sealed class TeammateResponse
 internal sealed class CreateSharedManualEntryResponse
 {
     public List<TimeEntryResponse> Entries { get; set; } = [];
-    public string? OverlapWarning { get; set; }
 }
 
 internal sealed class CreateManualEntryResponse
 {
     public TimeEntryResponse Entry { get; set; } = null!;
-    public string? OverlapWarning { get; set; }
 }
 
 internal sealed class UpdateTimeEntryResponse
 {
     public TimeEntryResponse Entry { get; set; } = null!;
-    public string? OverlapWarning { get; set; }
 }
 
 internal sealed class TimeEntryResponse

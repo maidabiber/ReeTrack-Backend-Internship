@@ -49,7 +49,6 @@ public class TimeEntryServiceManualTests : IDisposable
         Assert.Equal("Manual", result.Entry.Mode);
         Assert.Equal(3600, result.Entry.DurationSeconds);
         Assert.Equal("Design review", result.Entry.Description);
-        Assert.Null(result.OverlapWarning);
 
         var stored = await _db.TimeEntries.SingleAsync();
         Assert.Equal(TimeEntryMode.Manual, stored.Mode);
@@ -106,7 +105,7 @@ public class TimeEntryServiceManualTests : IDisposable
     }
 
     [Fact]
-    public async Task CreateManualEntry_OverlapWithoutConfirm_ThrowsConflict()
+    public async Task CreateManualEntry_Overlap_ThrowsConflict()
     {
         var startedAtUtc = DateTime.UtcNow.AddHours(-4);
         var endedAtUtc = DateTime.UtcNow.AddHours(-3);
@@ -127,6 +126,7 @@ public class TimeEntryServiceManualTests : IDisposable
 
         Assert.Equal(409, ex.StatusCode);
         Assert.Contains("overlap", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Save anyway", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -158,7 +158,7 @@ public class TimeEntryServiceManualTests : IDisposable
     }
 
     [Fact]
-    public async Task CreateManualEntry_OverlapWithConfirm_SavesAndReturnsWarning()
+    public async Task CreateManualEntry_OverlapWithConfirm_StillThrowsConflict()
     {
         var startedAtUtc = DateTime.UtcNow.AddHours(-4);
         var endedAtUtc = DateTime.UtcNow.AddHours(-3);
@@ -169,16 +169,16 @@ public class TimeEntryServiceManualTests : IDisposable
             EndedAtUtc = endedAtUtc
         });
 
-        var result = await _service.CreateManualEntryAsync(new CreateManualEntryInput
-        {
-            Description = "Overlapping entry",
-            StartedAtUtc = startedAtUtc.AddMinutes(30),
-            EndedAtUtc = endedAtUtc.AddMinutes(30),
-            ConfirmOverlap = true
-        });
+        var ex = await Assert.ThrowsAsync<AppException>(() =>
+            _service.CreateManualEntryAsync(new CreateManualEntryInput
+            {
+                Description = "Overlapping entry",
+                StartedAtUtc = startedAtUtc.AddMinutes(30),
+                EndedAtUtc = endedAtUtc.AddMinutes(30)
+            }));
 
-        Assert.NotNull(result.OverlapWarning);
-        Assert.Equal(2, await _db.TimeEntries.CountAsync());
+        Assert.Equal(409, ex.StatusCode);
+        Assert.Equal(1, await _db.TimeEntries.CountAsync());
     }
 
     public void Dispose()

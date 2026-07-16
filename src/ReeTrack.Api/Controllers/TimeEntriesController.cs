@@ -72,8 +72,7 @@ public class TimeEntriesController : ControllerBase
             var sharedInput = new StopSharedTimerInput
             {
                 AssigneeUserIds = assigneeUserIds,
-                Description = request?.Description,
-                ConfirmOverlap = request?.ConfirmOverlap ?? false
+                Description = request?.Description
             };
             var sharedResult = await _sharedTimeEntryService.StopSharedTimerAsync(
                 sharedInput,
@@ -81,8 +80,7 @@ public class TimeEntriesController : ControllerBase
 
             return Ok(new CreateSharedManualEntryResponse
             {
-                Entries = sharedResult.Entries.Select(MapTimeEntry).ToList(),
-                OverlapWarning = sharedResult.OverlapWarning
+                Entries = sharedResult.Entries.Select(MapTimeEntry).ToList()
             });
         }
 
@@ -101,15 +99,13 @@ public class TimeEntriesController : ControllerBase
             Description = request.Description,
             StartedAtUtc = request.StartedAtUtc,
             EndedAtUtc = request.EndedAtUtc,
-            IsBillable = request.IsBillable ?? true,
-            ConfirmOverlap = request.ConfirmOverlap
+            IsBillable = request.IsBillable ?? true
         };
         var result = await _timeEntryService.CreateManualEntryAsync(input, cancellationToken);
 
         return Ok(new CreateManualEntryResponse
         {
-            Entry = MapTimeEntry(result.Entry),
-            OverlapWarning = result.OverlapWarning
+            Entry = MapTimeEntry(result.Entry)
         });
     }
 
@@ -129,8 +125,7 @@ public class TimeEntriesController : ControllerBase
 
         return Ok(new CreateManualEntryResponse
         {
-            Entry = MapTimeEntry(result.Entry),
-            OverlapWarning = result.OverlapWarning
+            Entry = MapTimeEntry(result.Entry)
         });
     }
 
@@ -145,15 +140,13 @@ public class TimeEntriesController : ControllerBase
             Description = request.Description,
             StartedAtUtc = request.StartedAtUtc,
             EndedAtUtc = request.EndedAtUtc,
-            IsBillable = request.IsBillable ?? true,
-            ConfirmOverlap = request.ConfirmOverlap
+            IsBillable = request.IsBillable ?? true
         };
         var result = await _timeEntryService.UpdateTimeEntryAsync(id, input, cancellationToken);
 
         return Ok(new UpdateTimeEntryResponse
         {
-            Entry = MapTimeEntry(result.Entry),
-            OverlapWarning = result.OverlapWarning
+            Entry = MapTimeEntry(result.Entry)
         });
     }
 
@@ -174,8 +167,7 @@ public class TimeEntriesController : ControllerBase
 
         return Ok(new UpdateTimeEntryResponse
         {
-            Entry = MapTimeEntry(result.Entry),
-            OverlapWarning = result.OverlapWarning
+            Entry = MapTimeEntry(result.Entry)
         });
     }
 
@@ -190,15 +182,13 @@ public class TimeEntriesController : ControllerBase
             Description = request.Description,
             StartedAtUtc = request.StartedAtUtc,
             EndedAtUtc = request.EndedAtUtc,
-            IsBillable = request.IsBillable ?? true,
-            ConfirmOverlap = request.ConfirmOverlap
+            IsBillable = request.IsBillable ?? true
         };
         var result = await _sharedTimeEntryService.CreateSharedManualEntryAsync(input, cancellationToken);
 
         return Ok(new CreateSharedManualEntryResponse
         {
-            Entries = result.Entries.Select(MapTimeEntry).ToList(),
-            OverlapWarning = result.OverlapWarning
+            Entries = result.Entries.Select(MapTimeEntry).ToList()
         });
     }
 
@@ -231,8 +221,7 @@ public class TimeEntriesController : ControllerBase
 
         return Ok(new CreateSharedManualEntryResponse
         {
-            Entries = result.Entries.Select(MapTimeEntry).ToList(),
-            OverlapWarning = result.OverlapWarning
+            Entries = result.Entries.Select(MapTimeEntry).ToList()
         });
     }
 
@@ -251,8 +240,7 @@ public class TimeEntriesController : ControllerBase
 
         var input = new ShareExistingEntryInput
         {
-            AssigneeUserIds = assigneeUserIds,
-            ConfirmOverlap = request.ConfirmOverlap
+            AssigneeUserIds = assigneeUserIds
         };
         var result = await _sharedTimeEntryService.ShareExistingEntryAsync(
             id,
@@ -261,8 +249,7 @@ public class TimeEntriesController : ControllerBase
 
         return Ok(new CreateSharedManualEntryResponse
         {
-            Entries = result.Entries.Select(MapTimeEntry).ToList(),
-            OverlapWarning = result.OverlapWarning
+            Entries = result.Entries.Select(MapTimeEntry).ToList()
         });
     }
 
@@ -295,8 +282,7 @@ public class TimeEntriesController : ControllerBase
             Description = request.Description,
             StartedAtUtc = request.StartedAtUtc,
             EndedAtUtc = request.EndedAtUtc,
-            IsBillable = request.IsBillable ?? true,
-            ConfirmOverlap = request.ConfirmOverlap
+            IsBillable = request.IsBillable ?? true
         };
         var result = await _sharedTimeEntryApprovalService.UpdatePendingEntryAsync(
             id,
@@ -305,8 +291,7 @@ public class TimeEntriesController : ControllerBase
 
         return Ok(new UpdateTimeEntryResponse
         {
-            Entry = MapTimeEntry(result.Entry),
-            OverlapWarning = result.OverlapWarning
+            Entry = MapTimeEntry(result.Entry)
         });
     }
 

@@ -10,7 +10,6 @@ public sealed class StopTimerRequest
 {
     public string? Description { get; set; }
     public List<Guid>? AssigneeUserIds { get; set; }
-    public bool ConfirmOverlap { get; set; }
 }
 
 public sealed class CreateManualEntryRequest
@@ -19,7 +18,6 @@ public sealed class CreateManualEntryRequest
     public bool? IsBillable { get; set; }
     public required DateTime StartedAtUtc { get; set; }
     public required DateTime EndedAtUtc { get; set; }
-    public bool ConfirmOverlap { get; set; }
 }
 
 public sealed class CreateDurationOnlyEntryRequest
@@ -38,7 +36,6 @@ public sealed class CreateSharedManualEntryRequest
     public bool? IsBillable { get; set; }
     public required DateTime StartedAtUtc { get; set; }
     public required DateTime EndedAtUtc { get; set; }
-    public bool ConfirmOverlap { get; set; }
 }
 
 public sealed class CreateSharedDurationOnlyEntryRequest
@@ -54,19 +51,16 @@ public sealed class CreateSharedDurationOnlyEntryRequest
 public sealed class ShareExistingEntryRequest
 {
     public List<Guid>? AssigneeUserIds { get; set; }
-    public bool ConfirmOverlap { get; set; }
 }
 
 public sealed class CreateSharedManualEntryResponse
 {
     public required IReadOnlyList<TimeEntryResponse> Entries { get; init; }
-    public string? OverlapWarning { get; init; }
 }
 
 public sealed class CreateManualEntryResponse
 {
     public required TimeEntryResponse Entry { get; init; }
-    public string? OverlapWarning { get; init; }
 }
 
 public sealed class UpdateTimeEntryRequest
@@ -75,7 +69,6 @@ public sealed class UpdateTimeEntryRequest
     public bool? IsBillable { get; set; }
     public required DateTime StartedAtUtc { get; set; }
     public required DateTime EndedAtUtc { get; set; }
-    public bool ConfirmOverlap { get; set; }
 }
 
 public sealed class UpdateDurationOnlyEntryRequest
@@ -89,7 +82,6 @@ public sealed class UpdateDurationOnlyEntryRequest
 public sealed class UpdateTimeEntryResponse
 {
     public required TimeEntryResponse Entry { get; init; }
-    public string? OverlapWarning { get; init; }
 }
 
 public sealed class TimeEntryResponse

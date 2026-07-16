@@ -17,7 +17,6 @@ public sealed class CreateManualEntryInput
     public DateTime StartedAtUtc { get; init; }
     public DateTime EndedAtUtc { get; init; }
     public bool IsBillable { get; init; } = true;
-    public bool ConfirmOverlap { get; init; }
 }
 
 public sealed class CreateDurationOnlyEntryInput
@@ -34,7 +33,6 @@ public sealed class UpdateTimeEntryInput
     public DateTime StartedAtUtc { get; init; }
     public DateTime EndedAtUtc { get; init; }
     public bool IsBillable { get; init; }
-    public bool ConfirmOverlap { get; init; }
 }
 
 public sealed class UpdateDurationOnlyEntryInput
@@ -49,7 +47,6 @@ public sealed class StopSharedTimerInput
 {
     public IReadOnlyList<Guid> AssigneeUserIds { get; init; } = [];
     public string? Description { get; init; }
-    public bool ConfirmOverlap { get; init; }
 }
 
 public sealed class CreateSharedManualEntryInput
@@ -59,7 +56,6 @@ public sealed class CreateSharedManualEntryInput
     public DateTime StartedAtUtc { get; init; }
     public DateTime EndedAtUtc { get; init; }
     public bool IsBillable { get; init; } = true;
-    public bool ConfirmOverlap { get; init; }
 }
 
 public sealed class CreateSharedDurationOnlyEntryInput
@@ -74,7 +70,6 @@ public sealed class CreateSharedDurationOnlyEntryInput
 public sealed class ShareExistingEntryInput
 {
     public IReadOnlyList<Guid> AssigneeUserIds { get; init; } = [];
-    public bool ConfirmOverlap { get; init; }
 }
 
 public sealed class UpdatePendingEntryInput
@@ -83,5 +78,4 @@ public sealed class UpdatePendingEntryInput
     public DateTime StartedAtUtc { get; init; }
     public DateTime EndedAtUtc { get; init; }
     public bool IsBillable { get; init; }
-    public bool ConfirmOverlap { get; init; }
 }

@@ -61,7 +61,7 @@ public class UpdateTimeEntryEndpointsTests
     }
 
     [Fact]
-    public async Task UpdateTimeEntry_OverlapRequiresConfirmation()
+    public async Task UpdateTimeEntry_OverlapIsRejected()
     {
         using var factory = new ReeTrackWebApplicationFactory();
         var (_, token) = await factory.SeedAdminAsync();
@@ -89,19 +89,18 @@ public class UpdateTimeEntryEndpointsTests
         {
             description = "Movable",
             startedAtUtc = startedAtUtc.AddMinutes(30),
-            endedAtUtc = endedAtUtc.AddMinutes(30),
-            confirmOverlap = false
+            endedAtUtc = endedAtUtc.AddMinutes(30)
         });
         Assert.Equal(HttpStatusCode.Conflict, conflict.StatusCode);
 
-        var confirmed = await client.PutAsJsonAsync($"/api/time-entries/{secondBody.Entry.Id}", new
+        var confirmedStillRejected = await client.PutAsJsonAsync($"/api/time-entries/{secondBody.Entry.Id}", new
         {
             description = "Movable",
             startedAtUtc = startedAtUtc.AddMinutes(30),
             endedAtUtc = endedAtUtc.AddMinutes(30),
             confirmOverlap = true
         });
-        Assert.Equal(HttpStatusCode.OK, confirmed.StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, confirmedStillRejected.StatusCode);
     }
 
     private sealed class CreateManualEntryResponse
@@ -112,7 +111,6 @@ public class UpdateTimeEntryEndpointsTests
     private sealed class UpdateTimeEntryResponse
     {
         public TimeEntryResponse Entry { get; set; } = null!;
-        public string? OverlapWarning { get; set; }
     }
 
     private sealed class TimeEntryResponse

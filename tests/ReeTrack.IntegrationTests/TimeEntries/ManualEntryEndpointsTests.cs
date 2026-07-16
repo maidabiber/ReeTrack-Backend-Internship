@@ -30,7 +30,6 @@ public class ManualEntryEndpointsTests
         Assert.Equal("Manual", body!.Entry.Mode);
         Assert.Equal("Manual design review", body.Entry.Description);
         Assert.Equal(3600, body.Entry.DurationSeconds);
-        Assert.Null(body.OverlapWarning);
 
         var list = await client.GetAsync("/api/time-entries");
         var entries = await list.Content.ReadFromJsonAsync<List<TimeEntryResponse>>();
@@ -90,7 +89,7 @@ public class ManualEntryEndpointsTests
     }
 
     [Fact]
-    public async Task CreateManualEntry_OverlapRequiresConfirmation()
+    public async Task CreateManualEntry_OverlapIsRejected()
     {
         using var factory = new ReeTrackWebApplicationFactory();
         var (_, token) = await factory.SeedAdminAsync();
@@ -111,27 +110,23 @@ public class ManualEntryEndpointsTests
         {
             description = "Overlapping entry",
             startedAtUtc = startedAtUtc.AddMinutes(30),
-            endedAtUtc = endedAtUtc.AddMinutes(30),
-            confirmOverlap = false
+            endedAtUtc = endedAtUtc.AddMinutes(30)
         });
         Assert.Equal(HttpStatusCode.Conflict, overlapAttempt.StatusCode);
 
-        var confirmed = await client.PostAsJsonAsync("/api/time-entries/manual", new
+        var confirmedStillRejected = await client.PostAsJsonAsync("/api/time-entries/manual", new
         {
             description = "Overlapping entry",
             startedAtUtc = startedAtUtc.AddMinutes(30),
             endedAtUtc = endedAtUtc.AddMinutes(30),
             confirmOverlap = true
         });
-        Assert.Equal(HttpStatusCode.OK, confirmed.StatusCode);
-        var body = await confirmed.Content.ReadFromJsonAsync<CreateManualEntryResponse>();
-        Assert.NotNull(body?.OverlapWarning);
+        Assert.Equal(HttpStatusCode.Conflict, confirmedStillRejected.StatusCode);
     }
 
     private sealed class CreateManualEntryResponse
     {
         public TimeEntryResponse Entry { get; set; } = null!;
-        public string? OverlapWarning { get; set; }
     }
 
     private sealed class TimeEntryResponse

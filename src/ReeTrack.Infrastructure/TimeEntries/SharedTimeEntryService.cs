@@ -41,12 +41,12 @@ public class SharedTimeEntryService : ISharedTimeEntryService
         var startedAtUtc = running.StartedAtUtc.Value;
         var endedAtUtc = DateTime.UtcNow;
 
-        var assigneeOverlap = await BuildAssigneeOverlapWarningAsync(
+        var assigneeOverlap = await FindAssigneeOverlapMessageAsync(
             assignees,
             startedAtUtc,
             endedAtUtc,
             cancellationToken);
-        if (assigneeOverlap is not null && !input.ConfirmOverlap)
+        if (assigneeOverlap is not null)
             throw new AppException(assigneeOverlap, 409);
 
         var stopped = await _timeEntries.StopTimerAsync(
@@ -56,7 +56,6 @@ public class SharedTimeEntryService : ISharedTimeEntryService
         return await AttachShareToOwnedEntryAsync(
             stopped.Id,
             assignees,
-            input.ConfirmOverlap ? assigneeOverlap : null,
             cancellationToken);
     }
 
@@ -66,12 +65,12 @@ public class SharedTimeEntryService : ISharedTimeEntryService
     {
         var assignees = await ResolveAssigneesAsync(input.AssigneeUserIds, cancellationToken);
 
-        var assigneeOverlap = await BuildAssigneeOverlapWarningAsync(
+        var assigneeOverlap = await FindAssigneeOverlapMessageAsync(
             assignees,
             input.StartedAtUtc,
             input.EndedAtUtc,
             cancellationToken);
-        if (assigneeOverlap is not null && !input.ConfirmOverlap)
+        if (assigneeOverlap is not null)
             throw new AppException(assigneeOverlap, 409);
 
         var mine = await _timeEntries.CreateManualEntryAsync(
@@ -80,15 +79,13 @@ public class SharedTimeEntryService : ISharedTimeEntryService
                 Description = input.Description,
                 StartedAtUtc = input.StartedAtUtc,
                 EndedAtUtc = input.EndedAtUtc,
-                IsBillable = input.IsBillable,
-                ConfirmOverlap = input.ConfirmOverlap
+                IsBillable = input.IsBillable
             },
             cancellationToken);
 
         return await AttachShareToOwnedEntryAsync(
             mine.Entry.Id,
             assignees,
-            input.ConfirmOverlap ? mine.OverlapWarning ?? assigneeOverlap : null,
             cancellationToken);
     }
 
@@ -111,7 +108,6 @@ public class SharedTimeEntryService : ISharedTimeEntryService
         return await AttachShareToOwnedEntryAsync(
             mine.Entry.Id,
             assignees,
-            overlapWarning: null,
             cancellationToken);
     }
 
@@ -176,16 +172,16 @@ public class SharedTimeEntryService : ISharedTimeEntryService
         if (timingSource.Mode != TimeEntryMode.DurationOnly && timingSource.EndedAtUtc is null)
             throw new AppException("This entry cannot be shared.", 400);
 
-        string? overlapWarning = null;
+        string? overlapMessage = null;
         if (timingSource.Mode != TimeEntryMode.DurationOnly && timingSource.EndedAtUtc is not null)
         {
-            overlapWarning = await BuildAssigneeOverlapWarningAsync(
+            overlapMessage = await FindAssigneeOverlapMessageAsync(
                 assignees,
                 timingSource.StartedAtUtc!.Value,
                 timingSource.EndedAtUtc.Value,
                 cancellationToken);
-            if (overlapWarning is not null && !input.ConfirmOverlap)
-                throw new AppException(overlapWarning, 409);
+            if (overlapMessage is not null)
+                throw new AppException(overlapMessage, 409);
         }
 
         var shareGroupId = source.ShareGroupId
@@ -215,14 +211,12 @@ public class SharedTimeEntryService : ISharedTimeEntryService
             timingSource.DurationSeconds,
             timingSource.IsBillable,
             shareGroupId,
-            input.ConfirmOverlap ? overlapWarning : null,
             cancellationToken);
     }
 
     private async Task<CreateSharedManualEntryResult> AttachShareToOwnedEntryAsync(
         Guid ownedEntryId,
         IReadOnlyList<User> assignees,
-        string? overlapWarning,
         CancellationToken cancellationToken)
     {
         var ownedEntry = await _db.TimeEntries
@@ -245,7 +239,6 @@ public class SharedTimeEntryService : ISharedTimeEntryService
             ownedEntry.DurationSeconds,
             ownedEntry.IsBillable,
             shareGroupId,
-            overlapWarning,
             cancellationToken);
     }
 
@@ -260,7 +253,6 @@ public class SharedTimeEntryService : ISharedTimeEntryService
         int durationSeconds,
         bool isBillable,
         Guid shareGroupId,
-        string? overlapWarning,
         CancellationToken cancellationToken)
     {
         var submitterId = _currentUser.UserId;
@@ -317,28 +309,28 @@ public class SharedTimeEntryService : ISharedTimeEntryService
             pendingEntries,
             assigneeById,
             submitterName,
-            new Dictionary<Guid, List<TimeEntry>> { [shareGroupId] = groupRows },
-            overlapWarning);
+            new Dictionary<Guid, List<TimeEntry>> { [shareGroupId] = groupRows });
     }
 
-    private async Task<string?> BuildAssigneeOverlapWarningAsync(
+    private async Task<string?> FindAssigneeOverlapMessageAsync(
         IReadOnlyList<User> assignees,
         DateTime startedAtUtc,
         DateTime endedAtUtc,
         CancellationToken cancellationToken)
     {
-        string? warning = null;
         foreach (var assignee in assignees)
         {
-            warning ??= await BuildOverlapWarningAsync(
+            var message = await FindOverlapMessageAsync(
                 assignee.Id,
                 startedAtUtc,
                 endedAtUtc,
                 excludeEntryId: null,
                 cancellationToken);
+            if (message is not null)
+                return message;
         }
 
-        return warning;
+        return null;
     }
 
     private async Task<List<User>> ResolveAssigneesAsync(
@@ -369,8 +361,7 @@ public class SharedTimeEntryService : ISharedTimeEntryService
         IReadOnlyList<TimeEntry> pendingEntries,
         IReadOnlyDictionary<Guid, User> assigneeById,
         string submitterName,
-        IReadOnlyDictionary<Guid, List<TimeEntry>> shareGroups,
-        string? overlapWarning)
+        IReadOnlyDictionary<Guid, List<TimeEntry>> shareGroups)
     {
         var resultEntries = new List<TimeEntryDto>();
 
@@ -395,8 +386,7 @@ public class SharedTimeEntryService : ISharedTimeEntryService
 
         return new CreateSharedManualEntryResult
         {
-            Entries = resultEntries,
-            OverlapWarning = overlapWarning
+            Entries = resultEntries
         };
     }
 
@@ -414,7 +404,7 @@ public class SharedTimeEntryService : ISharedTimeEntryService
             .ToListAsync(cancellationToken);
     }
 
-    private async Task<string?> BuildOverlapWarningAsync(
+private async Task<string?> FindOverlapMessageAsync(
         Guid userId,
         DateTime startedAtUtc,
         DateTime endedAtUtc,
@@ -443,8 +433,8 @@ public class SharedTimeEntryService : ISharedTimeEntryService
             .ToList();
 
         if (labels.Count > 0)
-            return $"This entry overlaps with: {string.Join(", ", labels)}. Save anyway?";
+            return $"This entry overlaps with: {string.Join(", ", labels)}.";
 
-        return "This entry overlaps with an existing time entry. Save anyway?";
+        return "This entry overlaps with an existing time entry.";
     }
 }

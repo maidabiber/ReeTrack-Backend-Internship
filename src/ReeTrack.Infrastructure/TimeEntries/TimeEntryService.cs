@@ -98,15 +98,12 @@ public class TimeEntryService : ITimeEntryService
         await _lockedPeriod.EnsureEntryEditableAsync(input.StartedAtUtc, cancellationToken);
 
         var durationSeconds = (int)(input.EndedAtUtc - input.StartedAtUtc).TotalSeconds;
-        var overlapWarning = await BuildOverlapWarningAsync(
+        await EnsureNoOverlapAsync(
             userId,
             input.StartedAtUtc,
             input.EndedAtUtc,
             excludeEntryId: null,
             cancellationToken);
-
-        if (overlapWarning is not null && !input.ConfirmOverlap)
-            throw new AppException(overlapWarning, 409);
 
         var now = DateTime.UtcNow;
         var entry = new TimeEntry
@@ -127,8 +124,7 @@ public class TimeEntryService : ITimeEntryService
 
         return new CreateManualEntryResult
         {
-            Entry = MapEntity(entry),
-            OverlapWarning = input.ConfirmOverlap ? overlapWarning : null
+            Entry = MapEntity(entry)
         };
     }
 
@@ -161,8 +157,7 @@ public class TimeEntryService : ITimeEntryService
 
         return new CreateManualEntryResult
         {
-            Entry = MapEntity(entry),
-            OverlapWarning = null
+            Entry = MapEntity(entry)
         };
     }
 
@@ -185,7 +180,7 @@ public class TimeEntryService : ITimeEntryService
         if (entry.Status == TimeEntryStatus.Pending)
             throw new AppException("Pending entries must be reviewed on the Approvals page.", 409);
 
-        var overlapWarning = await ApplyTimedEntryUpdateAsync(
+        await ApplyTimedEntryUpdateAsync(
             entry,
             input,
             checkPreviousPeriodLock: true,
@@ -193,8 +188,7 @@ public class TimeEntryService : ITimeEntryService
 
         return new UpdateTimeEntryResult
         {
-            Entry = MapEntity(entry),
-            OverlapWarning = overlapWarning
+            Entry = MapEntity(entry)
         };
     }
 
@@ -230,8 +224,7 @@ public class TimeEntryService : ITimeEntryService
 
         return new UpdateTimeEntryResult
         {
-            Entry = MapEntity(entry),
-            OverlapWarning = null
+            Entry = MapEntity(entry)
         };
     }
 
@@ -297,7 +290,7 @@ public class TimeEntryService : ITimeEntryService
             cancellationToken);
     }
 
-    private async Task<string?> BuildOverlapWarningAsync(
+    private async Task EnsureNoOverlapAsync(
         Guid userId,
         DateTime startedAtUtc,
         DateTime endedAtUtc,
@@ -317,7 +310,7 @@ public class TimeEntryService : ITimeEntryService
             .ToListAsync(cancellationToken);
 
         if (overlapping.Count == 0)
-            return null;
+            return;
 
         var labels = overlapping
             .Select(e => e.Description?.Trim())
@@ -326,9 +319,9 @@ public class TimeEntryService : ITimeEntryService
             .ToList();
 
         if (labels.Count > 0)
-            return $"This entry overlaps with: {string.Join(", ", labels)}. Save anyway?";
+            throw new AppException($"This entry overlaps with: {string.Join(", ", labels)}.", 409);
 
-        return "This entry overlaps with an existing time entry. Save anyway?";
+        throw new AppException("This entry overlaps with an existing time entry.", 409);
     }
 
     private async Task<IReadOnlyDictionary<Guid, List<TimeEntry>>> LoadShareGroupsAsync(
@@ -356,7 +349,7 @@ public class TimeEntryService : ITimeEntryService
             .ToDictionary(group => group.Key, group => group.ToList());
     }
 
-    private async Task<string?> ApplyTimedEntryUpdateAsync(
+    private async Task ApplyTimedEntryUpdateAsync(
         TimeEntry entry,
         UpdateTimeEntryInput input,
         bool checkPreviousPeriodLock,
@@ -369,15 +362,12 @@ public class TimeEntryService : ITimeEntryService
         await _lockedPeriod.EnsureEntryEditableAsync(input.StartedAtUtc, cancellationToken);
 
         var durationSeconds = (int)(input.EndedAtUtc - input.StartedAtUtc).TotalSeconds;
-        var overlapWarning = await BuildOverlapWarningAsync(
+        await EnsureNoOverlapAsync(
             entry.UserId,
             input.StartedAtUtc,
             input.EndedAtUtc,
             excludeEntryId: entry.Id,
             cancellationToken);
-
-        if (overlapWarning is not null && !input.ConfirmOverlap)
-            throw new AppException(overlapWarning, 409);
 
         entry.Description = NormalizeDescription(input.Description);
         entry.IsBillable = input.IsBillable;
@@ -387,8 +377,6 @@ public class TimeEntryService : ITimeEntryService
         entry.UpdatedAtUtc = DateTime.UtcNow;
 
         await _db.SaveChangesAsync(cancellationToken);
-
-        return input.ConfirmOverlap ? overlapWarning : null;
     }
 
     private static void ValidateManualRange(DateTime startedAtUtc, DateTime endedAtUtc) =>
