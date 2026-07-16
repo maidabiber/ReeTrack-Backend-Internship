@@ -19,6 +19,7 @@ public class AppDbContext : DbContext, IApplicationDbContext
     public DbSet<ProjectTask> ProjectTasks => Set<ProjectTask>();
     public DbSet<Tag> Tags => Set<Tag>();
     public DbSet<TimeEntry> TimeEntries => Set<TimeEntry>();
+    public DbSet<TimeEntryTemplate> TimeEntryTemplates => Set<TimeEntryTemplate>();
     public DbSet<TimeEntryTag> TimeEntryTags => Set<TimeEntryTag>();
     public DbSet<UserCalendarConnection> UserCalendarConnections => Set<UserCalendarConnection>();
     public DbSet<SyncedCalendarEvent> SyncedCalendarEvents => Set<SyncedCalendarEvent>();

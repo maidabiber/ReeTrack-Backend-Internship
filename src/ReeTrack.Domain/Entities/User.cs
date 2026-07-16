@@ -18,5 +18,6 @@ public class User : BaseEntity, IAuditable
     public ICollection<Invitation> SentInvitations { get; set; } = [];
     public ICollection<Invitation> AcceptedInvitations { get; set; } = [];
     public ICollection<TimeEntry> TimeEntries { get; set; } = [];
+    public ICollection<TimeEntryTemplate> TimeEntryTemplates { get; set; } = [];
     public ICollection<ProjectTask> AssignedTasks { get; set; } = [];
 }
