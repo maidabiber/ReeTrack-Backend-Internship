@@ -14,17 +14,20 @@ public class SharedTimeEntryService : ISharedTimeEntryService
     private readonly ICurrentUserService _currentUser;
     private readonly ITimeEntryService _timeEntries;
     private readonly ISharedTimeEntryEmailNotifier _emailNotifier;
+    private readonly ITimeEntryGuardService _entryGuard;
 
     public SharedTimeEntryService(
         IApplicationDbContext db,
         ICurrentUserService currentUser,
         ITimeEntryService timeEntries,
-        ISharedTimeEntryEmailNotifier emailNotifier)
+        ISharedTimeEntryEmailNotifier emailNotifier,
+        ITimeEntryGuardService entryGuard)
     {
         _db = db;
         _currentUser = currentUser;
         _timeEntries = timeEntries;
         _emailNotifier = emailNotifier;
+        _entryGuard = entryGuard;
     }
 
     public async Task<CreateSharedManualEntryResult> StopSharedTimerAsync(
@@ -256,6 +259,9 @@ public class SharedTimeEntryService : ISharedTimeEntryService
         CancellationToken cancellationToken)
     {
         var submitterId = _currentUser.UserId;
+        foreach (var assignee in assignees)
+            await _entryGuard.EnsureEditableAsync(assignee.Id, startedAtUtc, cancellationToken);
+
         var submitter = await _db.Users
             .AsNoTracking()
             .FirstAsync(u => u.Id == submitterId, cancellationToken);

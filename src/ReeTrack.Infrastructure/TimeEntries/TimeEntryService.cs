@@ -11,16 +11,16 @@ public class TimeEntryService : ITimeEntryService
 {
     private readonly IApplicationDbContext _db;
     private readonly ICurrentUserService _currentUser;
-    private readonly ILockedPeriodService _lockedPeriod;
+    private readonly ITimeEntryGuardService _entryGuard;
 
     public TimeEntryService(
         IApplicationDbContext db,
         ICurrentUserService currentUser,
-        ILockedPeriodService lockedPeriod)
+        ITimeEntryGuardService entryGuard)
     {
         _db = db;
         _currentUser = currentUser;
-        _lockedPeriod = lockedPeriod;
+        _entryGuard = entryGuard;
     }
 
     public async Task<TimeEntryDto?> GetActiveTimerAsync(CancellationToken cancellationToken = default)
@@ -40,6 +40,8 @@ public class TimeEntryService : ITimeEntryService
             throw new AppException("A timer is already running.", 409);
 
         var now = DateTime.UtcNow;
+        await _entryGuard.EnsureEditableAsync(userId, now, cancellationToken);
+
         var entry = new TimeEntry
         {
             UserId = userId,
@@ -95,7 +97,7 @@ public class TimeEntryService : ITimeEntryService
     {
         var userId = _currentUser.UserId;
         ValidateManualRange(input.StartedAtUtc, input.EndedAtUtc);
-        await _lockedPeriod.EnsureEntryEditableAsync(input.StartedAtUtc, cancellationToken);
+        await _entryGuard.EnsureEditableAsync(userId, input.StartedAtUtc, cancellationToken);
 
         var durationSeconds = (int)(input.EndedAtUtc - input.StartedAtUtc).TotalSeconds;
         await EnsureNoOverlapAsync(
@@ -137,7 +139,7 @@ public class TimeEntryService : ITimeEntryService
         var normalizedEntryDateUtc = NormalizeEntryDateUtc(input.EntryDateUtc);
 
         var now = DateTime.UtcNow;
-        await _lockedPeriod.EnsureEntryEditableAsync(normalizedEntryDateUtc, cancellationToken);
+        await _entryGuard.EnsureEditableAsync(userId, normalizedEntryDateUtc, cancellationToken);
 
         var entry = new TimeEntry
         {
@@ -210,7 +212,9 @@ public class TimeEntryService : ITimeEntryService
 
         ValidateDurationOnly(input.DurationSeconds);
         var normalizedEntryDateUtc = NormalizeEntryDateUtc(input.EntryDateUtc);
-        await _lockedPeriod.EnsureEntryEditableAsync(normalizedEntryDateUtc, cancellationToken);
+        if (entry.StartedAtUtc is not null)
+            await _entryGuard.EnsureEditableAsync(entry.UserId, entry.StartedAtUtc.Value, cancellationToken);
+        await _entryGuard.EnsureEditableAsync(entry.UserId, normalizedEntryDateUtc, cancellationToken);
 
         var now = DateTime.UtcNow;
         entry.Description = NormalizeDescription(input.Description);
@@ -356,10 +360,10 @@ public class TimeEntryService : ITimeEntryService
         CancellationToken cancellationToken)
     {
         if (checkPreviousPeriodLock && entry.StartedAtUtc is not null)
-            await _lockedPeriod.EnsureEntryEditableAsync(entry.StartedAtUtc.Value, cancellationToken);
+            await _entryGuard.EnsureEditableAsync(entry.UserId, entry.StartedAtUtc.Value, cancellationToken);
 
         ValidateManualRange(input.StartedAtUtc, input.EndedAtUtc);
-        await _lockedPeriod.EnsureEntryEditableAsync(input.StartedAtUtc, cancellationToken);
+        await _entryGuard.EnsureEditableAsync(entry.UserId, input.StartedAtUtc, cancellationToken);
 
         var durationSeconds = (int)(input.EndedAtUtc - input.StartedAtUtc).TotalSeconds;
         await EnsureNoOverlapAsync(

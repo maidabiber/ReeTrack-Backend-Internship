@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using ReeTrack.Infrastructure.Persistence;
@@ -11,13 +12,15 @@ using ReeTrack.Infrastructure.Persistence;
 namespace ReeTrack.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260715110022_AddTimesheets")]
+    partial class AddTimesheets
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.4")
+                .HasAnnotation("ProductVersion", "10.0.9")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -585,79 +588,6 @@ namespace ReeTrack.Infrastructure.Persistence.Migrations
                     b.ToTable("time_entry_tags", (string)null);
                 });
 
-            modelBuilder.Entity("ReeTrack.Domain.Entities.TimeEntryTemplate", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id")
-                        .HasDefaultValueSql("gen_random_uuid()");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at_utc");
-
-                    b.Property<string>("Description")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)")
-                        .HasColumnName("description");
-
-                    b.Property<int>("DurationSeconds")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasDefaultValue(0)
-                        .HasColumnName("duration_seconds");
-
-                    b.Property<TimeOnly?>("EndTimeUtc")
-                        .HasColumnType("time without time zone")
-                        .HasColumnName("end_time_utc");
-
-                    b.Property<bool>("IsBillable")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(true)
-                        .HasColumnName("is_billable");
-
-                    b.Property<Guid?>("ProjectId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("project_id");
-
-                    b.Property<Guid?>("ProjectTaskId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("project_task_id");
-
-                    b.Property<TimeOnly?>("StartTimeUtc")
-                        .HasColumnType("time without time zone")
-                        .HasColumnName("start_time_utc");
-
-                    b.Property<Guid>("TimeEntryId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("time_entry_id");
-
-                    b.Property<DateTime>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at_utc");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("user_id");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ProjectId");
-
-                    b.HasIndex("ProjectTaskId");
-
-                    b.HasIndex("TimeEntryId")
-                        .IsUnique()
-                        .HasDatabaseName("ix_time_entry_templates_time_entry_id");
-
-                    b.HasIndex("UserId")
-                        .HasDatabaseName("ix_time_entry_templates_user_id");
-
-                    b.ToTable("time_entry_templates", (string)null);
-                });
-
             modelBuilder.Entity("ReeTrack.Domain.Entities.Timesheet", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1053,39 +983,6 @@ namespace ReeTrack.Infrastructure.Persistence.Migrations
                     b.Navigation("TimeEntry");
                 });
 
-            modelBuilder.Entity("ReeTrack.Domain.Entities.TimeEntryTemplate", b =>
-                {
-                    b.HasOne("ReeTrack.Domain.Entities.Project", "Project")
-                        .WithMany()
-                        .HasForeignKey("ProjectId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.HasOne("ReeTrack.Domain.Entities.ProjectTask", "ProjectTask")
-                        .WithMany()
-                        .HasForeignKey("ProjectTaskId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.HasOne("ReeTrack.Domain.Entities.TimeEntry", "TimeEntry")
-                        .WithMany()
-                        .HasForeignKey("TimeEntryId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("ReeTrack.Domain.Entities.User", "User")
-                        .WithMany("TimeEntryTemplates")
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("Project");
-
-                    b.Navigation("ProjectTask");
-
-                    b.Navigation("TimeEntry");
-
-                    b.Navigation("User");
-                });
-
             modelBuilder.Entity("ReeTrack.Domain.Entities.Timesheet", b =>
                 {
                     b.HasOne("ReeTrack.Domain.Entities.User", "ReviewedByUser")
@@ -1179,8 +1076,6 @@ namespace ReeTrack.Infrastructure.Persistence.Migrations
                     b.Navigation("SentInvitations");
 
                     b.Navigation("TimeEntries");
-
-                    b.Navigation("TimeEntryTemplates");
 
                     b.Navigation("UserRoles");
                 });

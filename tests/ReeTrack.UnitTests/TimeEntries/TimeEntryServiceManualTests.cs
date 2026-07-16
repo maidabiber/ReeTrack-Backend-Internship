@@ -6,6 +6,7 @@ using ReeTrack.Domain.Entities;
 using ReeTrack.Domain.Enums;
 using ReeTrack.Infrastructure.Persistence;
 using ReeTrack.Infrastructure.TimeEntries;
+using ReeTrack.Infrastructure.Timesheets;
 using Xunit;
 
 namespace ReeTrack.UnitTests.TimeEntries;
@@ -30,7 +31,7 @@ public class TimeEntryServiceManualTests : IDisposable
         _service = new TimeEntryService(
             _db,
             new FakeCurrentUser(_userId),
-            new PermissiveLockedPeriodService());
+            new TimeEntryGuardService(_db, new PermissiveLockedPeriodService()));
     }
 
     [Fact]
@@ -206,13 +207,14 @@ public class TimeEntryServiceManualTests : IDisposable
         var deps = TimeEntryServiceTestDependencies.Create();
         deps.EmailSender.ThrowOnMentionEmail = true;
         var currentUser = new FakeCurrentUser(_userId);
-        var lockedPeriod = new PermissiveLockedPeriodService();
-        var timeEntries = new TimeEntryService(_db, currentUser, lockedPeriod);
+        var entryGuard = new TimeEntryGuardService(_db, new PermissiveLockedPeriodService());
+        var timeEntries = new TimeEntryService(_db, currentUser, entryGuard);
         var service = new SharedTimeEntryService(
             _db,
             currentUser,
             timeEntries,
-            deps.EmailNotifier);
+            deps.EmailNotifier,
+            entryGuard);
 
         var startedAtUtc = DateTime.UtcNow.AddHours(-3);
         var endedAtUtc = DateTime.UtcNow.AddHours(-2);

@@ -14,6 +14,7 @@ using ReeTrack.Infrastructure.Projects;
 using ReeTrack.Infrastructure.Tags;
 using ReeTrack.Infrastructure.Teammates;
 using ReeTrack.Infrastructure.TimeEntries;
+using ReeTrack.Infrastructure.Timesheets;
 using ReeTrack.Infrastructure.Background;
 using ReeTrack.Infrastructure.Calendar;
 using ReeTrack.Infrastructure.Integrations.Calendar;
@@ -57,6 +58,7 @@ public static class DependencyInjection
         services.AddScoped<IMemberService, MemberService>();
         services.AddScoped<ITeammateService, TeammateService>();
         services.AddScoped<ILockedPeriodService, LockedPeriodService>();
+        services.AddScoped<ITimeEntryGuardService, TimeEntryGuardService>();
         services.AddScoped<ITimeEntryService, TimeEntryService>();
         services.AddScoped<ISharedTimeEntryService, SharedTimeEntryService>();
         services.AddScoped<ISharedTimeEntryEmailNotifier, SharedTimeEntryEmailNotifier>();

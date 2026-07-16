@@ -11,16 +11,16 @@ public class SharedTimeEntryApprovalService : ISharedTimeEntryApprovalService
 {
     private readonly IApplicationDbContext _db;
     private readonly ICurrentUserService _currentUser;
-    private readonly ILockedPeriodService _lockedPeriod;
+    private readonly ITimeEntryGuardService _entryGuard;
 
     public SharedTimeEntryApprovalService(
         IApplicationDbContext db,
         ICurrentUserService currentUser,
-        ILockedPeriodService lockedPeriod)
+        ITimeEntryGuardService entryGuard)
     {
         _db = db;
         _currentUser = currentUser;
-        _lockedPeriod = lockedPeriod;
+        _entryGuard = entryGuard;
     }
 
     public async Task<IReadOnlyList<TimeEntryDto>> ListPendingAsync(CancellationToken cancellationToken = default)
@@ -89,7 +89,7 @@ public class SharedTimeEntryApprovalService : ISharedTimeEntryApprovalService
             ?? throw new AppException("Pending time entry not found.", 404);
 
         if (entry.StartedAtUtc is not null)
-            await _lockedPeriod.EnsureEntryEditableAsync(entry.StartedAtUtc.Value, cancellationToken);
+            await _entryGuard.EnsureEditableAsync(entry.UserId, entry.StartedAtUtc.Value, cancellationToken);
 
         entry.Status = TimeEntryStatus.Confirmed;
         entry.UpdatedAtUtc = DateTime.UtcNow;
@@ -134,10 +134,10 @@ public class SharedTimeEntryApprovalService : ISharedTimeEntryApprovalService
         CancellationToken cancellationToken)
     {
         if (checkPreviousPeriodLock && entry.StartedAtUtc is not null)
-            await _lockedPeriod.EnsureEntryEditableAsync(entry.StartedAtUtc.Value, cancellationToken);
+            await _entryGuard.EnsureEditableAsync(entry.UserId, entry.StartedAtUtc.Value, cancellationToken);
 
         TimeEntryHelpers.ValidateManualRange(input.StartedAtUtc, input.EndedAtUtc);
-        await _lockedPeriod.EnsureEntryEditableAsync(input.StartedAtUtc, cancellationToken);
+        await _entryGuard.EnsureEditableAsync(entry.UserId, input.StartedAtUtc, cancellationToken);
 
         var durationSeconds = (int)(input.EndedAtUtc - input.StartedAtUtc).TotalSeconds;
         await EnsureNoOverlapAsync(

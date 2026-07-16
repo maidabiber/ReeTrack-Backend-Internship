@@ -8,6 +8,7 @@ using ReeTrack.Domain.Entities;
 using ReeTrack.Domain.Enums;
 using ReeTrack.Infrastructure.Persistence;
 using ReeTrack.Infrastructure.TimeEntries;
+using ReeTrack.Infrastructure.Timesheets;
 using Xunit;
 
 namespace ReeTrack.UnitTests.TimeEntries;
@@ -34,7 +35,7 @@ public class TimeEntryServiceUpdateTests : IDisposable
         _service = new TimeEntryService(
             _db,
             new FakeCurrentUser(_userId),
-            new LockedPeriodService(Options.Create(new TimeEntryOptions())));
+            new TimeEntryGuardService(_db, new LockedPeriodService(Options.Create(new TimeEntryOptions()))));
     }
 
     [Fact]
@@ -182,7 +183,7 @@ public class TimeEntryServiceUpdateTests : IDisposable
         var service = new TimeEntryService(
             _db,
             new FakeCurrentUser(_userId),
-            lockedService);
+            new TimeEntryGuardService(_db, lockedService));
 
         var entryId = await SeedManualEntry(
             DateTime.UtcNow.AddDays(-3),
