@@ -43,6 +43,34 @@ public sealed class MyWeekTimesheetResponse
     public required IReadOnlyList<string> Blockers { get; init; }
 }
 
+public sealed class ReviewDecisionRequest
+{
+    public string? Comment { get; set; }
+}
+
+public sealed class AdminTimesheetListItemResponse
+{
+    public required Guid Id { get; init; }
+    public required Guid UserId { get; init; }
+    public string? UserDisplayName { get; init; }
+    public required string UserEmail { get; init; }
+    public required DateOnly WeekStartDate { get; init; }
+    public required string Status { get; init; }
+    public required DateTime SubmittedAtUtc { get; init; }
+    public required long TotalSeconds { get; init; }
+    public required int EntryCount { get; init; }
+}
+
+public sealed class AdminTimesheetDetailResponse
+{
+    public required TimesheetResponse Timesheet { get; init; }
+    public string? UserDisplayName { get; init; }
+    public required string UserEmail { get; init; }
+    public required IReadOnlyList<TimesheetEntryResponse> Entries { get; init; }
+    public required long TotalSeconds { get; init; }
+    public required long BillableSeconds { get; init; }
+}
+
 public sealed class WeekSummaryResponse
 {
     public required DateOnly WeekStartDate { get; init; }

@@ -1,0 +1,181 @@
+using Microsoft.EntityFrameworkCore;
+using ReeTrack.Application.Common.Exceptions;
+using ReeTrack.Application.Common.Interfaces;
+using ReeTrack.Application.Common.Models;
+using ReeTrack.Domain.Enums;
+
+namespace ReeTrack.Infrastructure.Timesheets;
+
+public class TimesheetReviewService : ITimesheetReviewService
+{
+    private const int MaxPageSize = 100;
+
+    private readonly IApplicationDbContext _db;
+    private readonly ICurrentUserService _currentUser;
+    private readonly ITimesheetDecisionEmailNotifier _emailNotifier;
+
+    public TimesheetReviewService(
+        IApplicationDbContext db,
+        ICurrentUserService currentUser,
+        ITimesheetDecisionEmailNotifier emailNotifier)
+    {
+        _db = db;
+        _currentUser = currentUser;
+        _emailNotifier = emailNotifier;
+    }
+
+    public async Task<PagedResult<AdminTimesheetListItemDto>> ListAsync(
+        TimesheetStatus? status,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken = default)
+    {
+        page = Math.Max(1, page);
+        pageSize = Math.Clamp(pageSize, 1, MaxPageSize);
+
+        var query = _db.Timesheets
+            .AsNoTracking()
+            .Include(t => t.User)
+            .Where(t => status == null || t.Status == status);
+
+        var totalCount = await query.CountAsync(cancellationToken);
+        var timesheets = await query
+            .OrderBy(t => t.SubmittedAtUtc)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(cancellationToken);
+
+        var totalsByWeek = await LoadWeekTotalsAsync(
+            timesheets.Select(t => (t.UserId, t.WeekStartDate)).ToList(),
+            cancellationToken);
+
+        var items = timesheets
+            .Select(t =>
+            {
+                // Missing key yields the default tuple (0, 0) for weeks with no entries.
+                var totals = totalsByWeek.GetValueOrDefault((t.UserId, t.WeekStartDate));
+                return new AdminTimesheetListItemDto
+                {
+                    Id = t.Id,
+                    UserId = t.UserId,
+                    UserDisplayName = t.User.DisplayName,
+                    UserEmail = t.User.Email,
+                    WeekStartDate = t.WeekStartDate,
+                    Status = t.Status.ToString(),
+                    SubmittedAtUtc = t.SubmittedAtUtc,
+                    TotalSeconds = totals.TotalSeconds,
+                    EntryCount = totals.EntryCount
+                };
+            })
+            .ToList();
+
+        return new PagedResult<AdminTimesheetListItemDto>
+        {
+            Items = items,
+            TotalCount = totalCount,
+            Page = page,
+            PageSize = pageSize
+        };
+    }
+
+    public async Task<AdminTimesheetDetailDto> GetAsync(
+        Guid timesheetId,
+        CancellationToken cancellationToken = default)
+    {
+        var timesheet = await _db.Timesheets
+            .AsNoTracking()
+            .Include(t => t.User)
+            .Include(t => t.ReviewedByUser)
+            .FirstOrDefaultAsync(t => t.Id == timesheetId, cancellationToken)
+            ?? throw new AppException("Timesheet not found.", 404);
+
+        var entries = await TimesheetQueries.WeekEntriesAsync(
+            _db, timesheet.UserId, timesheet.WeekStartDate, cancellationToken);
+
+        return new AdminTimesheetDetailDto
+        {
+            Timesheet = TimesheetMapping.MapTimesheet(timesheet),
+            UserDisplayName = timesheet.User.DisplayName,
+            UserEmail = timesheet.User.Email,
+            Entries = entries.Select(TimesheetMapping.MapEntry).ToList(),
+            TotalSeconds = entries.Sum(e => (long)e.DurationSeconds),
+            BillableSeconds = entries.Where(e => e.IsBillable).Sum(e => (long)e.DurationSeconds)
+        };
+    }
+
+    public Task<TimesheetDto> ApproveAsync(
+        Guid timesheetId,
+        string? comment,
+        CancellationToken cancellationToken = default) =>
+        ReviewAsync(timesheetId, TimesheetStatus.Approved, comment, cancellationToken);
+
+    public Task<TimesheetDto> RejectAsync(
+        Guid timesheetId,
+        string? comment,
+        CancellationToken cancellationToken = default) =>
+        ReviewAsync(timesheetId, TimesheetStatus.Rejected, comment, cancellationToken);
+
+    private async Task<TimesheetDto> ReviewAsync(
+        Guid timesheetId,
+        TimesheetStatus decision,
+        string? comment,
+        CancellationToken cancellationToken)
+    {
+        var reviewerId = _currentUser.UserId;
+        var timesheet = await _db.Timesheets
+            .Include(t => t.User)
+            .FirstOrDefaultAsync(t => t.Id == timesheetId, cancellationToken)
+            ?? throw new AppException("Timesheet not found.", 404);
+
+        if (timesheet.Status != TimesheetStatus.Submitted)
+            throw new AppException("This timesheet has already been reviewed.", 409);
+
+        var reviewer = await _db.Users
+            .AsNoTracking()
+            .FirstAsync(u => u.Id == reviewerId, cancellationToken);
+
+        timesheet.Status = decision;
+        timesheet.ReviewedByUserId = reviewerId;
+        timesheet.ReviewedAtUtc = DateTime.UtcNow;
+        timesheet.ReviewComment = string.IsNullOrWhiteSpace(comment) ? null : comment.Trim();
+        timesheet.ReviewedByUser = reviewer;
+
+        await _db.SaveChangesAsync(cancellationToken);
+
+        _emailNotifier.QueueDecisionEmail(
+            timesheet,
+            timesheet.User,
+            reviewer.DisplayName?.Trim() ?? reviewer.Email,
+            approved: decision == TimesheetStatus.Approved);
+
+        return TimesheetMapping.MapTimesheet(timesheet);
+    }
+
+    private async Task<Dictionary<(Guid UserId, DateOnly Week), (long TotalSeconds, int EntryCount)>> LoadWeekTotalsAsync(
+        IReadOnlyList<(Guid UserId, DateOnly Week)> weeks,
+        CancellationToken cancellationToken)
+    {
+        if (weeks.Count == 0)
+            return [];
+
+        var userIds = weeks.Select(w => w.UserId).Distinct().ToList();
+        var rangeStartUtc = TimesheetWeek.ToUtcMidnight(weeks.Min(w => w.Week));
+        var rangeEndUtc = TimesheetWeek.ToUtcMidnight(weeks.Max(w => w.Week).AddDays(7));
+
+        var entries = await _db.TimeEntries
+            .AsNoTracking()
+            .Where(e => userIds.Contains(e.UserId) &&
+                        e.StartedAtUtc >= rangeStartUtc &&
+                        e.StartedAtUtc < rangeEndUtc)
+            .Select(e => new { e.UserId, StartedAtUtc = e.StartedAtUtc!.Value, e.DurationSeconds })
+            .ToListAsync(cancellationToken);
+
+        var wanted = weeks.ToHashSet();
+        return entries
+            .GroupBy(e => (e.UserId, Week: TimesheetWeek.ToWeekStart(e.StartedAtUtc)))
+            .Where(g => wanted.Contains(g.Key))
+            .ToDictionary(
+                g => g.Key,
+                g => (g.Sum(e => (long)e.DurationSeconds), g.Count()));
+    }
+}

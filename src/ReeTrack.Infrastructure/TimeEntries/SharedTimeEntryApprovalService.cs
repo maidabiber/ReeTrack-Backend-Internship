@@ -12,20 +12,17 @@ public class SharedTimeEntryApprovalService : ISharedTimeEntryApprovalService
     private readonly IApplicationDbContext _db;
     private readonly ICurrentUserService _currentUser;
     private readonly ITimeEntryGuardService _entryGuard;
-    private readonly ILockedPeriodService _lockedPeriod;
     private readonly ITimeEntryAssociationService _associations;
 
     public SharedTimeEntryApprovalService(
         IApplicationDbContext db,
         ICurrentUserService currentUser,
         ITimeEntryGuardService entryGuard,
-        ILockedPeriodService lockedPeriod,
         ITimeEntryAssociationService associations)
     {
         _db = db;
         _currentUser = currentUser;
         _entryGuard = entryGuard;
-        _lockedPeriod = lockedPeriod;
         _associations = associations;
     }
 

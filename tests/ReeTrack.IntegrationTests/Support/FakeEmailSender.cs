@@ -35,4 +35,31 @@ public sealed class FakeEmailSender : IEmailSender
         LastMentionReviewUrl = reviewUrl;
         return Task.CompletedTask;
     }
+
+    public sealed record DecisionEmail(
+        string ToEmail,
+        string RecipientName,
+        string ReviewerName,
+        string WeekLabel,
+        bool Approved,
+        string? Comment,
+        string TimesheetUrl);
+
+    public List<DecisionEmail> DecisionEmails { get; } = [];
+
+    public Task SendTimesheetDecisionEmailAsync(
+        string toEmail,
+        string recipientName,
+        string reviewerName,
+        string weekLabel,
+        bool approved,
+        string? comment,
+        string timesheetUrl,
+        string appName,
+        CancellationToken cancellationToken = default)
+    {
+        DecisionEmails.Add(new DecisionEmail(
+            toEmail, recipientName, reviewerName, weekLabel, approved, comment, timesheetUrl));
+        return Task.CompletedTask;
+    }
 }

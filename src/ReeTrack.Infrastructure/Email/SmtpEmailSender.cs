@@ -17,7 +17,7 @@ public class SmtpEmailSender : IEmailSender
         _options = options.Value;
     }
 
-    public async Task SendInviteEmailAsync(
+    public Task SendInviteEmailAsync(
         string toEmail,
         string inviteUrl,
         string inviterName,
@@ -25,9 +25,6 @@ public class SmtpEmailSender : IEmailSender
         string appName,
         CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(_options.SmtpHost))
-            throw new InvalidOperationException("SMTP host is not configured.");
-
         var subject = $"{inviterName} invited you to {appName}";
         var textBody =
             $"{inviterName} invited you to join {appName} as a {roleName}.\n\n" +
@@ -42,23 +39,10 @@ public class SmtpEmailSender : IEmailSender
             <p>Sign in with the Google account that matches this email address.</p>
             """;
 
-        var message = new MimeMessage();
-        message.From.Add(MailboxAddress.Parse(_options.From));
-        message.To.Add(MailboxAddress.Parse(toEmail));
-        message.Subject = subject;
-        message.Body = new BodyBuilder { TextBody = textBody, HtmlBody = htmlBody }.ToMessageBody();
-
-        using var client = new SmtpClient();
-        await client.ConnectAsync(_options.SmtpHost, _options.SmtpPort, SecureSocketOptions.StartTlsWhenAvailable, cancellationToken);
-
-        if (!string.IsNullOrWhiteSpace(_options.SmtpUsername))
-            await client.AuthenticateAsync(_options.SmtpUsername, _options.SmtpPassword, cancellationToken);
-
-        await client.SendAsync(message, cancellationToken);
-        await client.DisconnectAsync(quit: true, cancellationToken);
+        return SendAsync(toEmail, subject, textBody, htmlBody, cancellationToken);
     }
 
-    public async Task SendTimeEntryMentionEmailAsync(
+    public Task SendTimeEntryMentionEmailAsync(
         string toEmail,
         string assigneeName,
         string submitterName,
@@ -67,9 +51,6 @@ public class SmtpEmailSender : IEmailSender
         string appName,
         CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(_options.SmtpHost))
-            throw new InvalidOperationException("SMTP host is not configured.");
-
         var subject = $"{submitterName} shared a time entry with you on {appName}";
         var descriptionLine = string.IsNullOrWhiteSpace(description)
             ? "No description provided."
@@ -86,6 +67,57 @@ public class SmtpEmailSender : IEmailSender
             <p><strong>Description:</strong> {WebUtility.HtmlEncode(descriptionLine)}</p>
             <p><a href="{WebUtility.HtmlEncode(reviewUrl)}">Review and approve</a></p>
             """;
+
+        return SendAsync(toEmail, subject, textBody, htmlBody, cancellationToken);
+    }
+
+    public Task SendTimesheetDecisionEmailAsync(
+        string toEmail,
+        string recipientName,
+        string reviewerName,
+        string weekLabel,
+        bool approved,
+        string? comment,
+        string timesheetUrl,
+        string appName,
+        CancellationToken cancellationToken = default)
+    {
+        var decision = approved ? "approved" : "rejected";
+        var subject = $"Your timesheet for {weekLabel} was {decision} on {appName}";
+
+        var commentLine = string.IsNullOrWhiteSpace(comment) ? null : comment.Trim();
+        var callToAction = approved
+            ? "View your timesheet"
+            : "Fix your entries and resubmit";
+
+        var textBody =
+            $"Hi {recipientName},\n\n" +
+            $"{reviewerName} {decision} your timesheet for {weekLabel} in {appName}.\n\n" +
+            (commentLine is null ? "" : $"Comment: {commentLine}\n\n") +
+            $"{callToAction}: {timesheetUrl}";
+
+        var htmlBody =
+            $"""
+            <p>Hi {WebUtility.HtmlEncode(recipientName)},</p>
+            <p><strong>{WebUtility.HtmlEncode(reviewerName)}</strong> {decision} your timesheet for <strong>{WebUtility.HtmlEncode(weekLabel)}</strong> in <strong>{WebUtility.HtmlEncode(appName)}</strong>.</p>
+            """ +
+            (commentLine is null
+                ? ""
+                : $"""<p><strong>Comment:</strong> {WebUtility.HtmlEncode(commentLine)}</p>""") +
+            $"""<p><a href="{WebUtility.HtmlEncode(timesheetUrl)}">{callToAction}</a></p>""";
+
+        return SendAsync(toEmail, subject, textBody, htmlBody, cancellationToken);
+    }
+
+    private async Task SendAsync(
+        string toEmail,
+        string subject,
+        string textBody,
+        string htmlBody,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(_options.SmtpHost))
+            throw new InvalidOperationException("SMTP host is not configured.");
 
         var message = new MimeMessage();
         message.From.Add(MailboxAddress.Parse(_options.From));

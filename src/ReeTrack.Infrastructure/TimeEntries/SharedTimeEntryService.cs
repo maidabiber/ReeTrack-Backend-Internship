@@ -435,7 +435,7 @@ public class SharedTimeEntryService : ISharedTimeEntryService
             .ToListAsync(cancellationToken);
     }
 
-private async Task<string?> FindOverlapMessageAsync(
+    private async Task<string?> FindOverlapMessageAsync(
         Guid userId,
         DateTime startedAtUtc,
         DateTime endedAtUtc,

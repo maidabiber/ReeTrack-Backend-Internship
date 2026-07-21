@@ -33,6 +33,18 @@ internal sealed class FakeEmailSender : IEmailSender
         ThrowOnMentionEmail
             ? throw new InvalidOperationException("SMTP unavailable.")
             : Task.CompletedTask;
+
+    public Task SendTimesheetDecisionEmailAsync(
+        string toEmail,
+        string recipientName,
+        string reviewerName,
+        string weekLabel,
+        bool approved,
+        string? comment,
+        string timesheetUrl,
+        string appName,
+        CancellationToken cancellationToken = default) =>
+        Task.CompletedTask;
 }
 
 internal static class TimeEntryServiceTestDependencies

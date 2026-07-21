@@ -35,13 +35,13 @@ public class TimesheetService : ITimesheetService
                 t => t.UserId == userId && t.WeekStartDate == weekStart,
                 cancellationToken);
 
-        var entries = await LoadWeekEntriesAsync(userId, weekStart, cancellationToken);
+        var entries = await TimesheetQueries.WeekEntriesAsync(_db, userId, weekStart, cancellationToken);
         var blockers = EvaluateSubmitBlockers(timesheet, entries, weekStart);
 
         return new MyWeekTimesheetDto
         {
-            Timesheet = timesheet is null ? null : MapTimesheet(timesheet),
-            Entries = entries.Select(MapEntry).ToList(),
+            Timesheet = timesheet is null ? null : TimesheetMapping.MapTimesheet(timesheet),
+            Entries = entries.Select(TimesheetMapping.MapEntry).ToList(),
             CanSubmit = blockers.Count == 0,
             Blockers = blockers.Select(b => b.Message).ToList()
         };
@@ -56,8 +56,8 @@ public class TimesheetService : ITimesheetService
 
         var currentWeek = TimesheetWeek.ToWeekStart(DateTime.UtcNow);
         var oldestWeek = currentWeek.AddDays(-7 * (count - 1));
-        var rangeStartUtc = ToUtcMidnight(oldestWeek);
-        var rangeEndUtc = ToUtcMidnight(currentWeek.AddDays(7));
+        var rangeStartUtc = TimesheetWeek.ToUtcMidnight(oldestWeek);
+        var rangeEndUtc = TimesheetWeek.ToUtcMidnight(currentWeek.AddDays(7));
 
         var entries = await _db.TimeEntries
             .AsNoTracking()
@@ -108,7 +108,7 @@ public class TimesheetService : ITimesheetService
                 t => t.UserId == userId && t.WeekStartDate == weekStart,
                 cancellationToken);
 
-        var entries = await LoadWeekEntriesAsync(userId, weekStart, cancellationToken);
+        var entries = await TimesheetQueries.WeekEntriesAsync(_db, userId, weekStart, cancellationToken);
 
         var blocker = EvaluateSubmitBlockers(timesheet, entries, weekStart).FirstOrDefault();
         if (blocker is not null)
@@ -147,7 +147,7 @@ public class TimesheetService : ITimesheetService
             throw new AppException("This week's timesheet has already been submitted.", 409);
         }
 
-        return MapTimesheet(timesheet);
+        return TimesheetMapping.MapTimesheet(timesheet);
     }
 
     public async Task WithdrawAsync(
@@ -189,7 +189,7 @@ public class TimesheetService : ITimesheetService
         if (weekStart > TimesheetWeek.ToWeekStart(DateTime.UtcNow))
             blockers.Add(new("A future week cannot be submitted.", 400));
 
-        if (entries.Any(IsRunning))
+        if (entries.Any(TimesheetMapping.IsRunning))
             blockers.Add(new("Stop your running timer before submitting this week.", 409));
 
         if (entries.Any(e => e.Status == TimeEntryStatus.Pending))
@@ -201,64 +201,9 @@ public class TimesheetService : ITimesheetService
         return blockers;
     }
 
-    private async Task<List<TimeEntry>> LoadWeekEntriesAsync(
-        Guid userId,
-        DateOnly weekStart,
-        CancellationToken cancellationToken)
-    {
-        var weekStartUtc = ToUtcMidnight(weekStart);
-        var weekEndUtc = ToUtcMidnight(weekStart.AddDays(7));
-
-        return await _db.TimeEntries
-            .AsNoTracking()
-            .Include(e => e.Project)
-            .ThenInclude(p => p!.Client)
-            .Where(e => e.UserId == userId &&
-                        e.StartedAtUtc >= weekStartUtc &&
-                        e.StartedAtUtc < weekEndUtc)
-            .OrderBy(e => e.StartedAtUtc)
-            .ToListAsync(cancellationToken);
-    }
-
-    private static bool IsRunning(TimeEntry entry) =>
-        entry.Mode == TimeEntryMode.Timer && entry.EndedAtUtc is null;
-
-    private static DateTime ToUtcMidnight(DateOnly date) =>
-        date.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
-
     private static void EnsureMonday(DateOnly weekStart)
     {
         if (weekStart.DayOfWeek != DayOfWeek.Monday)
             throw new AppException("Week start must be a Monday.", 400);
     }
-
-    private static TimesheetDto MapTimesheet(Timesheet timesheet) =>
-        new()
-        {
-            Id = timesheet.Id,
-            UserId = timesheet.UserId,
-            WeekStartDate = timesheet.WeekStartDate,
-            Status = timesheet.Status.ToString(),
-            SubmittedAtUtc = timesheet.SubmittedAtUtc,
-            ReviewedByUserId = timesheet.ReviewedByUserId,
-            ReviewedByDisplayName = timesheet.ReviewedByUser?.DisplayName ?? timesheet.ReviewedByUser?.Email,
-            ReviewedAtUtc = timesheet.ReviewedAtUtc,
-            ReviewComment = timesheet.ReviewComment
-        };
-
-    private static TimesheetEntryDto MapEntry(TimeEntry entry) =>
-        new()
-        {
-            Id = entry.Id,
-            Description = entry.Description,
-            IsBillable = entry.IsBillable,
-            Mode = entry.Mode.ToString(),
-            StartedAtUtc = entry.StartedAtUtc,
-            EndedAtUtc = entry.EndedAtUtc,
-            DurationSeconds = entry.DurationSeconds,
-            IsRunning = IsRunning(entry),
-            Status = entry.Status.ToString(),
-            ProjectName = entry.Project?.Name,
-            ClientName = entry.Project?.Client?.Name
-        };
 }

@@ -48,4 +48,23 @@ public class NoOpEmailSender : IEmailSender
 
         return Task.CompletedTask;
     }
+
+    public Task SendTimesheetDecisionEmailAsync(
+        string toEmail,
+        string recipientName,
+        string reviewerName,
+        string weekLabel,
+        bool approved,
+        string? comment,
+        string timesheetUrl,
+        string appName,
+        CancellationToken cancellationToken = default)
+    {
+        _logger.LogWarning(
+            "Email delivery is not configured (Email__SmtpHost is empty). " +
+            "Timesheet {Decision} for {ToEmail} ({WeekLabel}) by {ReviewerName}: {TimesheetUrl}",
+            approved ? "approval" : "rejection", toEmail, weekLabel, reviewerName, timesheetUrl);
+
+        return Task.CompletedTask;
+    }
 }
