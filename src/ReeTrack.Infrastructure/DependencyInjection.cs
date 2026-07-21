@@ -59,6 +59,7 @@ public static class DependencyInjection
         services.AddScoped<ITeammateService, TeammateService>();
         services.AddScoped<ILockedPeriodService, LockedPeriodService>();
         services.AddScoped<ITimeEntryGuardService, TimeEntryGuardService>();
+        services.AddScoped<ITimesheetService, TimesheetService>();
         services.AddScoped<ITimeEntryAssociationService, TimeEntryAssociationService>();
         services.AddScoped<ITimeEntryService, TimeEntryService>();
         services.AddScoped<ISharedTimeEntryService, SharedTimeEntryService>();
