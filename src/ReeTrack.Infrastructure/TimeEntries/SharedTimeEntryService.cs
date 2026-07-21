@@ -15,19 +15,22 @@ public class SharedTimeEntryService : ISharedTimeEntryService
     private readonly ITimeEntryService _timeEntries;
     private readonly ISharedTimeEntryEmailNotifier _emailNotifier;
     private readonly ITimeEntryGuardService _entryGuard;
+    private readonly ITimeEntryAssociationService _associations;
 
     public SharedTimeEntryService(
         IApplicationDbContext db,
         ICurrentUserService currentUser,
         ITimeEntryService timeEntries,
         ISharedTimeEntryEmailNotifier emailNotifier,
-        ITimeEntryGuardService entryGuard)
+        ITimeEntryGuardService entryGuard,
+        ITimeEntryAssociationService associations)
     {
         _db = db;
         _currentUser = currentUser;
         _timeEntries = timeEntries;
         _emailNotifier = emailNotifier;
         _entryGuard = entryGuard;
+        _associations = associations;
     }
 
     public async Task<CreateSharedManualEntryResult> StopSharedTimerAsync(
@@ -53,7 +56,14 @@ public class SharedTimeEntryService : ISharedTimeEntryService
             throw new AppException(assigneeOverlap, 409);
 
         var stopped = await _timeEntries.StopTimerAsync(
-            new StopTimerInput { Description = input.Description },
+            new StopTimerInput
+            {
+                Description = input.Description,
+                ProjectId = input.ProjectId,
+                ProjectTaskId = input.ProjectTaskId,
+                TagIds = input.TagIds,
+                IsBillable = input.IsBillable
+            },
             cancellationToken);
 
         return await AttachShareToOwnedEntryAsync(
@@ -82,7 +92,10 @@ public class SharedTimeEntryService : ISharedTimeEntryService
                 Description = input.Description,
                 StartedAtUtc = input.StartedAtUtc,
                 EndedAtUtc = input.EndedAtUtc,
-                IsBillable = input.IsBillable
+                IsBillable = input.IsBillable,
+                ProjectId = input.ProjectId,
+                ProjectTaskId = input.ProjectTaskId,
+                TagIds = input.TagIds
             },
             cancellationToken);
 
@@ -104,7 +117,10 @@ public class SharedTimeEntryService : ISharedTimeEntryService
                 Description = input.Description,
                 EntryDateUtc = input.EntryDateUtc,
                 DurationSeconds = input.DurationSeconds,
-                IsBillable = input.IsBillable
+                IsBillable = input.IsBillable,
+                ProjectId = input.ProjectId,
+                ProjectTaskId = input.ProjectTaskId,
+                TagIds = input.TagIds
             },
             cancellationToken);
 
@@ -121,6 +137,7 @@ public class SharedTimeEntryService : ISharedTimeEntryService
     {
         var userId = _currentUser.UserId;
         var source = await _db.TimeEntries
+            .Include(e => e.TimeEntryTags)
             .FirstOrDefaultAsync(e => e.Id == entryId, cancellationToken)
             ?? throw new AppException("Time entry not found.", 404);
 
@@ -163,6 +180,7 @@ public class SharedTimeEntryService : ISharedTimeEntryService
         if (!isAuthorOwnedConfirmed && source.ShareGroupId is Guid groupId)
         {
             var owned = await _db.TimeEntries
+                .Include(e => e.TimeEntryTags)
                 .FirstOrDefaultAsync(
                     e => e.ShareGroupId == groupId &&
                          e.UserId == userId &&
@@ -206,6 +224,7 @@ public class SharedTimeEntryService : ISharedTimeEntryService
 
         return await AddPendingClonesAndNotifyAsync(
             ownedEntryForResponse: isAuthorOwnedConfirmed ? source : null,
+            associationSource: timingSource,
             assignees,
             timingSource.Description,
             timingSource.Mode,
@@ -223,6 +242,9 @@ public class SharedTimeEntryService : ISharedTimeEntryService
         CancellationToken cancellationToken)
     {
         var ownedEntry = await _db.TimeEntries
+            .Include(e => e.TimeEntryTags)
+            .Include(e => e.Project)
+            .Include(e => e.ProjectTask)
             .FirstAsync(e => e.Id == ownedEntryId, cancellationToken);
 
         var shareGroupId = ownedEntry.ShareGroupId ?? Guid.NewGuid();
@@ -234,6 +256,7 @@ public class SharedTimeEntryService : ISharedTimeEntryService
 
         return await AddPendingClonesAndNotifyAsync(
             ownedEntry,
+            associationSource: ownedEntry,
             assignees,
             ownedEntry.Description,
             ownedEntry.Mode,
@@ -248,6 +271,7 @@ public class SharedTimeEntryService : ISharedTimeEntryService
 
     private async Task<CreateSharedManualEntryResult> AddPendingClonesAndNotifyAsync(
         TimeEntry? ownedEntryForResponse,
+        TimeEntry associationSource,
         IReadOnlyList<User> assignees,
         string? description,
         TimeEntryMode mode,
@@ -288,6 +312,7 @@ public class SharedTimeEntryService : ISharedTimeEntryService
                 CreatedAtUtc = now,
                 UpdatedAtUtc = now
             };
+            _associations.CopyAssociations(associationSource, entry);
             _db.TimeEntries.Add(entry);
             pendingEntries.Add(entry);
         }

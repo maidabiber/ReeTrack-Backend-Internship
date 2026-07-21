@@ -27,7 +27,22 @@ internal static class TimeEntryMapping
             AssigneeUserId = entry.UserId,
             AssigneeDisplayName = assigneeDisplayName,
             ShareGroupId = entry.ShareGroupId,
-            Participants = shareGroups is null ? [] : BuildParticipants(entry, shareGroups)
+            Participants = shareGroups is null ? [] : BuildParticipants(entry, shareGroups),
+            ProjectId = entry.ProjectId,
+            ProjectName = entry.Project?.Name,
+            ProjectColor = entry.Project?.Color,
+            ProjectTaskId = entry.ProjectTaskId,
+            ProjectTaskName = entry.ProjectTask?.Name,
+            Tags = entry.TimeEntryTags
+                .Where(t => t.Tag is not null)
+                .OrderBy(t => t.Tag.Name)
+                .Select(t => new TimeEntryTagDto
+                {
+                    Id = t.TagId,
+                    Name = t.Tag.Name,
+                    Color = t.Tag.Color
+                })
+                .ToList()
         };
 
     private static IReadOnlyList<TimeEntryParticipantDto> BuildParticipants(

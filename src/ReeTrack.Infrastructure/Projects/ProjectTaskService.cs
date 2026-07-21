@@ -22,32 +22,46 @@ public class ProjectTaskService : IProjectTaskService
         _currentUser = currentUser;
     }
 
-    public async Task<IReadOnlyList<ProjectTaskDto>> ListAsync(
-        Guid projectId,
-        string? status,
+    public async Task<PagedResult<ProjectTaskDto>> ListAsync(
+        TaskListQuery query,
         CancellationToken cancellationToken = default)
     {
+        if (!query.ProjectId.HasValue)
+            throw new AppException("Project is required.");
+
+        var projectId = query.ProjectId.Value;
         await EnsureProjectExistsAsync(projectId, cancellationToken);
 
-        var query = _db.ProjectTasks.AsNoTracking().Where(t => t.ProjectId == projectId);
+        var page = Math.Max(1, query.Page);
+        var pageSize = Math.Clamp(query.PageSize, 1, 200);
 
-        switch (status?.Trim().ToLowerInvariant())
+        var filtered = _db.ProjectTasks.AsNoTracking().Where(t => t.ProjectId == projectId);
+
+        switch (query.Status?.Trim().ToLowerInvariant())
         {
             case null or "" or "all":
                 break;
             case "open":
-                query = query.Where(t => t.Status == ProjectTaskStatus.Open);
+                filtered = filtered.Where(t => t.Status == ProjectTaskStatus.Open);
                 break;
             case "done":
-                query = query.Where(t => t.Status == ProjectTaskStatus.Done);
+                filtered = filtered.Where(t => t.Status == ProjectTaskStatus.Done);
                 break;
             default:
                 throw new AppException("Status must be one of: open, done, all.");
         }
 
-        var rows = await query
+        var q = query.Q?.Trim().ToLowerInvariant();
+        if (!string.IsNullOrEmpty(q))
+            filtered = filtered.Where(t => t.Name.ToLower().Contains(q));
+
+        var totalCount = await filtered.CountAsync(cancellationToken);
+
+        var rows = await filtered
             .OrderBy(t => t.Status)
             .ThenBy(t => t.Name)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
             .Select(t => new TaskRow(
                 t.Id,
                 t.ProjectId,
@@ -59,7 +73,60 @@ public class ProjectTaskService : IProjectTaskService
                 t.CreatedAtUtc))
             .ToListAsync(cancellationToken);
 
-        return rows.Select(MapRow).ToList();
+        return new PagedResult<ProjectTaskDto>
+        {
+            Items = rows.Select(MapRow).ToList(),
+            TotalCount = totalCount,
+            Page = page,
+            PageSize = pageSize
+        };
+    }
+
+    public async Task<PagedResult<ProjectTaskDto>> ListOpenAsync(
+        TaskListQuery query,
+        CancellationToken cancellationToken = default)
+    {
+        var page = Math.Max(1, query.Page);
+        var pageSize = Math.Clamp(query.PageSize, 1, 200);
+
+        var q = query.Q?.Trim().ToLowerInvariant();
+
+        var filtered = _db.ProjectTasks
+            .AsNoTracking()
+            .Where(t => t.Status == ProjectTaskStatus.Open);
+
+        if (!string.IsNullOrEmpty(q))
+        {
+            filtered = filtered.Where(t =>
+                t.Name.ToLower().Contains(q) ||
+                t.Project.Name.ToLower().Contains(q));
+        }
+
+        var totalCount = await filtered.CountAsync(cancellationToken);
+
+        var rows = await filtered
+            .OrderBy(t => t.Project.Name)
+            .ThenBy(t => t.Name)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(t => new TaskRow(
+                t.Id,
+                t.ProjectId,
+                t.Name,
+                t.Status,
+                t.AssignedToUserId,
+                t.AssignedToUser != null ? (t.AssignedToUser.DisplayName ?? t.AssignedToUser.Email) : null,
+                t.TimeEstimateHours,
+                t.CreatedAtUtc))
+            .ToListAsync(cancellationToken);
+
+        return new PagedResult<ProjectTaskDto>
+        {
+            Items = rows.Select(MapRow).ToList(),
+            TotalCount = totalCount,
+            Page = page,
+            PageSize = pageSize
+        };
     }
 
     public async Task<ProjectTaskDto> CreateAsync(

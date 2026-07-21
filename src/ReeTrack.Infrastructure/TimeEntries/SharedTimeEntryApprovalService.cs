@@ -12,15 +12,21 @@ public class SharedTimeEntryApprovalService : ISharedTimeEntryApprovalService
     private readonly IApplicationDbContext _db;
     private readonly ICurrentUserService _currentUser;
     private readonly ITimeEntryGuardService _entryGuard;
+    private readonly ILockedPeriodService _lockedPeriod;
+    private readonly ITimeEntryAssociationService _associations;
 
     public SharedTimeEntryApprovalService(
         IApplicationDbContext db,
         ICurrentUserService currentUser,
-        ITimeEntryGuardService entryGuard)
+        ITimeEntryGuardService entryGuard,
+        ILockedPeriodService lockedPeriod,
+        ITimeEntryAssociationService associations)
     {
         _db = db;
         _currentUser = currentUser;
         _entryGuard = entryGuard;
+        _lockedPeriod = lockedPeriod;
+        _associations = associations;
     }
 
     public async Task<IReadOnlyList<TimeEntryDto>> ListPendingAsync(CancellationToken cancellationToken = default)
@@ -31,6 +37,10 @@ public class SharedTimeEntryApprovalService : ISharedTimeEntryApprovalService
             .AsNoTracking()
             .Include(e => e.SubmittedByUser)
             .Include(e => e.User)
+            .Include(e => e.Project)
+            .Include(e => e.ProjectTask)
+            .Include(e => e.TimeEntryTags)
+                .ThenInclude(t => t.Tag)
             .Where(e => e.UserId == userId && e.Status == TimeEntryStatus.Pending)
             .OrderByDescending(e => e.CreatedAtUtc)
             .ToListAsync(cancellationToken);
@@ -55,6 +65,7 @@ public class SharedTimeEntryApprovalService : ISharedTimeEntryApprovalService
         var entry = await _db.TimeEntries
             .Include(e => e.SubmittedByUser)
             .Include(e => e.User)
+            .Include(e => e.TimeEntryTags)
             .FirstOrDefaultAsync(
                 e => e.Id == entryId && e.UserId == userId && e.Status == TimeEntryStatus.Pending,
                 cancellationToken)
@@ -153,6 +164,8 @@ public class SharedTimeEntryApprovalService : ISharedTimeEntryApprovalService
         entry.EndedAtUtc = input.EndedAtUtc;
         entry.DurationSeconds = durationSeconds;
         entry.UpdatedAtUtc = DateTime.UtcNow;
+
+        await _associations.ApplyForUpdateAsync(entry, input, cancellationToken);
 
         await _db.SaveChangesAsync(cancellationToken);
     }

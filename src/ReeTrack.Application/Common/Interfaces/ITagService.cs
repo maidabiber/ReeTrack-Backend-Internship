@@ -4,7 +4,7 @@ namespace ReeTrack.Application.Common.Interfaces;
 
 public interface ITagService
 {
-    Task<IReadOnlyList<TagDto>> ListAsync(CancellationToken cancellationToken = default);
+    Task<PagedResult<TagDto>> ListAsync(TagListQuery query, CancellationToken cancellationToken = default);
 
     Task<TagDto> CreateAsync(string? name, string? color, CancellationToken cancellationToken = default);
 

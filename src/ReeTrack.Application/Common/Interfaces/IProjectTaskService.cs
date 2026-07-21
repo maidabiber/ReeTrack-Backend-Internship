@@ -4,7 +4,12 @@ namespace ReeTrack.Application.Common.Interfaces;
 
 public interface IProjectTaskService
 {
-    Task<IReadOnlyList<ProjectTaskDto>> ListAsync(Guid projectId, string? status, CancellationToken cancellationToken = default);
+    Task<PagedResult<ProjectTaskDto>> ListAsync(TaskListQuery query, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Lists open tasks across all projects, optionally filtered by name (or project name).
+    /// </summary>
+    Task<PagedResult<ProjectTaskDto>> ListOpenAsync(TaskListQuery query, CancellationToken cancellationToken = default);
 
     Task<ProjectTaskDto> CreateAsync(Guid projectId, CreateTaskInput input, CancellationToken cancellationToken = default);
 

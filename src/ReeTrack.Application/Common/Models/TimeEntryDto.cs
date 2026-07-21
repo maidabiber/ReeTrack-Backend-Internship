@@ -17,4 +17,11 @@ public sealed class TimeEntryDto
     public string? AssigneeDisplayName { get; init; }
     public Guid? ShareGroupId { get; init; }
     public IReadOnlyList<TimeEntryParticipantDto> Participants { get; init; } = [];
+
+    public Guid? ProjectId { get; init; }
+    public string? ProjectName { get; init; }
+    public string? ProjectColor { get; init; }
+    public Guid? ProjectTaskId { get; init; }
+    public string? ProjectTaskName { get; init; }
+    public IReadOnlyList<TimeEntryTagDto> Tags { get; init; } = [];
 }

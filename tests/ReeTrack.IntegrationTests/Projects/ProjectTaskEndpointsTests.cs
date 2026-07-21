@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using ReeTrack.Application.Common.Constants;
 using ReeTrack.Application.Common.Interfaces;
+using ReeTrack.Application.Common.Models;
 using ReeTrack.Domain.Entities;
 using ReeTrack.Domain.Enums;
 using ReeTrack.Infrastructure.Persistence;
@@ -34,8 +35,8 @@ public class ProjectTaskEndpointsTests
         Assert.Equal("Design", created!.Name);
         Assert.Equal("open", created.Status);
 
-        var list = await client.GetFromJsonAsync<List<TaskResponse>>($"/api/projects/{projectId}/tasks");
-        Assert.Single(list!);
+        var list = await client.GetFromJsonAsync<PagedResult<TaskResponse>>($"/api/projects/{projectId}/tasks");
+        Assert.Single(list!.Items);
     }
 
     [Fact]
@@ -215,8 +216,38 @@ public class ProjectTaskEndpointsTests
         var deleted = await client.DeleteAsync($"/api/projects/{projectId}/tasks/{free!.Id}");
         Assert.Equal(HttpStatusCode.NoContent, deleted.StatusCode);
 
-        var list = await client.GetFromJsonAsync<List<TaskResponse>>($"/api/projects/{projectId}/tasks");
-        Assert.DoesNotContain(list!, t => t.Id == free.Id);
+        var list = await client.GetFromJsonAsync<PagedResult<TaskResponse>>($"/api/projects/{projectId}/tasks");
+        Assert.DoesNotContain(list!.Items, t => t.Id == free.Id);
+    }
+
+    [Fact]
+    public async Task List_PaginationAndSearch_Work()
+    {
+        using var factory = new ReeTrackWebApplicationFactory();
+        var (_, token) = await factory.SeedAdminAsync();
+        var client = factory.CreateAuthenticatedClient(token);
+        var projectId = await SeedProjectAsync(factory, "Redesign");
+
+        for (var i = 1; i <= 3; i++)
+        {
+            (await client.PostAsJsonAsync($"/api/projects/{projectId}/tasks", new { name = $"Task {i}" }))
+                .EnsureSuccessStatusCode();
+        }
+
+        var page1 = await client.GetFromJsonAsync<PagedResult<TaskResponse>>(
+            $"/api/projects/{projectId}/tasks?page=1&pageSize=2");
+        Assert.NotNull(page1);
+        Assert.Equal(3, page1!.TotalCount);
+        Assert.Equal(2, page1.Items.Count);
+
+        var page2 = await client.GetFromJsonAsync<PagedResult<TaskResponse>>(
+            $"/api/projects/{projectId}/tasks?page=2&pageSize=2");
+        Assert.Single(page2!.Items);
+
+        var filtered = await client.GetFromJsonAsync<PagedResult<TaskResponse>>(
+            $"/api/projects/{projectId}/tasks?q=task%202");
+        Assert.Equal(1, filtered!.TotalCount);
+        Assert.Equal("Task 2", Assert.Single(filtered.Items).Name);
     }
 
     private static async Task<Guid> SeedProjectAsync(ReeTrackWebApplicationFactory factory, string name)

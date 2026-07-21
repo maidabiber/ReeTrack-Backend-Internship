@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using ReeTrack.Application.Common.Interfaces;
 using ReeTrack.Application.Common.Options;
+using ReeTrack.Infrastructure.Persistence;
 using ReeTrack.Infrastructure.TimeEntries;
 
 namespace ReeTrack.UnitTests.TimeEntries;
@@ -58,5 +59,26 @@ internal static class TimeEntryServiceTestDependencies
             appOptions);
 
         return (emailSender, configuration, appOptions, emailNotifier);
+    }
+
+    public static TimeEntryService CreateTimeEntryService(
+        AppDbContext db,
+        ICurrentUserService currentUser,
+        ITimeEntryGuardService entryGuard) =>
+        new(
+            db,
+            currentUser,
+            entryGuard,
+            new TimeEntryAssociationService(db));
+
+    public static SharedTimeEntryService CreateSharedTimeEntryService(
+        AppDbContext db,
+        ICurrentUserService currentUser,
+        ITimeEntryGuardService entryGuard,
+        ISharedTimeEntryEmailNotifier emailNotifier)
+    {
+        var associations = new TimeEntryAssociationService(db);
+        var timeEntries = new TimeEntryService(db, currentUser, entryGuard, associations);
+        return new SharedTimeEntryService(db, currentUser, timeEntries, emailNotifier, entryGuard, associations);
     }
 }

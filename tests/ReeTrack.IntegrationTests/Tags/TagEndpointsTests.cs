@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using ReeTrack.Application.Common.Constants;
 using ReeTrack.Application.Common.Interfaces;
+using ReeTrack.Application.Common.Models;
 using ReeTrack.Domain.Entities;
 using ReeTrack.Domain.Enums;
 using ReeTrack.Infrastructure.Persistence;
@@ -35,8 +36,8 @@ public class TagEndpointsTests
         Assert.Equal("#FF6B4A", created.Color);
         Assert.Equal(0, created.UsageCount);
 
-        var list = await client.GetFromJsonAsync<List<TagResponse>>("/api/tags");
-        var listed = Assert.Single(list!);
+        var list = await client.GetFromJsonAsync<PagedResult<TagResponse>>("/api/tags");
+        var listed = Assert.Single(list!.Items);
         Assert.Equal(created.Id, listed.Id);
     }
 
@@ -118,14 +119,38 @@ public class TagEndpointsTests
         await SeedTagAsync(factory, "Urgent", usageCount: 2, ownerUserId: admin.Id);
         await SeedTagAsync(factory, "Billable", usageCount: 0, ownerUserId: admin.Id);
 
-        var list = await client.GetFromJsonAsync<List<TagResponse>>("/api/tags");
+        var list = await client.GetFromJsonAsync<PagedResult<TagResponse>>("/api/tags");
 
         Assert.NotNull(list);
-        Assert.Equal(2, list.Count);
-        Assert.Equal("Billable", list[0].Name); // alphabetical
-        Assert.Equal("Urgent", list[1].Name);
-        Assert.Equal(2, list.Single(t => t.Name == "Urgent").UsageCount);
-        Assert.Equal(0, list.Single(t => t.Name == "Billable").UsageCount);
+        Assert.Equal(2, list!.TotalCount);
+        Assert.Equal("Billable", list.Items[0].Name); // alphabetical
+        Assert.Equal("Urgent", list.Items[1].Name);
+        Assert.Equal(2, list.Items.Single(t => t.Name == "Urgent").UsageCount);
+        Assert.Equal(0, list.Items.Single(t => t.Name == "Billable").UsageCount);
+    }
+
+    [Fact]
+    public async Task List_PaginationAndSearch_Work()
+    {
+        using var factory = new ReeTrackWebApplicationFactory();
+        var (admin, token) = await factory.SeedAdminAsync();
+        var client = factory.CreateAuthenticatedClient(token);
+
+        await SeedTagAsync(factory, "Alpha", ownerUserId: admin.Id);
+        await SeedTagAsync(factory, "Beta", ownerUserId: admin.Id);
+        await SeedTagAsync(factory, "Gamma", ownerUserId: admin.Id);
+
+        var page1 = await client.GetFromJsonAsync<PagedResult<TagResponse>>("/api/tags?page=1&pageSize=2");
+        Assert.NotNull(page1);
+        Assert.Equal(3, page1!.TotalCount);
+        Assert.Equal(2, page1.Items.Count);
+
+        var page2 = await client.GetFromJsonAsync<PagedResult<TagResponse>>("/api/tags?page=2&pageSize=2");
+        Assert.Single(page2!.Items);
+
+        var filtered = await client.GetFromJsonAsync<PagedResult<TagResponse>>("/api/tags?q=beta");
+        Assert.Equal(1, filtered!.TotalCount);
+        Assert.Equal("Beta", Assert.Single(filtered.Items).Name);
     }
 
     [Fact]
@@ -193,8 +218,8 @@ public class TagEndpointsTests
         var response = await client.DeleteAsync($"/api/tags/{seeded.Id}");
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
 
-        var list = await client.GetFromJsonAsync<List<TagResponse>>("/api/tags");
-        Assert.Empty(list!);
+        var list = await client.GetFromJsonAsync<PagedResult<TagResponse>>("/api/tags");
+        Assert.Empty(list!.Items);
 
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();

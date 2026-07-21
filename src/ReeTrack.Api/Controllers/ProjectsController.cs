@@ -22,13 +22,30 @@ public class ProjectsController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<ActionResult<IReadOnlyList<ProjectResponse>>> List(
+    public async Task<ActionResult<PagedResult<ProjectResponse>>> List(
         [FromQuery] string? status,
         [FromQuery] Guid? clientId,
-        CancellationToken cancellationToken)
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 50,
+        [FromQuery] string? q = null,
+        CancellationToken cancellationToken = default)
     {
-        var projects = await _projectService.ListAsync(status, clientId, cancellationToken);
-        return Ok(projects.Select(MapProject).ToList());
+        var result = await _projectService.ListAsync(new ProjectListQuery
+        {
+            Status = status,
+            ClientId = clientId,
+            Page = page,
+            PageSize = pageSize,
+            Q = q
+        }, cancellationToken);
+
+        return Ok(new PagedResult<ProjectResponse>
+        {
+            Items = result.Items.Select(MapProject).ToList(),
+            TotalCount = result.TotalCount,
+            Page = result.Page,
+            PageSize = result.PageSize
+        });
     }
 
     [HttpGet("{id:guid}")]

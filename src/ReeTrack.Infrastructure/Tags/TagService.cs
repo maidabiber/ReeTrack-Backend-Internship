@@ -22,10 +22,25 @@ public class TagService : ITagService
         _currentUser = currentUser;
     }
 
-    public async Task<IReadOnlyList<TagDto>> ListAsync(CancellationToken cancellationToken = default)
+    public async Task<PagedResult<TagDto>> ListAsync(
+        TagListQuery query,
+        CancellationToken cancellationToken = default)
     {
-        return await _db.Tags.AsNoTracking()
+        var page = Math.Max(1, query.Page);
+        var pageSize = Math.Clamp(query.PageSize, 1, 200);
+
+        var filtered = _db.Tags.AsNoTracking();
+
+        var q = query.Q?.Trim().ToLowerInvariant();
+        if (!string.IsNullOrEmpty(q))
+            filtered = filtered.Where(t => t.Name.ToLower().Contains(q));
+
+        var totalCount = await filtered.CountAsync(cancellationToken);
+
+        var items = await filtered
             .OrderBy(t => t.Name)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
             .Select(t => new TagDto
             {
                 Id = t.Id,
@@ -35,6 +50,14 @@ public class TagService : ITagService
                 CreatedAtUtc = t.CreatedAtUtc
             })
             .ToListAsync(cancellationToken);
+
+        return new PagedResult<TagDto>
+        {
+            Items = items,
+            TotalCount = totalCount,
+            Page = page,
+            PageSize = pageSize
+        };
     }
 
     public async Task<TagDto> CreateAsync(

@@ -26,20 +26,22 @@ public class ProjectService : IProjectService
         _currentUser = currentUser;
     }
 
-    public async Task<IReadOnlyList<ProjectDto>> ListAsync(
-        string? status,
-        Guid? clientId,
+    public async Task<PagedResult<ProjectDto>> ListAsync(
+        ProjectListQuery query,
         CancellationToken cancellationToken = default)
     {
-        var query = _db.Projects.AsNoTracking();
+        var page = Math.Max(1, query.Page);
+        var pageSize = Math.Clamp(query.PageSize, 1, 200);
 
-        switch (status?.Trim().ToLowerInvariant())
+        var filtered = _db.Projects.AsNoTracking();
+
+        switch (query.Status?.Trim().ToLowerInvariant())
         {
             case null or "" or "active":
-                query = query.Where(p => p.Status == ProjectStatus.Active);
+                filtered = filtered.Where(p => p.Status == ProjectStatus.Active);
                 break;
             case "archived":
-                query = query.Where(p => p.Status == ProjectStatus.Archived);
+                filtered = filtered.Where(p => p.Status == ProjectStatus.Archived);
                 break;
             case "all":
                 break;
@@ -47,11 +49,24 @@ public class ProjectService : IProjectService
                 throw new AppException("Status must be one of: active, archived, all.");
         }
 
-        if (clientId.HasValue)
-            query = query.Where(p => p.ClientId == clientId.Value);
+        if (query.ClientId.HasValue)
+            filtered = filtered.Where(p => p.ClientId == query.ClientId.Value);
 
-        var rows = await query
-            .OrderBy(p => p.Name)
+        var q = query.Q?.Trim().ToLowerInvariant();
+        if (!string.IsNullOrEmpty(q))
+        {
+            filtered = filtered.Where(p =>
+                p.Name.ToLower().Contains(q) ||
+                p.Client.Name.ToLower().Contains(q));
+        }
+
+        var totalCount = await filtered.CountAsync(cancellationToken);
+
+        var rows = await filtered
+            .OrderBy(p => p.Client.Name)
+            .ThenBy(p => p.Name)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
             .Select(p => new ProjectRow(
                 p.Id,
                 p.Name,
@@ -69,7 +84,13 @@ public class ProjectService : IProjectService
                 p.CreatedAtUtc))
             .ToListAsync(cancellationToken);
 
-        return rows.Select(MapRow).ToList();
+        return new PagedResult<ProjectDto>
+        {
+            Items = rows.Select(MapRow).ToList(),
+            TotalCount = totalCount,
+            Page = page,
+            PageSize = pageSize
+        };
     }
 
     public async Task<ProjectDto> GetAsync(Guid id, CancellationToken cancellationToken = default)

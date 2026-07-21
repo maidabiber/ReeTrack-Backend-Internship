@@ -51,7 +51,10 @@ public class TimeEntriesController : ControllerBase
         var input = new StartTimerInput
         {
             Description = request?.Description,
-            IsBillable = request?.IsBillable ?? true
+            IsBillable = request?.IsBillable ?? true,
+            ProjectId = request?.ProjectId,
+            ProjectTaskId = request?.ProjectTaskId,
+            TagIds = request?.TagIds
         };
         var entry = await _timeEntryService.StartTimerAsync(input, cancellationToken);
 
@@ -72,7 +75,11 @@ public class TimeEntriesController : ControllerBase
             var sharedInput = new StopSharedTimerInput
             {
                 AssigneeUserIds = assigneeUserIds,
-                Description = request?.Description
+                Description = request?.Description,
+                IsBillable = request?.IsBillable,
+                ProjectId = request?.ProjectId,
+                ProjectTaskId = request?.ProjectTaskId,
+                TagIds = request?.TagIds
             };
             var sharedResult = await _sharedTimeEntryService.StopSharedTimerAsync(
                 sharedInput,
@@ -84,7 +91,14 @@ public class TimeEntriesController : ControllerBase
             });
         }
 
-        var stopInput = new StopTimerInput { Description = request?.Description };
+        var stopInput = new StopTimerInput
+        {
+            Description = request?.Description,
+            IsBillable = request?.IsBillable,
+            ProjectId = request?.ProjectId,
+            ProjectTaskId = request?.ProjectTaskId,
+            TagIds = request?.TagIds
+        };
         var entry = await _timeEntryService.StopTimerAsync(stopInput, cancellationToken);
         return Ok(MapTimeEntry(entry));
     }
@@ -99,7 +113,10 @@ public class TimeEntriesController : ControllerBase
             Description = request.Description,
             StartedAtUtc = request.StartedAtUtc,
             EndedAtUtc = request.EndedAtUtc,
-            IsBillable = request.IsBillable ?? true
+            IsBillable = request.IsBillable ?? true,
+            ProjectId = request.ProjectId,
+            ProjectTaskId = request.ProjectTaskId,
+            TagIds = request.TagIds
         };
         var result = await _timeEntryService.CreateManualEntryAsync(input, cancellationToken);
 
@@ -119,7 +136,10 @@ public class TimeEntriesController : ControllerBase
             Description = request.Description,
             EntryDateUtc = request.EntryDateUtc,
             DurationSeconds = request.DurationSeconds,
-            IsBillable = request.IsBillable ?? true
+            IsBillable = request.IsBillable ?? true,
+            ProjectId = request.ProjectId,
+            ProjectTaskId = request.ProjectTaskId,
+            TagIds = request.TagIds
         };
         var result = await _timeEntryService.CreateDurationOnlyEntryAsync(input, cancellationToken);
 
@@ -140,7 +160,10 @@ public class TimeEntriesController : ControllerBase
             Description = request.Description,
             StartedAtUtc = request.StartedAtUtc,
             EndedAtUtc = request.EndedAtUtc,
-            IsBillable = request.IsBillable ?? true
+            IsBillable = request.IsBillable ?? true,
+            ProjectId = request.ProjectId,
+            ProjectTaskId = request.ProjectTaskId,
+            TagIds = request.TagIds
         };
         var result = await _timeEntryService.UpdateTimeEntryAsync(id, input, cancellationToken);
 
@@ -161,7 +184,10 @@ public class TimeEntriesController : ControllerBase
             Description = request.Description,
             EntryDateUtc = request.EntryDateUtc,
             DurationSeconds = request.DurationSeconds,
-            IsBillable = request.IsBillable ?? true
+            IsBillable = request.IsBillable ?? true,
+            ProjectId = request.ProjectId,
+            ProjectTaskId = request.ProjectTaskId,
+            TagIds = request.TagIds
         };
         var result = await _timeEntryService.UpdateDurationOnlyEntryAsync(id, input, cancellationToken);
 
@@ -182,7 +208,10 @@ public class TimeEntriesController : ControllerBase
             Description = request.Description,
             StartedAtUtc = request.StartedAtUtc,
             EndedAtUtc = request.EndedAtUtc,
-            IsBillable = request.IsBillable ?? true
+            IsBillable = request.IsBillable ?? true,
+            ProjectId = request.ProjectId,
+            ProjectTaskId = request.ProjectTaskId,
+            TagIds = request.TagIds
         };
         var result = await _sharedTimeEntryService.CreateSharedManualEntryAsync(input, cancellationToken);
 
@@ -213,7 +242,10 @@ public class TimeEntriesController : ControllerBase
             Description = request.Description,
             EntryDateUtc = request.EntryDateUtc,
             DurationSeconds = request.DurationSeconds,
-            IsBillable = request.IsBillable ?? true
+            IsBillable = request.IsBillable ?? true,
+            ProjectId = request.ProjectId,
+            ProjectTaskId = request.ProjectTaskId,
+            TagIds = request.TagIds
         };
         var result = await _sharedTimeEntryService.CreateSharedDurationOnlyEntryAsync(
             input,
@@ -282,7 +314,10 @@ public class TimeEntriesController : ControllerBase
             Description = request.Description,
             StartedAtUtc = request.StartedAtUtc,
             EndedAtUtc = request.EndedAtUtc,
-            IsBillable = request.IsBillable ?? true
+            IsBillable = request.IsBillable ?? true,
+            ProjectId = request.ProjectId,
+            ProjectTaskId = request.ProjectTaskId,
+            TagIds = request.TagIds
         };
         var result = await _sharedTimeEntryApprovalService.UpdatePendingEntryAsync(
             id,
@@ -328,6 +363,19 @@ public class TimeEntriesController : ControllerBase
                     DisplayName = participant.DisplayName,
                     Email = participant.Email,
                     Role = participant.Role
+                })
+                .ToList(),
+            ProjectId = entry.ProjectId,
+            ProjectName = entry.ProjectName,
+            ProjectColor = entry.ProjectColor,
+            ProjectTaskId = entry.ProjectTaskId,
+            ProjectTaskName = entry.ProjectTaskName,
+            Tags = entry.Tags
+                .Select(tag => new TimeEntryTagResponse
+                {
+                    Id = tag.Id,
+                    Name = tag.Name,
+                    Color = tag.Color
                 })
                 .ToList()
         };

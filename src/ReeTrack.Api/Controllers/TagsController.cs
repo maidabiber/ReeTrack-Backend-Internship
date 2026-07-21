@@ -22,10 +22,26 @@ public class TagsController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<ActionResult<IReadOnlyList<TagResponse>>> List(CancellationToken cancellationToken)
+    public async Task<ActionResult<PagedResult<TagResponse>>> List(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 50,
+        [FromQuery] string? q = null,
+        CancellationToken cancellationToken = default)
     {
-        var tags = await _tagService.ListAsync(cancellationToken);
-        return Ok(tags.Select(MapTag).ToList());
+        var result = await _tagService.ListAsync(new TagListQuery
+        {
+            Page = page,
+            PageSize = pageSize,
+            Q = q
+        }, cancellationToken);
+
+        return Ok(new PagedResult<TagResponse>
+        {
+            Items = result.Items.Select(MapTag).ToList(),
+            TotalCount = result.TotalCount,
+            Page = result.Page,
+            PageSize = result.PageSize
+        });
     }
 
     [HttpPost]

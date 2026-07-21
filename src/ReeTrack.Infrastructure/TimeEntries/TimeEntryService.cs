@@ -12,15 +12,18 @@ public class TimeEntryService : ITimeEntryService
     private readonly IApplicationDbContext _db;
     private readonly ICurrentUserService _currentUser;
     private readonly ITimeEntryGuardService _entryGuard;
+    private readonly ITimeEntryAssociationService _associations;
 
     public TimeEntryService(
         IApplicationDbContext db,
         ICurrentUserService currentUser,
-        ITimeEntryGuardService entryGuard)
+        ITimeEntryGuardService entryGuard,
+        ITimeEntryAssociationService associations)
     {
         _db = db;
         _currentUser = currentUser;
         _entryGuard = entryGuard;
+        _associations = associations;
     }
 
     public async Task<TimeEntryDto?> GetActiveTimerAsync(CancellationToken cancellationToken = default)
@@ -56,6 +59,8 @@ public class TimeEntryService : ITimeEntryService
             UpdatedAtUtc = now
         };
 
+        await _associations.ApplyForCreateAsync(entry, input, cancellationToken);
+
         _db.TimeEntries.Add(entry);
 
         try
@@ -84,6 +89,14 @@ public class TimeEntryService : ITimeEntryService
 
         if (input?.Description is not null)
             entry.Description = NormalizeDescription(input.Description);
+
+        if (input is not null)
+        {
+            await _associations.ApplyForUpdateAsync(entry, input, cancellationToken);
+
+            if (input.IsBillable is bool isBillable)
+                entry.IsBillable = isBillable;
+        }
 
         entry.UpdatedAtUtc = now;
         await _db.SaveChangesAsync(cancellationToken);
@@ -121,6 +134,8 @@ public class TimeEntryService : ITimeEntryService
             UpdatedAtUtc = now
         };
 
+        await _associations.ApplyForCreateAsync(entry, input, cancellationToken);
+
         _db.TimeEntries.Add(entry);
         await _db.SaveChangesAsync(cancellationToken);
 
@@ -154,6 +169,8 @@ public class TimeEntryService : ITimeEntryService
             UpdatedAtUtc = now
         };
 
+        await _associations.ApplyForCreateAsync(entry, input, cancellationToken);
+
         _db.TimeEntries.Add(entry);
         await _db.SaveChangesAsync(cancellationToken);
 
@@ -170,6 +187,7 @@ public class TimeEntryService : ITimeEntryService
     {
         var userId = _currentUser.UserId;
         var entry = await _db.TimeEntries
+            .Include(e => e.TimeEntryTags)
             .FirstOrDefaultAsync(e => e.Id == entryId && e.UserId == userId, cancellationToken)
             ?? throw new AppException("Time entry not found.", 404);
 
@@ -201,6 +219,7 @@ public class TimeEntryService : ITimeEntryService
     {
         var userId = _currentUser.UserId;
         var entry = await _db.TimeEntries
+            .Include(e => e.TimeEntryTags)
             .FirstOrDefaultAsync(e => e.Id == entryId && e.UserId == userId, cancellationToken)
             ?? throw new AppException("Time entry not found.", 404);
 
@@ -224,6 +243,8 @@ public class TimeEntryService : ITimeEntryService
         entry.EndedAtUtc = null;
         entry.UpdatedAtUtc = now;
 
+        await _associations.ApplyForUpdateAsync(entry, input, cancellationToken);
+
         await _db.SaveChangesAsync(cancellationToken);
 
         return new UpdateTimeEntryResult
@@ -240,6 +261,10 @@ public class TimeEntryService : ITimeEntryService
             .AsNoTracking()
             .Include(e => e.User)
             .Include(e => e.SubmittedByUser)
+            .Include(e => e.Project)
+            .Include(e => e.ProjectTask)
+            .Include(e => e.TimeEntryTags)
+                .ThenInclude(t => t.Tag)
             .Where(e =>
                 (e.UserId == userId || e.SubmittedByUserId == userId) &&
                 (
@@ -270,6 +295,10 @@ public class TimeEntryService : ITimeEntryService
 
         var entries = await _db.TimeEntries
             .AsNoTracking()
+            .Include(e => e.Project)
+            .Include(e => e.ProjectTask)
+            .Include(e => e.TimeEntryTags)
+                .ThenInclude(t => t.Tag)
             .Where(e => e.UserId == userId && e.StartedAtUtc != null)
             .Where(e => e.StartedAtUtc < toUtc && (e.EndedAtUtc ?? now) > fromUtc)
             .OrderBy(e => e.StartedAtUtc)
@@ -287,11 +316,16 @@ public class TimeEntryService : ITimeEntryService
             ? _db.TimeEntries.AsQueryable()
             : _db.TimeEntries.AsNoTracking();
 
-        return query.FirstOrDefaultAsync(
-            e => e.UserId == userId &&
-                 e.Mode == TimeEntryMode.Timer &&
-                 e.EndedAtUtc == null,
-            cancellationToken);
+        return query
+            .Include(e => e.Project)
+            .Include(e => e.ProjectTask)
+            .Include(e => e.TimeEntryTags)
+                .ThenInclude(t => t.Tag)
+            .FirstOrDefaultAsync(
+                e => e.UserId == userId &&
+                     e.Mode == TimeEntryMode.Timer &&
+                     e.EndedAtUtc == null,
+                cancellationToken);
     }
 
     private async Task EnsureNoOverlapAsync(
@@ -379,6 +413,8 @@ public class TimeEntryService : ITimeEntryService
         entry.EndedAtUtc = input.EndedAtUtc;
         entry.DurationSeconds = durationSeconds;
         entry.UpdatedAtUtc = DateTime.UtcNow;
+
+        await _associations.ApplyForUpdateAsync(entry, input, cancellationToken);
 
         await _db.SaveChangesAsync(cancellationToken);
     }

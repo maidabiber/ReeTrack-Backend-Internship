@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using ReeTrack.Application.Common.Constants;
 using ReeTrack.Application.Common.Interfaces;
+using ReeTrack.Application.Common.Models;
 using ReeTrack.Domain.Entities;
 using ReeTrack.Domain.Enums;
 using ReeTrack.Infrastructure.Persistence;
@@ -43,8 +44,8 @@ public class ProjectEndpointsTests
         Assert.Equal("Acme Corp", created.ClientName);
         Assert.Equal(0, created.TaskCount);
 
-        var list = await client.GetFromJsonAsync<List<ProjectResponse>>("/api/projects");
-        var listed = Assert.Single(list!);
+        var list = await client.GetFromJsonAsync<PagedResult<ProjectResponse>>("/api/projects");
+        var listed = Assert.Single(list!.Items);
         Assert.Equal(created.Id, listed.Id);
     }
 
@@ -190,21 +191,48 @@ public class ProjectEndpointsTests
         await SeedProjectAsync(factory, acme, "Acme Archived", ProjectStatus.Archived);
         await SeedProjectAsync(factory, globex, "Globex Active");
 
-        var active = await client.GetFromJsonAsync<List<ProjectResponse>>("/api/projects");
-        Assert.Equal(2, active!.Count);
+        var active = await client.GetFromJsonAsync<PagedResult<ProjectResponse>>("/api/projects");
+        Assert.Equal(2, active!.TotalCount);
+        Assert.Equal(2, active.Items.Count);
 
-        var archived = await client.GetFromJsonAsync<List<ProjectResponse>>("/api/projects?status=archived");
-        Assert.Equal("Acme Archived", Assert.Single(archived!).Name);
+        var archived = await client.GetFromJsonAsync<PagedResult<ProjectResponse>>("/api/projects?status=archived");
+        Assert.Equal("Acme Archived", Assert.Single(archived!.Items).Name);
 
-        var all = await client.GetFromJsonAsync<List<ProjectResponse>>("/api/projects?status=all");
-        Assert.Equal(3, all!.Count);
+        var all = await client.GetFromJsonAsync<PagedResult<ProjectResponse>>("/api/projects?status=all");
+        Assert.Equal(3, all!.TotalCount);
 
-        var byClient = await client.GetFromJsonAsync<List<ProjectResponse>>($"/api/projects?status=all&clientId={acme}");
-        Assert.Equal(2, byClient!.Count);
-        Assert.All(byClient, p => Assert.Equal(acme, p.ClientId));
+        var byClient = await client.GetFromJsonAsync<PagedResult<ProjectResponse>>($"/api/projects?status=all&clientId={acme}");
+        Assert.Equal(2, byClient!.TotalCount);
+        Assert.All(byClient.Items, p => Assert.Equal(acme, p.ClientId));
 
         var invalid = await client.GetAsync("/api/projects?status=bogus");
         Assert.Equal(HttpStatusCode.BadRequest, invalid.StatusCode);
+    }
+
+    [Fact]
+    public async Task List_PaginationAndSearch_Work()
+    {
+        using var factory = new ReeTrackWebApplicationFactory();
+        var (_, token) = await factory.SeedAdminAsync();
+        var client = factory.CreateAuthenticatedClient(token);
+        var acme = await SeedClientAsync(factory, "Acme Corp");
+
+        for (var i = 1; i <= 3; i++)
+            await SeedProjectAsync(factory, acme, $"Project {i}");
+
+        var page1 = await client.GetFromJsonAsync<PagedResult<ProjectResponse>>("/api/projects?page=1&pageSize=2");
+        Assert.NotNull(page1);
+        Assert.Equal(3, page1!.TotalCount);
+        Assert.Equal(2, page1.Items.Count);
+        Assert.Equal(1, page1.Page);
+        Assert.Equal(2, page1.PageSize);
+
+        var page2 = await client.GetFromJsonAsync<PagedResult<ProjectResponse>>("/api/projects?page=2&pageSize=2");
+        Assert.Single(page2!.Items);
+
+        var filtered = await client.GetFromJsonAsync<PagedResult<ProjectResponse>>("/api/projects?q=project%202");
+        Assert.Equal(1, filtered!.TotalCount);
+        Assert.Equal("Project 2", Assert.Single(filtered.Items).Name);
     }
 
     [Fact]
