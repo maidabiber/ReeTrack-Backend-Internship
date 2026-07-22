@@ -127,11 +127,25 @@ public class TimesheetReviewService : ITimesheetReviewService
             .FirstOrDefaultAsync(t => t.Id == timesheetId, cancellationToken)
             ?? throw new AppException("Timesheet not found.", 404);
 
-        if (timesheet.Status != TimesheetStatus.Submitted)
-            throw new AppException("This timesheet has already been reviewed.", 409);
+        // Approve is only valid on a fresh submission; a send-back (reject) is also
+        // allowed on an already-approved sheet so an admin can reopen it for fixes.
+        var allowed = decision == TimesheetStatus.Approved
+            ? timesheet.Status == TimesheetStatus.Submitted
+            : timesheet.Status is TimesheetStatus.Submitted or TimesheetStatus.Approved;
 
+        if (!allowed)
+            throw new AppException(
+                decision == TimesheetStatus.Approved
+                    ? "Only a submitted timesheet can be approved."
+                    : "This timesheet can no longer be sent back.",
+                409);
+
+        // Load the reviewer tracked (not AsNoTracking): when an admin reviews
+        // their own timesheet the owner is already tracked via Include(t => t.User),
+        // so EF's identity map hands back that same instance instead of attaching a
+        // second User with the same key -- which the audit interceptor's change scan
+        // rejects as an identity conflict when the row is saved.
         var reviewer = await _db.Users
-            .AsNoTracking()
             .FirstAsync(u => u.Id == reviewerId, cancellationToken);
 
         timesheet.Status = decision;

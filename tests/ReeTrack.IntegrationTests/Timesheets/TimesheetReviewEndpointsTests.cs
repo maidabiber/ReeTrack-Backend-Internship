@@ -198,7 +198,7 @@ public class TimesheetReviewEndpointsTests
     }
 
     [Fact]
-    public async Task Review_AlreadyReviewed_ReturnsConflict()
+    public async Task Approve_AlreadyApproved_ReturnsConflict()
     {
         using var factory = new ReeTrackWebApplicationFactory();
         var (_, adminToken) = await factory.SeedAdminAsync();
@@ -209,9 +209,77 @@ public class TimesheetReviewEndpointsTests
             $"/api/timesheets/review/{submitted.TimesheetId}/approve", new { });
         Assert.Equal(HttpStatusCode.OK, approve.StatusCode);
 
+        // Approve only acts on a fresh submission; re-approving an approved sheet 409s.
         var again = await adminClient.PostAsJsonAsync(
-            $"/api/timesheets/review/{submitted.TimesheetId}/reject", new { comment = "Too late" });
+            $"/api/timesheets/review/{submitted.TimesheetId}/approve", new { });
         Assert.Equal(HttpStatusCode.Conflict, again.StatusCode);
+    }
+
+    [Fact]
+    public async Task SendBack_AfterApproval_ReopensWeekForResubmission()
+    {
+        using var factory = new ReeTrackWebApplicationFactory();
+        var (_, adminToken) = await factory.SeedAdminAsync();
+        var adminClient = factory.CreateAuthenticatedClient(adminToken);
+        var submitted = await SeedSubmittedWeekAsync(factory, "member@reetrack.test", "Test Member");
+
+        var approve = await adminClient.PostAsJsonAsync(
+            $"/api/timesheets/review/{submitted.TimesheetId}/approve", new { });
+        Assert.Equal(HttpStatusCode.OK, approve.StatusCode);
+
+        // Admin spots an error after approving and sends the sheet back for fixes.
+        var sendBack = await adminClient.PostAsJsonAsync(
+            $"/api/timesheets/review/{submitted.TimesheetId}/reject",
+            new { comment = "Wrong project on Monday." });
+
+        Assert.Equal(HttpStatusCode.OK, sendBack.StatusCode);
+        var body = await sendBack.Content.ReadFromJsonAsync<TimesheetResponse>();
+        Assert.Equal("Rejected", body!.Status);
+        Assert.Equal("Wrong project on Monday.", body.ReviewComment);
+
+        // A second decision email is queued for the send-back.
+        Assert.Equal(2, factory.EmailSender.DecisionEmails.Count);
+        var latest = factory.EmailSender.DecisionEmails[^1];
+        Assert.False(latest.Approved);
+        Assert.Equal("Wrong project on Monday.", latest.Comment);
+
+        // The week is editable again and can be resubmitted into the review queue.
+        var memberClient = factory.CreateAuthenticatedClient(submitted.MemberToken);
+        var monday = PreviousWeek.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+        var edit = await memberClient.PostAsJsonAsync("/api/time-entries/manual", new
+        {
+            description = "Monday fix",
+            startedAtUtc = monday.AddHours(13),
+            endedAtUtc = monday.AddHours(14)
+        });
+        Assert.Equal(HttpStatusCode.OK, edit.StatusCode);
+
+        var resubmit = await memberClient.PostAsJsonAsync(
+            "/api/timesheets/my/submit", new { weekStart = PreviousWeek });
+        Assert.Equal(HttpStatusCode.OK, resubmit.StatusCode);
+
+        var queue = await adminClient.GetFromJsonAsync<PagedResponse<AdminListItemResponse>>(
+            "/api/timesheets/review");
+        Assert.Equal(1, queue!.TotalCount);
+        Assert.Equal(submitted.TimesheetId, queue.Items[0].Id);
+    }
+
+    [Fact]
+    public async Task Approve_AfterSendBack_ReturnsConflict()
+    {
+        using var factory = new ReeTrackWebApplicationFactory();
+        var (_, adminToken) = await factory.SeedAdminAsync();
+        var adminClient = factory.CreateAuthenticatedClient(adminToken);
+        var submitted = await SeedSubmittedWeekAsync(factory, "member@reetrack.test", "Test Member");
+
+        var reject = await adminClient.PostAsJsonAsync(
+            $"/api/timesheets/review/{submitted.TimesheetId}/reject", new { comment = "Fix it" });
+        Assert.Equal(HttpStatusCode.OK, reject.StatusCode);
+
+        // A sent-back sheet must be resubmitted before it can be approved.
+        var approve = await adminClient.PostAsJsonAsync(
+            $"/api/timesheets/review/{submitted.TimesheetId}/approve", new { });
+        Assert.Equal(HttpStatusCode.Conflict, approve.StatusCode);
     }
 
     [Fact]
@@ -230,6 +298,33 @@ public class TimesheetReviewEndpointsTests
         Assert.Equal(HttpStatusCode.OK, approve.StatusCode);
         var body = await approve.Content.ReadFromJsonAsync<TimesheetResponse>();
         Assert.Equal("Approved", body!.Status);
+    }
+
+    [Fact]
+    public async Task Admin_CanSendBackOwnApprovedTimesheet()
+    {
+        using var factory = new ReeTrackWebApplicationFactory();
+        var (_, adminToken) = await factory.SeedAdminAsync();
+        var adminClient = factory.CreateAuthenticatedClient(adminToken);
+        var monday = PreviousWeek.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+        await CreateManualEntryAsync(adminClient, monday.AddHours(9));
+        var submit = await adminClient.PostAsJsonAsync("/api/timesheets/my/submit", new { weekStart = PreviousWeek });
+        var own = await submit.Content.ReadFromJsonAsync<TimesheetResponse>();
+
+        var approve = await adminClient.PostAsJsonAsync($"/api/timesheets/review/{own!.Id}/approve", new { });
+        Assert.Equal(HttpStatusCode.OK, approve.StatusCode);
+
+        // Reviewing one's own timesheet is the owner==reviewer path: the same User is
+        // tracked as the sheet owner and loaded again as the reviewer. Sending the
+        // approved sheet back must reuse that single instance, not attach a duplicate.
+        var sendBack = await adminClient.PostAsJsonAsync(
+            $"/api/timesheets/review/{own.Id}/reject", new { comment = "Fix Monday's hours." });
+
+        Assert.Equal(HttpStatusCode.OK, sendBack.StatusCode);
+        var body = await sendBack.Content.ReadFromJsonAsync<TimesheetResponse>();
+        Assert.Equal("Rejected", body!.Status);
+        Assert.Equal("Fix Monday's hours.", body.ReviewComment);
+        Assert.Equal("Test Admin", body.ReviewedByDisplayName);
     }
 
     private sealed record SubmittedWeek(Guid TimesheetId, string MemberToken);
