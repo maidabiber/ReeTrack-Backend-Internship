@@ -4,8 +4,11 @@ namespace ReeTrack.Domain.Services;
 
 public interface IProjectCostCalculator
 {
-    decimal Calculate(
+    ProjectCostResult Calculate(
         Project project,
-        IReadOnlyList<TimeEntry> entries,
-        IReadOnlyList<UserHourlyRate> userRates);
+        IReadOnlyList<TimeEntry> projectEntries,
+        IReadOnlyList<TimeEntry> crossProjectUserEntries,
+        IReadOnlyList<UserHourlyRate> userRates,
+        IReadOnlySet<DateOnly> holidays,
+        RateMultiplierConfig multiplierConfig);
 }

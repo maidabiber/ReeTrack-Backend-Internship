@@ -19,6 +19,30 @@ public sealed class ProjectCostService : IProjectCostService
         _calculator = calculator;
     }
 
+    public async Task<ProjectCostDto?> GetLatestAsync(
+        Guid projectId,
+        CancellationToken cancellationToken = default)
+    {
+        var projectExists = await _db.Projects
+            .AsNoTracking()
+            .AnyAsync(p => p.Id == projectId, cancellationToken);
+
+        if (!projectExists)
+            throw new AppException("Project not found.", 404);
+
+        var snapshot = await _db.ProjectCostSnapshots
+            .AsNoTracking()
+            .Include(s => s.TaskCosts)
+            .Where(s => s.ProjectId == projectId)
+            .OrderByDescending(s => s.CalculatedAtUtc)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (snapshot is null)
+            return null;
+
+        return ToDto(snapshot);
+    }
+
     public async Task<ProjectCostDto> CalculateAsync(
         Guid projectId,
         CancellationToken cancellationToken = default)
@@ -48,26 +72,124 @@ public sealed class ProjectCostService : IProjectCostService
                 .Where(r => userIds.Contains(r.UserId))
                 .ToListAsync(cancellationToken);
 
-        var calculatedCost = _calculator.Calculate(project, entries, userRates);
+        var crossProjectUserEntries = Array.Empty<TimeEntry>();
+        var holidays = new HashSet<DateOnly>();
+
+        if (entries.Count > 0)
+        {
+            var entryDates = entries.Select(ResolveEntryDate).ToList();
+            var firstWeekStart = GetWeekStart(entryDates.Min());
+            var lastWeekEnd = GetWeekStart(entryDates.Max()).AddDays(6);
+            var rangeStart = firstWeekStart.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+            var rangeEndExclusive = lastWeekEnd
+                .AddDays(1)
+                .ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+
+            crossProjectUserEntries = await _db.TimeEntries
+                .AsNoTracking()
+                .Where(e =>
+                    userIds.Contains(e.UserId) &&
+                    e.Status == TimeEntryStatus.Confirmed &&
+                    e.DeletedAtUtc == null &&
+                    (e.StartedAtUtc ?? e.CreatedAtUtc) >= rangeStart &&
+                    (e.StartedAtUtc ?? e.CreatedAtUtc) < rangeEndExclusive)
+                .ToArrayAsync(cancellationToken);
+
+            holidays = (await _db.Holidays
+                    .AsNoTracking()
+                    .Where(holiday => holiday.Date >= firstWeekStart && holiday.Date <= lastWeekEnd)
+                    .Select(holiday => holiday.Date)
+                    .ToListAsync(cancellationToken))
+                .ToHashSet();
+        }
+
+        var multiplierConfig = await LoadMultiplierConfigAsync(cancellationToken);
+
+        var result = _calculator.Calculate(
+            project,
+            entries,
+            crossProjectUserEntries,
+            userRates,
+            holidays,
+            multiplierConfig);
         var calculatedAtUtc = DateTime.UtcNow;
 
         var snapshot = new ProjectCostSnapshot
         {
             ProjectId = projectId,
-            CalculatedCost = calculatedCost,
+            CalculatedCost = result.CalculatedCost,
+            TotalHours = result.TotalHours,
+            WeekendHours = result.WeekendHours,
+            HolidayHours = result.HolidayHours,
+            OvertimeHours = result.OvertimeHours,
             CalculatedAtUtc = calculatedAtUtc,
             CreatedAtUtc = calculatedAtUtc,
-            UpdatedAtUtc = calculatedAtUtc
+            UpdatedAtUtc = calculatedAtUtc,
+            TaskCosts = result.TaskCosts
+                .Select(task => new ProjectTaskCostSnapshot
+                {
+                    ProjectTaskId = task.ProjectTaskId,
+                    CalculatedCost = task.CalculatedCost,
+                    TotalHours = task.TotalHours,
+                    WeekendHours = task.WeekendHours,
+                    HolidayHours = task.HolidayHours,
+                    OvertimeHours = task.OvertimeHours,
+                    CreatedAtUtc = calculatedAtUtc,
+                    UpdatedAtUtc = calculatedAtUtc
+                })
+                .ToList()
         };
 
         _db.ProjectCostSnapshots.Add(snapshot);
         await _db.SaveChangesAsync(cancellationToken);
 
-        return new ProjectCostDto
+        return ToDto(snapshot);
+    }
+
+    private static ProjectCostDto ToDto(ProjectCostSnapshot snapshot) =>
+        new()
         {
-            ProjectId = projectId,
-            CalculatedCost = calculatedCost,
-            CalculatedAtUtc = calculatedAtUtc
+            ProjectId = snapshot.ProjectId,
+            CalculatedCost = snapshot.CalculatedCost,
+            TotalHours = snapshot.TotalHours,
+            WeekendHours = snapshot.WeekendHours,
+            HolidayHours = snapshot.HolidayHours,
+            OvertimeHours = snapshot.OvertimeHours,
+            CalculatedAtUtc = snapshot.CalculatedAtUtc,
+            TaskCosts = snapshot.TaskCosts
+                .OrderBy(task => task.ProjectTaskId)
+                .Select(task => new ProjectTaskCostDto
+                {
+                    ProjectTaskId = task.ProjectTaskId,
+                    CalculatedCost = task.CalculatedCost,
+                    TotalHours = task.TotalHours,
+                    WeekendHours = task.WeekendHours,
+                    HolidayHours = task.HolidayHours,
+                    OvertimeHours = task.OvertimeHours
+                })
+                .ToList()
         };
+
+    private static DateOnly ResolveEntryDate(TimeEntry entry) =>
+        DateOnly.FromDateTime(entry.StartedAtUtc ?? entry.CreatedAtUtc);
+
+    private static DateOnly GetWeekStart(DateOnly date) =>
+        date.AddDays(-((7 + ((int)date.DayOfWeek - (int)DayOfWeek.Monday)) % 7));
+
+    private async Task<RateMultiplierConfig> LoadMultiplierConfigAsync(CancellationToken cancellationToken)
+    {
+        var settings = await _db.RateMultiplierSettings
+            .AsNoTracking()
+            .OrderBy(s => s.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (settings is null)
+            return RateMultiplierConfig.Defaults;
+
+        return new RateMultiplierConfig(
+            settings.WeekendPremium,
+            settings.HolidayPremium,
+            settings.OvertimePremium,
+            settings.WeeklyOvertimeThresholdHours);
     }
 }

@@ -14,38 +14,142 @@ public sealed class ProjectCostCalculator : IProjectCostCalculator
             .ToList();
     }
 
-    public decimal Calculate(
+    public ProjectCostResult Calculate(
         Project project,
-        IReadOnlyList<TimeEntry> entries,
-        IReadOnlyList<UserHourlyRate> userRates)
+        IReadOnlyList<TimeEntry> projectEntries,
+        IReadOnlyList<TimeEntry> crossProjectUserEntries,
+        IReadOnlyList<UserHourlyRate> userRates,
+        IReadOnlySet<DateOnly> holidays,
+        RateMultiplierConfig multiplierConfig)
     {
         var projectRate = project.HourlyRate ?? 0m;
+        var cumulativeWeeklyHours = CalculateCumulativeWeeklyHours(crossProjectUserEntries);
         decimal total = 0m;
+        decimal totalHours = 0m;
+        decimal weekendHours = 0m;
+        decimal holidayHours = 0m;
+        decimal overtimeHours = 0m;
+        var taskTotals = new Dictionary<Guid, TaskAccumulator>();
 
-        foreach (var entry in entries)
+        foreach (var entry in projectEntries)
         {
-            if (entry.Status != TimeEntryStatus.Confirmed) // Already filtered in the service, but double-checking here for safety
+            if (entry.Status != TimeEntryStatus.Confirmed)
                 continue;
 
             if (entry.DeletedAtUtc is not null)
                 continue;
 
             var entryDate = ResolveEntryDate(entry);
+            var entryHours = entry.DurationSeconds / 3600m;
+            var hoursBeforeEntry = cumulativeWeeklyHours.GetValueOrDefault(entry.Id);
+            var isHoliday = holidays.Contains(entryDate);
+            var entryWeekendHours = entryDate.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday
+                ? entryHours
+                : 0m;
+            var entryHolidayHours = isHoliday ? entryHours : 0m;
+            var entryOvertimeHours = CalculateOvertimeHours(
+                entryHours,
+                hoursBeforeEntry,
+                multiplierConfig.WeeklyOvertimeThresholdHours);
+
+            totalHours += entryHours;
+            weekendHours += entryWeekendHours;
+            holidayHours += entryHolidayHours;
+            overtimeHours += entryOvertimeHours;
+
             var userRate = ResolveUserRate(userRates, entry.UserId, entryDate);
             var baseRate = Math.Max(userRate, projectRate);
 
-            var context = new RateContext(entry, entryDate, baseRate);
+            var context = new RateContext(
+                entry,
+                entryDate,
+                baseRate,
+                hoursBeforeEntry,
+                isHoliday,
+                multiplierConfig);
             var appliedRate = baseRate;
             foreach (var multiplier in _multipliers)
-                appliedRate = multiplier.Apply(appliedRate, context); 
-                // Will be used later for holidays, weekends, overtime, etc. 
-                // The multipliers are applied in the order defined by ExecutionOrder.
+                appliedRate = multiplier.Apply(appliedRate, context);
 
-            total += (entry.DurationSeconds / 3600m) * appliedRate;
+            var entryCost = entryHours * appliedRate;
+            total += entryCost;
+
+            if (entry.ProjectTaskId is Guid taskId)
+            {
+                if (!taskTotals.TryGetValue(taskId, out var task))
+                {
+                    task = new TaskAccumulator();
+                    taskTotals[taskId] = task;
+                }
+
+                task.CalculatedCost += entryCost;
+                task.TotalHours += entryHours;
+                task.WeekendHours += entryWeekendHours;
+                task.HolidayHours += entryHolidayHours;
+                task.OvertimeHours += entryOvertimeHours;
+            }
         }
 
-        return Math.Round(total, 2, MidpointRounding.AwayFromZero);
+        var taskCosts = taskTotals
+            .OrderBy(pair => pair.Key)
+            .Select(pair => new ProjectTaskCostResult(
+                pair.Key,
+                Math.Round(pair.Value.CalculatedCost, 2, MidpointRounding.AwayFromZero),
+                Math.Round(pair.Value.TotalHours, 2, MidpointRounding.AwayFromZero),
+                Math.Round(pair.Value.WeekendHours, 2, MidpointRounding.AwayFromZero),
+                Math.Round(pair.Value.HolidayHours, 2, MidpointRounding.AwayFromZero),
+                Math.Round(pair.Value.OvertimeHours, 2, MidpointRounding.AwayFromZero)))
+            .ToList();
+
+        return new ProjectCostResult(
+            Math.Round(total, 2, MidpointRounding.AwayFromZero),
+            Math.Round(totalHours, 2, MidpointRounding.AwayFromZero),
+            Math.Round(weekendHours, 2, MidpointRounding.AwayFromZero),
+            Math.Round(holidayHours, 2, MidpointRounding.AwayFromZero),
+            Math.Round(overtimeHours, 2, MidpointRounding.AwayFromZero),
+            taskCosts);
     }
+
+    private static decimal CalculateOvertimeHours(
+        decimal entryHours,
+        decimal hoursBeforeEntry,
+        decimal weeklyThresholdHours)
+    {
+        if (entryHours <= 0m)
+            return 0m;
+
+        var regularHours = Math.Clamp(
+            weeklyThresholdHours - hoursBeforeEntry,
+            0m,
+            entryHours);
+        return entryHours - regularHours;
+    }
+
+    private static IReadOnlyDictionary<Guid, decimal> CalculateCumulativeWeeklyHours(
+        IReadOnlyList<TimeEntry> entries)
+    {
+        var cumulativeHoursByEntryId = new Dictionary<Guid, decimal>();
+
+        foreach (var userWeekEntries in entries
+                     .Where(IsConfirmedAndActive)
+                     .GroupBy(entry => new { entry.UserId, WeekStart = GetWeekStart(ResolveEntryDate(entry)) }))
+        {
+            decimal cumulativeHours = 0m;
+            foreach (var entry in userWeekEntries.OrderBy(entry => entry.StartedAtUtc ?? entry.CreatedAtUtc))
+            {
+                cumulativeHoursByEntryId[entry.Id] = cumulativeHours;
+                cumulativeHours += entry.DurationSeconds / 3600m;
+            }
+        }
+
+        return cumulativeHoursByEntryId;
+    }
+
+    private static bool IsConfirmedAndActive(TimeEntry entry) =>
+        entry.Status == TimeEntryStatus.Confirmed && entry.DeletedAtUtc is null;
+
+    private static DateOnly GetWeekStart(DateOnly date) =>
+        date.AddDays(-((7 + ((int)date.DayOfWeek - (int)DayOfWeek.Monday)) % 7));
 
     private static DateOnly ResolveEntryDate(TimeEntry entry)
     {
@@ -60,5 +164,14 @@ public sealed class ProjectCostCalculator : IProjectCostCalculator
     {
         var rate = userRates.FirstOrDefault(r => r.UserId == userId && r.Covers(entryDate));
         return rate?.Rate.Amount ?? 0m;
+    }
+
+    private sealed class TaskAccumulator
+    {
+        public decimal CalculatedCost { get; set; }
+        public decimal TotalHours { get; set; }
+        public decimal WeekendHours { get; set; }
+        public decimal HolidayHours { get; set; }
+        public decimal OvertimeHours { get; set; }
     }
 }

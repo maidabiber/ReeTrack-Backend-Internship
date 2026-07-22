@@ -22,6 +22,8 @@ public interface IApplicationDbContext
     DbSet<UserHourlyRate> UserHourlyRates { get; }
     DbSet<Currency> Currencies { get; }
     DbSet<ProjectCostSnapshot> ProjectCostSnapshots { get; }
+    DbSet<Holiday> Holidays { get; }
+    DbSet<RateMultiplierSettings> RateMultiplierSettings { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

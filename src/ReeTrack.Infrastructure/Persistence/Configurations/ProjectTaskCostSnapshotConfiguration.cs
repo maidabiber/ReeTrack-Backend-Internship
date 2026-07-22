@@ -4,11 +4,11 @@ using ReeTrack.Domain.Entities;
 
 namespace ReeTrack.Infrastructure.Persistence.Configurations;
 
-public class ProjectCostSnapshotConfiguration : IEntityTypeConfiguration<ProjectCostSnapshot>
+public class ProjectTaskCostSnapshotConfiguration : IEntityTypeConfiguration<ProjectTaskCostSnapshot>
 {
-    public void Configure(EntityTypeBuilder<ProjectCostSnapshot> builder)
+    public void Configure(EntityTypeBuilder<ProjectTaskCostSnapshot> builder)
     {
-        builder.ToTable("project_cost_snapshots");
+        builder.ToTable("project_task_cost_snapshots");
 
         builder.HasKey(s => s.Id);
 
@@ -16,8 +16,12 @@ public class ProjectCostSnapshotConfiguration : IEntityTypeConfiguration<Project
             .HasColumnName("id")
             .HasDefaultValueSql("gen_random_uuid()");
 
-        builder.Property(s => s.ProjectId)
-            .HasColumnName("project_id")
+        builder.Property(s => s.ProjectCostSnapshotId)
+            .HasColumnName("project_cost_snapshot_id")
+            .IsRequired();
+
+        builder.Property(s => s.ProjectTaskId)
+            .HasColumnName("project_task_id")
             .IsRequired();
 
         builder.Property(s => s.CalculatedCost)
@@ -45,10 +49,6 @@ public class ProjectCostSnapshotConfiguration : IEntityTypeConfiguration<Project
             .HasPrecision(18, 2)
             .IsRequired();
 
-        builder.Property(s => s.CalculatedAtUtc)
-            .HasColumnName("calculated_at_utc")
-            .IsRequired();
-
         builder.Property(s => s.CreatedAtUtc)
             .HasColumnName("created_at_utc")
             .IsRequired();
@@ -57,12 +57,20 @@ public class ProjectCostSnapshotConfiguration : IEntityTypeConfiguration<Project
             .HasColumnName("updated_at_utc")
             .IsRequired();
 
-        builder.HasIndex(s => s.ProjectId)
-            .HasDatabaseName("ix_project_cost_snapshots_project_id");
+        builder.HasIndex(s => s.ProjectCostSnapshotId)
+            .HasDatabaseName("ix_project_task_cost_snapshots_project_cost_snapshot_id");
 
-        builder.HasOne(s => s.Project)
-            .WithMany(p => p.CostSnapshots)
-            .HasForeignKey(s => s.ProjectId)
+        builder.HasIndex(s => s.ProjectTaskId)
+            .HasDatabaseName("ix_project_task_cost_snapshots_project_task_id");
+
+        builder.HasOne(s => s.ProjectCostSnapshot)
+            .WithMany(s => s.TaskCosts)
+            .HasForeignKey(s => s.ProjectCostSnapshotId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        builder.HasOne(s => s.ProjectTask)
+            .WithMany()
+            .HasForeignKey(s => s.ProjectTaskId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }

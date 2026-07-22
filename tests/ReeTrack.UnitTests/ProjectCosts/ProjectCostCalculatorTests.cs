@@ -24,11 +24,11 @@ public class ProjectCostCalculatorTests
             CreateEntry(user.Id, durationSeconds: 3600, startedAt: new DateTime(2026, 2, 10, 9, 0, 0, DateTimeKind.Utc))
         };
 
-        var calculator = CreateCalculator();
-        var cost = calculator.Calculate(project, entries, user.HourlyRates.ToList());
+        var result = CreateCalculator().Calculate(
+            project, entries, entries, user.HourlyRates.ToList(), new HashSet<DateOnly>(), RateMultiplierConfig.Defaults);
 
-        // MAX(80, 50) * 1h = 80
-        Assert.Equal(80m, cost);
+        Assert.Equal(80m, result.CalculatedCost);
+        Assert.Equal(1m, result.TotalHours);
     }
 
     [Fact]
@@ -43,11 +43,11 @@ public class ProjectCostCalculatorTests
             CreateEntry(user.Id, durationSeconds: 7200, startedAt: new DateTime(2026, 1, 15, 9, 0, 0, DateTimeKind.Utc))
         };
 
-        var calculator = CreateCalculator();
-        var cost = calculator.Calculate(project, entries, user.HourlyRates.ToList());
+        var result = CreateCalculator().Calculate(
+            project, entries, entries, user.HourlyRates.ToList(), new HashSet<DateOnly>(), RateMultiplierConfig.Defaults);
 
-        // MAX(minimum wage, 100) * 2h = 200
-        Assert.Equal(200m, cost);
+        Assert.Equal(200m, result.CalculatedCost);
+        Assert.Equal(2m, result.TotalHours);
     }
 
     [Fact]
@@ -59,10 +59,11 @@ public class ProjectCostCalculatorTests
             CreateEntry(UserId, durationSeconds: 3600, startedAt: new DateTime(2026, 1, 15, 9, 0, 0, DateTimeKind.Utc))
         };
 
-        var calculator = CreateCalculator();
-        var cost = calculator.Calculate(project, entries, []);
+        var result = CreateCalculator().Calculate(
+            project, entries, entries, [], new HashSet<DateOnly>(), RateMultiplierConfig.Defaults);
 
-        Assert.Equal(0m, cost);
+        Assert.Equal(0m, result.CalculatedCost);
+        Assert.Equal(1m, result.TotalHours);
     }
 
     [Fact]
@@ -81,10 +82,12 @@ public class ProjectCostCalculatorTests
                 deletedAtUtc: new DateTime(2026, 1, 18, 0, 0, 0, DateTimeKind.Utc))
         };
 
-        var calculator = CreateCalculator();
-        var cost = calculator.Calculate(project, entries, []);
+        var result = CreateCalculator().Calculate(
+            project, entries, entries, [], new HashSet<DateOnly>(), RateMultiplierConfig.Defaults);
 
-        Assert.Equal(50m, cost);
+        Assert.Equal(50m, result.CalculatedCost);
+        Assert.Equal(1m, result.TotalHours);
+        Assert.Equal(0m, result.WeekendHours);
     }
 
     [Fact]
@@ -97,10 +100,11 @@ public class ProjectCostCalculatorTests
         };
 
         var calculator = new ProjectCostCalculator([new BaseRateMultiplier()]);
-        var cost = calculator.Calculate(project, entries, []);
+        var result = calculator.Calculate(
+            project, entries, entries, [], new HashSet<DateOnly>(), RateMultiplierConfig.Defaults);
 
-        // 0.5h * 40 = 20
-        Assert.Equal(20m, cost);
+        Assert.Equal(20m, result.CalculatedCost);
+        Assert.Equal(0.5m, result.TotalHours);
     }
 
     [Fact]
@@ -113,15 +117,239 @@ public class ProjectCostCalculatorTests
             CreateEntry(UserId, 1800, new DateTime(2026, 1, 16, 9, 0, 0, DateTimeKind.Utc))
         };
 
-        var calculator = CreateCalculator();
-        var cost = calculator.Calculate(project, entries, []);
+        var result = CreateCalculator().Calculate(
+            project, entries, entries, [], new HashSet<DateOnly>(), RateMultiplierConfig.Defaults);
 
-        // 1h*60 + 0.5h*60 = 90
-        Assert.Equal(90m, cost);
+        Assert.Equal(90m, result.CalculatedCost);
+        Assert.Equal(1.5m, result.TotalHours);
+    }
+
+    [Fact]
+    public void Calculate_AppliesWeekendRate()
+    {
+        var project = CreateProject(hourlyRate: 100m);
+        var entries = new List<TimeEntry>
+        {
+            CreateEntry(UserId, 3600, new DateTime(2026, 1, 17, 9, 0, 0, DateTimeKind.Utc))
+        };
+
+        var result = CreateCalculator().Calculate(
+            project, entries, entries, [], new HashSet<DateOnly>(), RateMultiplierConfig.Defaults);
+
+        Assert.Equal(150m, result.CalculatedCost);
+        Assert.Equal(1m, result.TotalHours);
+        Assert.Equal(1m, result.WeekendHours);
+        Assert.Equal(0m, result.HolidayHours);
+        Assert.Equal(0m, result.OvertimeHours);
+    }
+
+    [Fact]
+    public void Calculate_AppliesHolidayRate()
+    {
+        var project = CreateProject(hourlyRate: 100m);
+        var entries = new List<TimeEntry>
+        {
+            CreateEntry(UserId, 3600, new DateTime(2026, 1, 15, 9, 0, 0, DateTimeKind.Utc))
+        };
+
+        var result = CreateCalculator().Calculate(
+            project,
+            entries,
+            entries,
+            [],
+            new HashSet<DateOnly> { new(2026, 1, 15) },
+            RateMultiplierConfig.Defaults);
+
+        Assert.Equal(200m, result.CalculatedCost);
+        Assert.Equal(1m, result.TotalHours);
+        Assert.Equal(0m, result.WeekendHours);
+        Assert.Equal(1m, result.HolidayHours);
+        Assert.Equal(0m, result.OvertimeHours);
+    }
+
+    [Fact]
+    public void Calculate_AddsWeekendAndHolidayPremiums()
+    {
+        var project = CreateProject(hourlyRate: 100m);
+        var entries = new List<TimeEntry>
+        {
+            CreateEntry(UserId, 3600, new DateTime(2026, 1, 17, 9, 0, 0, DateTimeKind.Utc))
+        };
+
+        var result = CreateCalculator().Calculate(
+            project,
+            entries,
+            entries,
+            [],
+            new HashSet<DateOnly> { new(2026, 1, 17) },
+            RateMultiplierConfig.Defaults);
+
+        Assert.Equal(250m, result.CalculatedCost);
+        Assert.Equal(1m, result.TotalHours);
+        Assert.Equal(1m, result.WeekendHours);
+        Assert.Equal(1m, result.HolidayHours);
+        Assert.Equal(0m, result.OvertimeHours);
+    }
+
+    [Fact]
+    public void Calculate_AddsWeekendAndOvertimePremiums()
+    {
+        var project = CreateProject(hourlyRate: 100m);
+        var precedingEntry = CreateEntry(
+            UserId,
+            40 * 3600,
+            new DateTime(2026, 1, 16, 9, 0, 0, DateTimeKind.Utc));
+        var weekendOvertimeEntry = CreateEntry(
+            UserId,
+            3600,
+            new DateTime(2026, 1, 17, 9, 0, 0, DateTimeKind.Utc));
+        var projectEntries = new List<TimeEntry> { weekendOvertimeEntry };
+        var crossProjectEntries = new List<TimeEntry> { precedingEntry, weekendOvertimeEntry };
+
+        var result = CreateCalculator().Calculate(
+            project, projectEntries, crossProjectEntries, [], new HashSet<DateOnly>(), RateMultiplierConfig.Defaults);
+
+        Assert.Equal(200m, result.CalculatedCost);
+        Assert.Equal(1m, result.TotalHours);
+        Assert.Equal(1m, result.WeekendHours);
+        Assert.Equal(1m, result.OvertimeHours);
+    }
+
+    [Fact]
+    public void Calculate_UsesWeightedRate_WhenEntryCrossesOvertimeThreshold()
+    {
+        var project = CreateProject(hourlyRate: 100m);
+        var precedingEntry = CreateEntry(
+            UserId,
+            38 * 3600,
+            new DateTime(2026, 1, 12, 9, 0, 0, DateTimeKind.Utc));
+        var thresholdCrossingEntry = CreateEntry(
+            UserId,
+            4 * 3600,
+            new DateTime(2026, 1, 13, 9, 0, 0, DateTimeKind.Utc));
+        var projectEntries = new List<TimeEntry> { thresholdCrossingEntry };
+        var crossProjectEntries = new List<TimeEntry> { thresholdCrossingEntry, precedingEntry };
+
+        var result = CreateCalculator().Calculate(
+            project, projectEntries, crossProjectEntries, [], new HashSet<DateOnly>(), RateMultiplierConfig.Defaults);
+
+        Assert.Equal(500m, result.CalculatedCost);
+        Assert.Equal(4m, result.TotalHours);
+        Assert.Equal(2m, result.OvertimeHours);
+    }
+
+    [Fact]
+    public void Calculate_UsesConfiguredPremiumsAndThreshold()
+    {
+        var project = CreateProject(hourlyRate: 100m);
+        var entries = new List<TimeEntry>
+        {
+            CreateEntry(UserId, 3600, new DateTime(2026, 1, 17, 9, 0, 0, DateTimeKind.Utc))
+        };
+        var config = new RateMultiplierConfig(
+            WeekendPremium: 0.25m,
+            HolidayPremium: 1.0m,
+            OvertimePremium: 0.5m,
+            WeeklyOvertimeThresholdHours: 40m);
+
+        var result = CreateCalculator().Calculate(project, entries, entries, [], new HashSet<DateOnly>(), config);
+
+        // 100 * (1 + 0.25) = 125
+        Assert.Equal(125m, result.CalculatedCost);
+    }
+
+    [Fact]
+    public void Calculate_UsesCrossProjectEntriesToDetermineWeeklyOvertime()
+    {
+        var project = CreateProject(hourlyRate: 100m);
+        var otherProjectEntry = CreateEntry(
+            UserId,
+            40 * 3600,
+            new DateTime(2026, 1, 12, 9, 0, 0, DateTimeKind.Utc));
+        var projectEntry = CreateEntry(
+            UserId,
+            3600,
+            new DateTime(2026, 1, 13, 9, 0, 0, DateTimeKind.Utc));
+        var projectEntries = new List<TimeEntry> { projectEntry };
+        var crossProjectEntries = new List<TimeEntry> { projectEntry, otherProjectEntry };
+
+        var result = CreateCalculator().Calculate(
+            project, projectEntries, crossProjectEntries, [], new HashSet<DateOnly>(), RateMultiplierConfig.Defaults);
+
+        Assert.Equal(150m, result.CalculatedCost);
+        Assert.Equal(1m, result.TotalHours);
+        Assert.Equal(1m, result.OvertimeHours);
+    }
+
+    [Fact]
+    public void Calculate_IsolatesOvertimeByUserAndMondayBasedWeek()
+    {
+        var project = CreateProject(hourlyRate: 100m);
+        var otherUserId = Guid.NewGuid();
+        var lastWeekEntry = CreateEntry(
+            UserId,
+            40 * 3600,
+            new DateTime(2026, 1, 12, 9, 0, 0, DateTimeKind.Utc));
+        var otherUserEntry = CreateEntry(
+            otherUserId,
+            40 * 3600,
+            new DateTime(2026, 1, 19, 9, 0, 0, DateTimeKind.Utc));
+        var projectEntry = CreateEntry(
+            UserId,
+            3600,
+            new DateTime(2026, 1, 19, 9, 0, 0, DateTimeKind.Utc));
+        var projectEntries = new List<TimeEntry> { projectEntry };
+        var crossProjectEntries = new List<TimeEntry>
+        {
+            lastWeekEntry,
+            otherUserEntry,
+            projectEntry
+        };
+
+        var result = CreateCalculator().Calculate(
+            project, projectEntries, crossProjectEntries, [], new HashSet<DateOnly>(), RateMultiplierConfig.Defaults);
+
+        Assert.Equal(100m, result.CalculatedCost);
+        Assert.Equal(1m, result.TotalHours);
+        Assert.Equal(0m, result.OvertimeHours);
+    }
+
+    [Fact]
+    public void Calculate_GroupsCostsByTask_AndIgnoresUntaskedInTaskBreakdown()
+    {
+        var project = CreateProject(hourlyRate: 100m);
+        var taskA = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+        var taskB = Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
+        var entries = new List<TimeEntry>
+        {
+            CreateEntry(UserId, 3600, new DateTime(2026, 1, 14, 9, 0, 0, DateTimeKind.Utc), projectTaskId: taskA),
+            CreateEntry(UserId, 7200, new DateTime(2026, 1, 14, 11, 0, 0, DateTimeKind.Utc), projectTaskId: taskB),
+            CreateEntry(UserId, 1800, new DateTime(2026, 1, 14, 14, 0, 0, DateTimeKind.Utc))
+        };
+
+        var result = CreateCalculator().Calculate(
+            project, entries, entries, [], new HashSet<DateOnly>(), RateMultiplierConfig.Defaults);
+
+        Assert.Equal(350m, result.CalculatedCost);
+        Assert.Equal(3.5m, result.TotalHours);
+        Assert.Equal(2, result.TaskCosts.Count);
+
+        var taskACost = Assert.Single(result.TaskCosts, task => task.ProjectTaskId == taskA);
+        Assert.Equal(100m, taskACost.CalculatedCost);
+        Assert.Equal(1m, taskACost.TotalHours);
+
+        var taskBCost = Assert.Single(result.TaskCosts, task => task.ProjectTaskId == taskB);
+        Assert.Equal(200m, taskBCost.CalculatedCost);
+        Assert.Equal(2m, taskBCost.TotalHours);
     }
 
     private static ProjectCostCalculator CreateCalculator() =>
-        new([new BaseRateMultiplier()]);
+        new([
+            new BaseRateMultiplier(),
+            new WeekendRateMultiplier(),
+            new HolidayRateMultiplier(),
+            new OvertimeRateMultiplier()
+        ]);
 
     private static Project CreateProject(decimal? hourlyRate) =>
         new()
@@ -147,12 +375,14 @@ public class ProjectCostCalculatorTests
         int durationSeconds,
         DateTime startedAt,
         TimeEntryStatus status = TimeEntryStatus.Confirmed,
-        DateTime? deletedAtUtc = null) =>
+        DateTime? deletedAtUtc = null,
+        Guid? projectTaskId = null) =>
         new()
         {
             Id = Guid.NewGuid(),
             UserId = userId,
             ProjectId = ProjectId,
+            ProjectTaskId = projectTaskId,
             DurationSeconds = durationSeconds,
             StartedAtUtc = startedAt,
             Status = status,

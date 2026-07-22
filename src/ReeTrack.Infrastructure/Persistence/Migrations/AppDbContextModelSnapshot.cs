@@ -114,6 +114,35 @@ namespace ReeTrack.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("ReeTrack.Domain.Entities.Holiday", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date")
+                        .HasColumnName("date");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at_utc");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Date")
+                        .IsUnique()
+                        .HasDatabaseName("ux_holidays_date");
+
+                    b.ToTable("holidays", (string)null);
+                });
+
             modelBuilder.Entity("ReeTrack.Domain.Entities.Invitation", b =>
                 {
                     b.Property<Guid>("Id")
@@ -289,13 +318,33 @@ namespace ReeTrack.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at_utc");
 
+                    b.Property<decimal>("HolidayHours")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("holiday_hours");
+
+                    b.Property<decimal>("OvertimeHours")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("overtime_hours");
+
                     b.Property<Guid>("ProjectId")
                         .HasColumnType("uuid")
                         .HasColumnName("project_id");
 
+                    b.Property<decimal>("TotalHours")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("total_hours");
+
                     b.Property<DateTime>("UpdatedAtUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at_utc");
+
+                    b.Property<decimal>("WeekendHours")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("weekend_hours");
 
                     b.HasKey("Id");
 
@@ -303,6 +352,66 @@ namespace ReeTrack.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_project_cost_snapshots_project_id");
 
                     b.ToTable("project_cost_snapshots", (string)null);
+                });
+
+            modelBuilder.Entity("ReeTrack.Domain.Entities.ProjectTaskCostSnapshot", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<decimal>("CalculatedCost")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("calculated_cost");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<decimal>("HolidayHours")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("holiday_hours");
+
+                    b.Property<decimal>("OvertimeHours")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("overtime_hours");
+
+                    b.Property<Guid>("ProjectCostSnapshotId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("project_cost_snapshot_id");
+
+                    b.Property<Guid>("ProjectTaskId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("project_task_id");
+
+                    b.Property<decimal>("TotalHours")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("total_hours");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at_utc");
+
+                    b.Property<decimal>("WeekendHours")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("weekend_hours");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProjectCostSnapshotId")
+                        .HasDatabaseName("ix_project_task_cost_snapshots_project_cost_snapshot_id");
+
+                    b.HasIndex("ProjectTaskId")
+                        .HasDatabaseName("ix_project_task_cost_snapshots_project_task_id");
+
+                    b.ToTable("project_task_cost_snapshots", (string)null);
                 });
 
             modelBuilder.Entity("ReeTrack.Domain.Entities.ProjectTask", b =>
@@ -366,6 +475,58 @@ namespace ReeTrack.Infrastructure.Persistence.Migrations
                         .HasFilter("deleted_at_utc IS NULL");
 
                     b.ToTable("project_tasks", (string)null);
+                });
+
+            modelBuilder.Entity("ReeTrack.Domain.Entities.RateMultiplierSettings", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<decimal>("HolidayPremium")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("holiday_premium");
+
+                    b.Property<decimal>("OvertimePremium")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("overtime_premium");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at_utc");
+
+                    b.Property<decimal>("WeekendPremium")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("weekend_premium");
+
+                    b.Property<decimal>("WeeklyOvertimeThresholdHours")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("weekly_overtime_threshold_hours");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("rate_multiplier_settings", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            Id = new Guid("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"),
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            HolidayPremium = 1.0m,
+                            OvertimePremium = 0.5m,
+                            UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            WeekendPremium = 0.5m,
+                            WeeklyOvertimeThresholdHours = 40m
+                        });
                 });
 
             modelBuilder.Entity("ReeTrack.Domain.Entities.Role", b =>
@@ -1092,6 +1253,25 @@ namespace ReeTrack.Infrastructure.Persistence.Migrations
                     b.Navigation("Project");
                 });
 
+            modelBuilder.Entity("ReeTrack.Domain.Entities.ProjectTaskCostSnapshot", b =>
+                {
+                    b.HasOne("ReeTrack.Domain.Entities.ProjectCostSnapshot", "ProjectCostSnapshot")
+                        .WithMany("TaskCosts")
+                        .HasForeignKey("ProjectCostSnapshotId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("ReeTrack.Domain.Entities.ProjectTask", "ProjectTask")
+                        .WithMany()
+                        .HasForeignKey("ProjectTaskId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("ProjectCostSnapshot");
+
+                    b.Navigation("ProjectTask");
+                });
+
             modelBuilder.Entity("ReeTrack.Domain.Entities.ProjectTask", b =>
                 {
                     b.HasOne("ReeTrack.Domain.Entities.User", "AssignedToUser")
@@ -1316,6 +1496,11 @@ namespace ReeTrack.Infrastructure.Persistence.Migrations
                     b.Navigation("CostSnapshots");
 
                     b.Navigation("Tasks");
+                });
+
+            modelBuilder.Entity("ReeTrack.Domain.Entities.ProjectCostSnapshot", b =>
+                {
+                    b.Navigation("TaskCosts");
                 });
 
             modelBuilder.Entity("ReeTrack.Domain.Entities.Role", b =>
