@@ -246,6 +246,7 @@ public class ProjectService : IProjectService
         string? color,
         CancellationToken cancellationToken)
     {
+
         project.CurrencyCode = await _currencyService.EnsureSupportedAsync(currencyCode, cancellationToken);
         project.HourlyRate = ValidateAmount(hourlyRate, "Hourly rate");
         project.FixedFeeAmount = ValidateAmount(fixedFeeAmount, "Fixed fee");

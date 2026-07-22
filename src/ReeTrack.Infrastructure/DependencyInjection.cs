@@ -21,6 +21,7 @@ using ReeTrack.Infrastructure.Background;
 using ReeTrack.Infrastructure.Calendar;
 using ReeTrack.Infrastructure.Integrations.Calendar;
 using ReeTrack.Infrastructure.Integrations.Calendar.Google;
+using ReeTrack.Domain.Services;
 
 namespace ReeTrack.Infrastructure;
 
@@ -72,6 +73,9 @@ public static class DependencyInjection
         services.AddScoped<ISharedTimeEntryApprovalService, SharedTimeEntryApprovalService>();
         services.AddScoped<ITimeEntryTemplateService, TimeEntryTemplateService>();
         services.AddScoped<IProjectService, ProjectService>();
+        services.AddScoped<IProjectCostService, ProjectCostService>();
+        services.AddScoped<IRateMultiplier, BaseRateMultiplier>();
+        services.AddScoped<IProjectCostCalculator, ProjectCostCalculator>();
         services.AddScoped<IProjectTaskService, ProjectTaskService>();
         services.AddScoped<ITagService, TagService>();
         services.AddScoped<IClientService, ClientService>();

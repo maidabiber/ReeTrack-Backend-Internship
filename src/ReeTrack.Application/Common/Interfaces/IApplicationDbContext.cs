@@ -21,6 +21,7 @@ public interface IApplicationDbContext
     DbSet<SyncedCalendarEvent> SyncedCalendarEvents { get; }
     DbSet<UserHourlyRate> UserHourlyRates { get; }
     DbSet<Currency> Currencies { get; }
+    DbSet<ProjectCostSnapshot> ProjectCostSnapshots { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

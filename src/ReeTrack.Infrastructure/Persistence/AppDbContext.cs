@@ -26,6 +26,7 @@ public class AppDbContext : DbContext, IApplicationDbContext
     public DbSet<SyncedCalendarEvent> SyncedCalendarEvents => Set<SyncedCalendarEvent>();
     public DbSet<UserHourlyRate> UserHourlyRates => Set<UserHourlyRate>();
     public DbSet<Currency> Currencies => Set<Currency>();
+    public DbSet<ProjectCostSnapshot> ProjectCostSnapshots => Set<ProjectCostSnapshot>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
