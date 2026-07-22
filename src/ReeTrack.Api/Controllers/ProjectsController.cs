@@ -6,9 +6,11 @@ using ReeTrack.Application.Common.Models;
 
 namespace ReeTrack.Api.Controllers;
 
-// Trust-based domain: every authenticated user may create/edit/delete projects
-// (no Admin role gate on mutations). Changes are captured by the audit trail
-// and deletes are soft-deletes guarded against tracked time.
+// Trust-based domain: every authenticated user may create/edit projects (no
+// Admin role gate on mutations). Deleting is the exception — only the project's
+// creator or an admin may delete (enforced in ProjectService). Changes are
+// captured by the audit trail and deletes are soft-deletes guarded against
+// tracked time.
 [ApiController]
 [Route("api/projects")]
 [Authorize]
@@ -64,11 +66,9 @@ public class ProjectsController : ControllerBase
         {
             Name = request?.Name,
             ClientId = request?.ClientId,
-            BillingType = request?.BillingType,
             CurrencyCode = request?.CurrencyCode,
             HourlyRate = request?.HourlyRate,
             FixedFeeAmount = request?.FixedFeeAmount,
-            BudgetAmount = request?.BudgetAmount,
             TimeEstimateHours = request?.TimeEstimateHours,
             Color = request?.Color
         };
@@ -88,11 +88,9 @@ public class ProjectsController : ControllerBase
             Name = request?.Name,
             ClientId = request?.ClientId,
             Status = request?.Status,
-            BillingType = request?.BillingType,
             CurrencyCode = request?.CurrencyCode,
             HourlyRate = request?.HourlyRate,
             FixedFeeAmount = request?.FixedFeeAmount,
-            BudgetAmount = request?.BudgetAmount,
             TimeEstimateHours = request?.TimeEstimateHours,
             Color = request?.Color
         };
@@ -116,11 +114,10 @@ public class ProjectsController : ControllerBase
             ClientId = project.ClientId,
             ClientName = project.ClientName,
             Status = project.Status,
-            BillingType = project.BillingType,
+            CreatedByUserId = project.CreatedByUserId,
             CurrencyCode = project.CurrencyCode,
             HourlyRate = project.HourlyRate,
             FixedFeeAmount = project.FixedFeeAmount,
-            BudgetAmount = project.BudgetAmount,
             TimeEstimateHours = project.TimeEstimateHours,
             Color = project.Color,
             TaskCount = project.TaskCount,

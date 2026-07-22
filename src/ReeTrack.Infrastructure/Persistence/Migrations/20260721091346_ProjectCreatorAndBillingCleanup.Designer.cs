@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using ReeTrack.Infrastructure.Persistence;
@@ -11,9 +12,11 @@ using ReeTrack.Infrastructure.Persistence;
 namespace ReeTrack.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260721091346_ProjectCreatorAndBillingCleanup")]
+    partial class ProjectCreatorAndBillingCleanup
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -66,52 +69,6 @@ namespace ReeTrack.Infrastructure.Persistence.Migrations
                         .HasFilter("deleted_at_utc IS NULL");
 
                     b.ToTable("clients", (string)null);
-                });
-
-            modelBuilder.Entity("ReeTrack.Domain.Entities.Currency", b =>
-                {
-                    b.Property<string>("Code")
-                        .HasMaxLength(3)
-                        .HasColumnType("character(3)")
-                        .HasColumnName("code")
-                        .IsFixedLength();
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at_utc");
-
-                    b.Property<bool>("IsActive")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(true)
-                        .HasColumnName("is_active");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("name");
-
-                    b.Property<DateTime>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at_utc");
-
-                    b.HasKey("Code");
-
-                    b.HasIndex("IsActive")
-                        .HasDatabaseName("ix_currencies_is_active");
-
-                    b.ToTable("currencies", (string)null);
-
-                    b.HasData(
-                        new
-                        {
-                            Code = "EUR",
-                            CreatedAtUtc = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            IsActive = true,
-                            Name = "Euro",
-                            UpdatedAtUtc = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
-                        });
                 });
 
             modelBuilder.Entity("ReeTrack.Domain.Entities.Invitation", b =>
@@ -889,43 +846,6 @@ namespace ReeTrack.Infrastructure.Persistence.Migrations
                     b.ToTable("user_calendar_connections", (string)null);
                 });
 
-            modelBuilder.Entity("ReeTrack.Domain.Entities.UserHourlyRate", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id")
-                        .HasDefaultValueSql("gen_random_uuid()");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at_utc");
-
-                    b.Property<DateTime>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at_utc");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("user_id");
-
-                    b.Property<DateOnly>("ValidFrom")
-                        .HasColumnType("date")
-                        .HasColumnName("valid_from");
-
-                    b.Property<DateOnly?>("ValidTo")
-                        .HasColumnType("date")
-                        .HasColumnName("valid_to");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("UserId", "ValidFrom")
-                        .IsUnique()
-                        .HasDatabaseName("ix_user_hourly_rates_user_id_valid_from");
-
-                    b.ToTable("user_hourly_rates", (string)null);
-                });
-
             modelBuilder.Entity("ReeTrack.Domain.Entities.UserRole", b =>
                 {
                     b.Property<Guid>("UserId")
@@ -1193,45 +1113,6 @@ namespace ReeTrack.Infrastructure.Persistence.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("ReeTrack.Domain.Entities.UserHourlyRate", b =>
-                {
-                    b.HasOne("ReeTrack.Domain.Entities.User", "User")
-                        .WithMany("HourlyRates")
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.OwnsOne("ReeTrack.Domain.ValueObjects.Money", "Rate", b1 =>
-                        {
-                            b1.Property<Guid>("UserHourlyRateId")
-                                .ValueGeneratedOnAdd()
-                                .HasColumnType("uuid");
-
-                            b1.Property<decimal>("Amount")
-                                .HasPrecision(18, 2)
-                                .HasColumnType("numeric(18,2)")
-                                .HasColumnName("hourly_rate");
-
-                            b1.Property<string>("CurrencyCode")
-                                .IsRequired()
-                                .HasMaxLength(3)
-                                .HasColumnType("character varying(3)")
-                                .HasColumnName("currency_code");
-
-                            b1.HasKey("UserHourlyRateId");
-
-                            b1.ToTable("user_hourly_rates");
-
-                            b1.WithOwner()
-                                .HasForeignKey("UserHourlyRateId");
-                        });
-
-                    b.Navigation("Rate")
-                        .IsRequired();
-
-                    b.Navigation("User");
-                });
-
             modelBuilder.Entity("ReeTrack.Domain.Entities.UserRole", b =>
                 {
                     b.HasOne("ReeTrack.Domain.Entities.User", "AssignedByUser")
@@ -1292,8 +1173,6 @@ namespace ReeTrack.Infrastructure.Persistence.Migrations
                     b.Navigation("AssignedRoles");
 
                     b.Navigation("AssignedTasks");
-
-                    b.Navigation("HourlyRates");
 
                     b.Navigation("SentInvitations");
 

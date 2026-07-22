@@ -260,8 +260,7 @@ public class ProjectTaskEndpointsTests
         {
             Client = client,
             Name = name,
-            Status = ProjectStatus.Active,
-            BillingType = BillingType.Hourly
+            Status = ProjectStatus.Active
         };
         db.Projects.Add(project);
         await db.SaveChangesAsync();

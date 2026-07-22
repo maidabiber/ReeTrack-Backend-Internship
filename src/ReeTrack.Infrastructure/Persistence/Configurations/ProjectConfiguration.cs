@@ -30,9 +30,8 @@ public class ProjectConfiguration : IEntityTypeConfiguration<Project>
             .HasConversion<short>()
             .IsRequired();
 
-        builder.Property(p => p.BillingType)
-            .HasColumnName("billing_type")
-            .HasConversion<short>()
+        builder.Property(p => p.CreatedByUserId)
+            .HasColumnName("created_by_user_id")
             .IsRequired();
 
         builder.Property(p => p.CurrencyCode)
@@ -40,10 +39,6 @@ public class ProjectConfiguration : IEntityTypeConfiguration<Project>
             .HasMaxLength(3)
             .HasDefaultValue("EUR")
             .IsRequired();
-
-        builder.Property(p => p.BudgetAmount)
-            .HasColumnName("budget_amount")
-            .HasPrecision(18, 2);
 
         builder.Property(p => p.FixedFeeAmount)
             .HasColumnName("fixed_fee_amount")

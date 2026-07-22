@@ -24,7 +24,7 @@ public class ProjectEndpointsTests
     public async Task Create_ReturnsProject_WithDefaults()
     {
         using var factory = new ReeTrackWebApplicationFactory();
-        var (_, token) = await factory.SeedAdminAsync();
+        var (admin, token) = await factory.SeedAdminAsync();
         var client = factory.CreateAuthenticatedClient(token);
         var clientId = await SeedClientAsync(factory, "Acme Corp");
 
@@ -39,7 +39,7 @@ public class ProjectEndpointsTests
         Assert.NotNull(created);
         Assert.Equal("Website Redesign", created.Name);
         Assert.Equal("active", created.Status);
-        Assert.Equal("hourly", created.BillingType);
+        Assert.Equal(admin.Id, created.CreatedByUserId);
         Assert.Equal("EUR", created.CurrencyCode);
         Assert.Equal("Acme Corp", created.ClientName);
         Assert.Equal(0, created.TaskCount);
@@ -97,7 +97,7 @@ public class ProjectEndpointsTests
     [InlineData("color", "red")]
     [InlineData("currencyCode", "EUROS")]
     [InlineData("hourlyRate", -5)]
-    [InlineData("budgetAmount", -1)]
+    [InlineData("fixedFeeAmount", -1)]
     public async Task Create_InvalidField_Returns400(string field, object value)
     {
         using var factory = new ReeTrackWebApplicationFactory();
@@ -109,7 +109,6 @@ public class ProjectEndpointsTests
         {
             ["name"] = "Project X",
             ["clientId"] = clientId,
-            ["billingType"] = "hourly",
             [field] = value
         };
 
@@ -119,40 +118,30 @@ public class ProjectEndpointsTests
     }
 
     [Fact]
-    public async Task Create_BillingType_KeepsFeeModelsExclusive()
+    public async Task Create_StoresHourlyRateAndFixedFeeTogether()
     {
         using var factory = new ReeTrackWebApplicationFactory();
         var (_, token) = await factory.SeedAdminAsync();
         var client = factory.CreateAuthenticatedClient(token);
         var clientId = await SeedClientAsync(factory, "Acme Corp");
 
-        var hourly = await (await client.PostAsJsonAsync("/api/projects", new
+        var created = await (await client.PostAsJsonAsync("/api/projects", new
         {
-            name = "Hourly Project",
+            name = "Mixed Billing Project",
             clientId,
-            billingType = "hourly",
             hourlyRate = 90,
             fixedFeeAmount = 12000
         })).Content.ReadFromJsonAsync<ProjectResponse>();
-        Assert.Equal(90, hourly!.HourlyRate);
-        Assert.Null(hourly.FixedFeeAmount);
 
-        var fixedFee = await (await client.PostAsJsonAsync("/api/projects", new
-        {
-            name = "Fixed Project",
-            clientId,
-            billingType = "fixedFee",
-            hourlyRate = 90,
-            fixedFeeAmount = 12000
-        })).Content.ReadFromJsonAsync<ProjectResponse>();
-        Assert.Equal(12000, fixedFee!.FixedFeeAmount);
-        Assert.Null(fixedFee.HourlyRate);
+        Assert.Equal(90, created!.HourlyRate);
+        Assert.Equal(12000, created.FixedFeeAmount);
     }
 
     [Fact]
     public async Task Mutations_AsMember_Succeed()
     {
-        // Trust-based domain: members (not just admins) may create/edit/delete projects.
+        // Trust-based domain: members (not just admins) may create/edit projects,
+        // and may delete projects they created themselves.
         using var factory = new ReeTrackWebApplicationFactory();
         var (_, adminToken) = await factory.SeedAdminAsync();
         var adminClient = factory.CreateAuthenticatedClient(adminToken);
@@ -263,9 +252,8 @@ public class ProjectEndpointsTests
         {
             name = "Redesign",
             clientId,
-            billingType = "hourly",
             hourlyRate = 90,
-            budgetAmount = 5000,
+            fixedFeeAmount = 12000,
             color = "#4366E2"
         })).Content.ReadFromJsonAsync<ProjectResponse>();
 
@@ -274,7 +262,7 @@ public class ProjectEndpointsTests
 
         Assert.Equal("archived", archived!.Status);
         Assert.Equal(90, archived.HourlyRate);
-        Assert.Equal(5000, archived.BudgetAmount);
+        Assert.Equal(12000, archived.FixedFeeAmount);
         Assert.Equal("#4366E2", archived.Color);
     }
 
@@ -290,21 +278,20 @@ public class ProjectEndpointsTests
         {
             name = "Redesign",
             clientId,
-            billingType = "hourly",
             hourlyRate = 90,
-            budgetAmount = 5000,
+            fixedFeeAmount = 12000,
             color = "#4366E2"
         })).Content.ReadFromJsonAsync<ProjectResponse>();
 
-        // Re-send the billing block with only billingType: the wholesale rule clears budget/color.
+        // Re-send the billing block with only currencyCode: the wholesale rule clears fee/color.
         var updated = await (await client.PatchAsJsonAsync($"/api/projects/{created!.Id}", new
         {
-            billingType = "hourly",
+            currencyCode = "EUR",
             hourlyRate = 100
         })).Content.ReadFromJsonAsync<ProjectResponse>();
 
         Assert.Equal(100, updated!.HourlyRate);
-        Assert.Null(updated.BudgetAmount);
+        Assert.Null(updated.FixedFeeAmount);
         Assert.Null(updated.Color);
     }
 
@@ -358,6 +345,44 @@ public class ProjectEndpointsTests
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
     }
 
+    [Fact]
+    public async Task Delete_AsMember_OfAnotherUsersProject_Returns403()
+    {
+        using var factory = new ReeTrackWebApplicationFactory();
+        var (_, adminToken) = await factory.SeedAdminAsync();
+        var adminClient = factory.CreateAuthenticatedClient(adminToken);
+        var clientId = await SeedClientAsync(factory, "Acme Corp");
+
+        var adminProject = await (await adminClient.PostAsJsonAsync("/api/projects", new { name = "Admin project", clientId }))
+            .Content.ReadFromJsonAsync<ProjectResponse>();
+
+        var memberToken = await SeedMemberTokenAsync(factory);
+        var memberClient = factory.CreateAuthenticatedClient(memberToken);
+
+        var response = await memberClient.DeleteAsync($"/api/projects/{adminProject!.Id}");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await adminClient.GetAsync($"/api/projects/{adminProject.Id}")).StatusCode);
+    }
+
+    [Fact]
+    public async Task Delete_AsAdmin_OfAnotherUsersProject_Succeeds()
+    {
+        using var factory = new ReeTrackWebApplicationFactory();
+        var (_, adminToken) = await factory.SeedAdminAsync();
+        var adminClient = factory.CreateAuthenticatedClient(adminToken);
+        var clientId = await SeedClientAsync(factory, "Acme Corp");
+
+        var memberToken = await SeedMemberTokenAsync(factory);
+        var memberClient = factory.CreateAuthenticatedClient(memberToken);
+        var memberProject = await (await memberClient.PostAsJsonAsync("/api/projects", new { name = "Member project", clientId }))
+            .Content.ReadFromJsonAsync<ProjectResponse>();
+
+        var response = await adminClient.DeleteAsync($"/api/projects/{memberProject!.Id}");
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+    }
+
     private static async Task<Guid> SeedClientAsync(ReeTrackWebApplicationFactory factory, string name)
     {
         using var scope = factory.Services.CreateScope();
@@ -376,12 +401,13 @@ public class ProjectEndpointsTests
     {
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        // CreatedByUserId is left as Guid.Empty: directly-seeded projects belong
+        // to nobody, so only admins can delete them.
         var project = new Project
         {
             ClientId = clientId,
             Name = name,
-            Status = status,
-            BillingType = BillingType.Hourly
+            Status = status
         };
         db.Projects.Add(project);
         await db.SaveChangesAsync();
@@ -453,11 +479,10 @@ public class ProjectEndpointsTests
         public Guid ClientId { get; init; }
         public string ClientName { get; init; } = string.Empty;
         public string Status { get; init; } = string.Empty;
-        public string BillingType { get; init; } = string.Empty;
+        public Guid CreatedByUserId { get; init; }
         public string CurrencyCode { get; init; } = string.Empty;
         public decimal? HourlyRate { get; init; }
         public decimal? FixedFeeAmount { get; init; }
-        public decimal? BudgetAmount { get; init; }
         public decimal? TimeEstimateHours { get; init; }
         public string? Color { get; init; }
         public int TaskCount { get; init; }

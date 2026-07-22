@@ -77,11 +77,10 @@ public class ProjectService : IProjectService
                 p.ClientId,
                 p.Client.Name,
                 p.Status,
-                p.BillingType,
+                p.CreatedByUserId,
                 p.CurrencyCode,
                 p.HourlyRate,
                 p.FixedFeeAmount,
-                p.BudgetAmount,
                 p.TimeEstimateHours,
                 p.Color,
                 p.Tasks.Count,
@@ -107,11 +106,10 @@ public class ProjectService : IProjectService
                 p.ClientId,
                 p.Client.Name,
                 p.Status,
-                p.BillingType,
+                p.CreatedByUserId,
                 p.CurrencyCode,
                 p.HourlyRate,
                 p.FixedFeeAmount,
-                p.BudgetAmount,
                 p.TimeEstimateHours,
                 p.Color,
                 p.Tasks.Count,
@@ -133,16 +131,16 @@ public class ProjectService : IProjectService
         {
             ClientId = input.ClientId!.Value,
             Name = name,
-            Status = ProjectStatus.Active
+            Status = ProjectStatus.Active,
+            // Hand-set like DeletedByUserId — the audit interceptor only owns Id/timestamps.
+            CreatedByUserId = _currentUser.UserId
         };
 
         await ApplyBillingBlockAsync(
             project,
-            input.BillingType,
             input.CurrencyCode,
             input.HourlyRate,
             input.FixedFeeAmount,
-            input.BudgetAmount,
             input.TimeEstimateHours,
             input.Color,
             cancellationToken);
@@ -177,17 +175,16 @@ public class ProjectService : IProjectService
         if (input.Status is not null)
             project.Status = ParseStatus(input.Status);
 
-        // The billing block is applied wholesale only when BillingType is sent,
-        // so a status-only (archive) patch leaves rate/fee/budget untouched.
-        if (input.BillingType is not null)
+        // The billing block is applied wholesale only when CurrencyCode is sent
+        // (the edit form always includes it), so a status-only (archive) patch
+        // leaves rate/fee/estimate untouched.
+        if (input.CurrencyCode is not null)
         {
             await ApplyBillingBlockAsync(
                 project,
-                input.BillingType,
                 input.CurrencyCode,
                 input.HourlyRate,
                 input.FixedFeeAmount,
-                input.BudgetAmount,
                 input.TimeEstimateHours,
                 input.Color,
                 cancellationToken);
@@ -208,6 +205,10 @@ public class ProjectService : IProjectService
     {
         var project = await _db.Projects.FirstOrDefaultAsync(p => p.Id == id, cancellationToken)
             ?? throw new AppException("Project was not found.", 404);
+
+        var isAdmin = _currentUser.Roles.Contains("Admin");
+        if (!isAdmin && project.CreatedByUserId != _currentUser.UserId)
+            throw new AppException("Only the person who created this project or an admin can delete it.", 403);
 
         var taskIds = await _db.ProjectTasks
             .Where(t => t.ProjectId == id)
@@ -238,33 +239,18 @@ public class ProjectService : IProjectService
 
     private async Task ApplyBillingBlockAsync(
         Project project,
-        string? billingType,
         string? currencyCode,
         decimal? hourlyRate,
         decimal? fixedFeeAmount,
-        decimal? budgetAmount,
         decimal? timeEstimateHours,
         string? color,
         CancellationToken cancellationToken)
     {
-        var type = billingType is null ? BillingType.Hourly : ParseBillingType(billingType);
-
-        project.BillingType = type;
         project.CurrencyCode = await _currencyService.EnsureSupportedAsync(currencyCode, cancellationToken);
-        project.BudgetAmount = ValidateAmount(budgetAmount, "Budget");
+        project.HourlyRate = ValidateAmount(hourlyRate, "Hourly rate");
+        project.FixedFeeAmount = ValidateAmount(fixedFeeAmount, "Fixed fee");
         project.TimeEstimateHours = ValidateEstimate(timeEstimateHours);
         project.Color = NormalizeColor(color);
-
-        if (type == BillingType.Hourly)
-        {
-            project.HourlyRate = ValidateAmount(hourlyRate, "Hourly rate");
-            project.FixedFeeAmount = null;
-        }
-        else
-        {
-            project.FixedFeeAmount = ValidateAmount(fixedFeeAmount, "Fixed fee");
-            project.HourlyRate = null;
-        }
     }
 
     private async Task<string> EnsureClientExistsAsync(Guid? clientId, CancellationToken cancellationToken)
@@ -335,19 +321,8 @@ public class ProjectService : IProjectService
             _ => throw new AppException("Status must be one of: active, archived.")
         };
 
-    private static BillingType ParseBillingType(string billingType) =>
-        billingType.Trim().ToLowerInvariant() switch
-        {
-            "hourly" => BillingType.Hourly,
-            "fixedfee" => BillingType.FixedFee,
-            _ => throw new AppException("Billing type must be one of: hourly, fixedFee.")
-        };
-
     private static string FormatStatus(ProjectStatus status) =>
         status == ProjectStatus.Archived ? "archived" : "active";
-
-    private static string FormatBillingType(BillingType billingType) =>
-        billingType == BillingType.FixedFee ? "fixedFee" : "hourly";
 
     private async Task EnsureNameIsAvailableAsync(string name, Guid? excludeId, CancellationToken cancellationToken)
     {
@@ -386,11 +361,10 @@ public class ProjectService : IProjectService
             ClientId = project.ClientId,
             ClientName = clientName,
             Status = FormatStatus(project.Status),
-            BillingType = FormatBillingType(project.BillingType),
+            CreatedByUserId = project.CreatedByUserId,
             CurrencyCode = project.CurrencyCode,
             HourlyRate = project.HourlyRate,
             FixedFeeAmount = project.FixedFeeAmount,
-            BudgetAmount = project.BudgetAmount,
             TimeEstimateHours = project.TimeEstimateHours,
             Color = project.Color,
             TaskCount = taskCount,
@@ -405,11 +379,10 @@ public class ProjectService : IProjectService
             ClientId = row.ClientId,
             ClientName = row.ClientName,
             Status = FormatStatus(row.Status),
-            BillingType = FormatBillingType(row.BillingType),
+            CreatedByUserId = row.CreatedByUserId,
             CurrencyCode = row.CurrencyCode,
             HourlyRate = row.HourlyRate,
             FixedFeeAmount = row.FixedFeeAmount,
-            BudgetAmount = row.BudgetAmount,
             TimeEstimateHours = row.TimeEstimateHours,
             Color = row.Color,
             TaskCount = row.TaskCount,
@@ -422,11 +395,10 @@ public class ProjectService : IProjectService
         Guid ClientId,
         string ClientName,
         ProjectStatus Status,
-        BillingType BillingType,
+        Guid CreatedByUserId,
         string CurrencyCode,
         decimal? HourlyRate,
         decimal? FixedFeeAmount,
-        decimal? BudgetAmount,
         decimal? TimeEstimateHours,
         string? Color,
         int TaskCount,

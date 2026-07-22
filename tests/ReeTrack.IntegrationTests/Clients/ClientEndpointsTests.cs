@@ -233,8 +233,7 @@ public class ClientEndpointsTests
             {
                 Client = client,
                 Name = $"{name} project {i}",
-                Status = ProjectStatus.Active,
-                BillingType = BillingType.Hourly
+                Status = ProjectStatus.Active
             });
         }
 

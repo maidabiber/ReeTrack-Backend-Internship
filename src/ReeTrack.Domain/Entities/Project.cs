@@ -8,10 +8,9 @@ public class Project : BaseEntity, ISoftDeletable, IAuditable
     public Guid ClientId { get; set; }
     public string Name { get; set; } = string.Empty;
     public ProjectStatus Status { get; set; }
+    public Guid CreatedByUserId { get; set; }
 
-    public BillingType BillingType { get; set; }
     public string CurrencyCode { get; set; } = "EUR";
-    public decimal? BudgetAmount { get; set; }
     public decimal? FixedFeeAmount { get; set; }
     public decimal? HourlyRate { get; set; }
     public decimal? TimeEstimateHours { get; set; }

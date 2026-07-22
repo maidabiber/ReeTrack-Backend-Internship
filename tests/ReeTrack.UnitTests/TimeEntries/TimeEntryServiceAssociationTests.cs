@@ -235,7 +235,6 @@ public class TimeEntryServiceAssociationTests : IDisposable
             ClientId = _clientId,
             Name = "Redesign",
             Status = ProjectStatus.Active,
-            BillingType = BillingType.Hourly,
             Color = "#4366E2",
             CreatedAtUtc = now,
             UpdatedAtUtc = now
@@ -246,7 +245,6 @@ public class TimeEntryServiceAssociationTests : IDisposable
             ClientId = _clientId,
             Name = "Other",
             Status = ProjectStatus.Active,
-            BillingType = BillingType.Hourly,
             CreatedAtUtc = now,
             UpdatedAtUtc = now
         });
