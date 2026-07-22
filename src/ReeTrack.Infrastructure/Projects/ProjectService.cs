@@ -15,15 +15,19 @@ public class ProjectService : IProjectService
     private const decimal EstimateMax = 100_000_000m; // fits numeric(10,2)
 
     private static readonly Regex ColorPattern = new("^#[0-9A-Fa-f]{6}$", RegexOptions.Compiled);
-    private static readonly Regex CurrencyPattern = new("^[A-Za-z]{3}$", RegexOptions.Compiled);
 
     private readonly IApplicationDbContext _db;
     private readonly ICurrentUserService _currentUser;
+    private readonly ICurrencyService _currencyService;
 
-    public ProjectService(IApplicationDbContext db, ICurrentUserService currentUser)
+    public ProjectService(
+        IApplicationDbContext db,
+        ICurrentUserService currentUser,
+        ICurrencyService currencyService)
     {
         _db = db;
         _currentUser = currentUser;
+        _currencyService = currencyService;
     }
 
     public async Task<PagedResult<ProjectDto>> ListAsync(
@@ -132,7 +136,7 @@ public class ProjectService : IProjectService
             Status = ProjectStatus.Active
         };
 
-        ApplyBillingBlock(
+        await ApplyBillingBlockAsync(
             project,
             input.BillingType,
             input.CurrencyCode,
@@ -140,7 +144,8 @@ public class ProjectService : IProjectService
             input.FixedFeeAmount,
             input.BudgetAmount,
             input.TimeEstimateHours,
-            input.Color);
+            input.Color,
+            cancellationToken);
 
         _db.Projects.Add(project);
         await SaveGuardingNameConflictAsync(cancellationToken);
@@ -176,7 +181,7 @@ public class ProjectService : IProjectService
         // so a status-only (archive) patch leaves rate/fee/budget untouched.
         if (input.BillingType is not null)
         {
-            ApplyBillingBlock(
+            await ApplyBillingBlockAsync(
                 project,
                 input.BillingType,
                 input.CurrencyCode,
@@ -184,7 +189,8 @@ public class ProjectService : IProjectService
                 input.FixedFeeAmount,
                 input.BudgetAmount,
                 input.TimeEstimateHours,
-                input.Color);
+                input.Color,
+                cancellationToken);
         }
 
         await SaveGuardingNameConflictAsync(cancellationToken);
@@ -230,7 +236,7 @@ public class ProjectService : IProjectService
         await _db.SaveChangesAsync(cancellationToken);
     }
 
-    private void ApplyBillingBlock(
+    private async Task ApplyBillingBlockAsync(
         Project project,
         string? billingType,
         string? currencyCode,
@@ -238,12 +244,13 @@ public class ProjectService : IProjectService
         decimal? fixedFeeAmount,
         decimal? budgetAmount,
         decimal? timeEstimateHours,
-        string? color)
+        string? color,
+        CancellationToken cancellationToken)
     {
         var type = billingType is null ? BillingType.Hourly : ParseBillingType(billingType);
 
         project.BillingType = type;
-        project.CurrencyCode = NormalizeCurrency(currencyCode);
+        project.CurrencyCode = await _currencyService.EnsureSupportedAsync(currencyCode, cancellationToken);
         project.BudgetAmount = ValidateAmount(budgetAmount, "Budget");
         project.TimeEstimateHours = ValidateEstimate(timeEstimateHours);
         project.Color = NormalizeColor(color);
@@ -285,17 +292,6 @@ public class ProjectService : IProjectService
             throw new AppException($"Project name must be at most {NameMaxLength} characters.");
 
         return trimmed;
-    }
-
-    private static string NormalizeCurrency(string? currency)
-    {
-        var trimmed = currency?.Trim();
-        if (string.IsNullOrEmpty(trimmed))
-            return "EUR";
-        if (!CurrencyPattern.IsMatch(trimmed))
-            throw new AppException("Currency must be a 3-letter code.");
-
-        return trimmed.ToUpperInvariant();
     }
 
     private static string? NormalizeColor(string? color)

@@ -24,6 +24,8 @@ public class AppDbContext : DbContext, IApplicationDbContext
     public DbSet<Timesheet> Timesheets => Set<Timesheet>();
     public DbSet<UserCalendarConnection> UserCalendarConnections => Set<UserCalendarConnection>();
     public DbSet<SyncedCalendarEvent> SyncedCalendarEvents => Set<SyncedCalendarEvent>();
+    public DbSet<UserHourlyRate> UserHourlyRates => Set<UserHourlyRate>();
+    public DbSet<Currency> Currencies => Set<Currency>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

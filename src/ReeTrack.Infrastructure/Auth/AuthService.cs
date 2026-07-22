@@ -161,6 +161,8 @@ public class AuthService : IAuthService
             ]
         };
 
+        user.AssignInitialHourlyRate(DateOnly.FromDateTime(now));
+
         _db.Users.Add(user);
         await _db.SaveChangesAsync(cancellationToken);
 

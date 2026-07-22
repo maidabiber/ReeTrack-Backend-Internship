@@ -65,16 +65,7 @@ public class ReeTrackWebApplicationFactory : WebApplicationFactory<Program>
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
 
-        await db.Database.EnsureCreatedAsync();
-
-        if (!await db.Roles.AnyAsync())
-        {
-            var seedTimestamp = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc);
-            db.Roles.AddRange(
-                new Role { Id = RoleIds.Admin, Name = "Admin", CreatedAtUtc = seedTimestamp, UpdatedAtUtc = seedTimestamp },
-                new Role { Id = RoleIds.Member, Name = "Member", CreatedAtUtc = seedTimestamp, UpdatedAtUtc = seedTimestamp });
-            await db.SaveChangesAsync();
-        }
+        await EnsureReferenceDataAsync(db);
 
         var now = DateTime.UtcNow;
         var admin = new User
@@ -94,6 +85,7 @@ public class ReeTrackWebApplicationFactory : WebApplicationFactory<Program>
                 }
             ]
         };
+        admin.AssignInitialHourlyRate(DateOnly.FromDateTime(now));
 
         db.Users.Add(admin);
         await db.SaveChangesAsync();
@@ -110,16 +102,7 @@ public class ReeTrackWebApplicationFactory : WebApplicationFactory<Program>
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
 
-        await db.Database.EnsureCreatedAsync();
-
-        if (!await db.Roles.AnyAsync())
-        {
-            var seedTimestamp = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc);
-            db.Roles.AddRange(
-                new Role { Id = RoleIds.Admin, Name = "Admin", CreatedAtUtc = seedTimestamp, UpdatedAtUtc = seedTimestamp },
-                new Role { Id = RoleIds.Member, Name = "Member", CreatedAtUtc = seedTimestamp, UpdatedAtUtc = seedTimestamp });
-            await db.SaveChangesAsync();
-        }
+        await EnsureReferenceDataAsync(db);
 
         var now = DateTime.UtcNow;
         var member = new User
@@ -139,6 +122,7 @@ public class ReeTrackWebApplicationFactory : WebApplicationFactory<Program>
                 }
             ]
         };
+        member.AssignInitialHourlyRate(DateOnly.FromDateTime(now));
 
         db.Users.Add(member);
         await db.SaveChangesAsync();
@@ -152,5 +136,33 @@ public class ReeTrackWebApplicationFactory : WebApplicationFactory<Program>
         var client = CreateClient();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
         return client;
+    }
+
+    private static async Task EnsureReferenceDataAsync(AppDbContext db)
+    {
+        await db.Database.EnsureCreatedAsync();
+
+        var seedTimestamp = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+
+        if (!await db.Roles.AnyAsync())
+        {
+            db.Roles.AddRange(
+                new Role { Id = RoleIds.Admin, Name = "Admin", CreatedAtUtc = seedTimestamp, UpdatedAtUtc = seedTimestamp },
+                new Role { Id = RoleIds.Member, Name = "Member", CreatedAtUtc = seedTimestamp, UpdatedAtUtc = seedTimestamp });
+            await db.SaveChangesAsync();
+        }
+
+        if (!await db.Currencies.AnyAsync(c => c.Code == "EUR"))
+        {
+            db.Currencies.Add(new Currency
+            {
+                Code = "EUR",
+                Name = "Euro",
+                IsActive = true,
+                CreatedAtUtc = seedTimestamp,
+                UpdatedAtUtc = seedTimestamp
+            });
+            await db.SaveChangesAsync();
+        }
     }
 }

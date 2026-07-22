@@ -102,6 +102,7 @@ public class InvitationService : IInvitationService
                     CreatedAtUtc = now,
                     UpdatedAtUtc = now
                 };
+                user.AssignInitialHourlyRate(DateOnly.FromDateTime(now));
                 _db.Users.Add(user);
             }
             else

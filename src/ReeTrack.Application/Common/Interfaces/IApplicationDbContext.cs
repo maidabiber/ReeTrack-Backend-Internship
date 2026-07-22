@@ -19,6 +19,8 @@ public interface IApplicationDbContext
     DbSet<Timesheet> Timesheets { get; }
     DbSet<UserCalendarConnection> UserCalendarConnections { get; }
     DbSet<SyncedCalendarEvent> SyncedCalendarEvents { get; }
+    DbSet<UserHourlyRate> UserHourlyRates { get; }
+    DbSet<Currency> Currencies { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

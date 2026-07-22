@@ -7,6 +7,7 @@ using ReeTrack.Infrastructure.Auditing;
 using ReeTrack.Application.Integrations.Calendar;
 using ReeTrack.Infrastructure.Auth;
 using ReeTrack.Infrastructure.Clients;
+using ReeTrack.Infrastructure.Currencies;
 using ReeTrack.Infrastructure.Email;
 using ReeTrack.Infrastructure.Invitations;
 using ReeTrack.Infrastructure.Members;
@@ -15,6 +16,7 @@ using ReeTrack.Infrastructure.Tags;
 using ReeTrack.Infrastructure.Teammates;
 using ReeTrack.Infrastructure.TimeEntries;
 using ReeTrack.Infrastructure.Timesheets;
+using ReeTrack.Infrastructure.UserHourlyRates;
 using ReeTrack.Infrastructure.Background;
 using ReeTrack.Infrastructure.Calendar;
 using ReeTrack.Infrastructure.Integrations.Calendar;
@@ -56,6 +58,7 @@ public static class DependencyInjection
 
         services.AddScoped<IInvitationService, InvitationService>();
         services.AddScoped<IMemberService, MemberService>();
+        services.AddScoped<IUserHourlyRateService, UserHourlyRateService>();
         services.AddScoped<ITeammateService, TeammateService>();
         services.AddScoped<ILockedPeriodService, LockedPeriodService>();
         services.AddScoped<ITimeEntryGuardService, TimeEntryGuardService>();
@@ -72,6 +75,7 @@ public static class DependencyInjection
         services.AddScoped<IProjectTaskService, ProjectTaskService>();
         services.AddScoped<ITagService, TagService>();
         services.AddScoped<IClientService, ClientService>();
+        services.AddScoped<ICurrencyService, CurrencyService>();
 
         services.AddScoped<ICalendarProvider, GoogleCalendarProvider>();
         services.AddScoped<ICalendarProviderRegistry, CalendarProviderRegistry>();
