@@ -13,6 +13,7 @@ using ReeTrack.Infrastructure.Invitations;
 using ReeTrack.Infrastructure.Members;
 using ReeTrack.Infrastructure.Projects;
 using ReeTrack.Infrastructure.RateMultipliers;
+using ReeTrack.Infrastructure.Reports;
 using ReeTrack.Infrastructure.Holidays;
 using ReeTrack.Infrastructure.Tags;
 using ReeTrack.Infrastructure.Teammates;
@@ -83,6 +84,7 @@ public static class DependencyInjection
         services.AddScoped<ISmartTimeParseService, SmartTimeParseService>();
         services.AddScoped<IProjectService, ProjectService>();
         services.AddScoped<IProjectCostService, ProjectCostService>();
+        services.AddScoped<IReportService, ReportService>();
         services.AddScoped<IRateMultiplierSettingsService, RateMultiplierSettingsService>();
         services.AddScoped<IHolidayService, HolidayService>();
         services.AddScoped<IRateMultiplier, BaseRateMultiplier>();
