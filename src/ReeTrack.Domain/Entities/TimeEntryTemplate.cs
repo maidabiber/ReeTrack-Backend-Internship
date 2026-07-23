@@ -27,6 +27,8 @@ public class TimeEntryTemplate : BaseEntity
     public TimeEntry TimeEntry { get; set; } = null!;
     public Project? Project { get; set; }
     public ProjectTask? ProjectTask { get; set; }
+    public ICollection<TimeEntryTemplateTag> TimeEntryTemplateTags { get; set; } = [];
+
 
     public static TimeEntryTemplate FromTimeEntry(Guid userId, TimeEntry entry)
     {

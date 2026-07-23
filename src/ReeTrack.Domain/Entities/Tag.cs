@@ -11,4 +11,6 @@ public class Tag : BaseEntity, ISoftDeletable, IAuditable
     public Guid? DeletedByUserId { get; set; }
 
     public ICollection<TimeEntryTag> TimeEntryTags { get; set; } = [];
+    public ICollection<TimeEntryTemplateTag> TimeEntryTemplateTags { get; set; } = [];
 }
+

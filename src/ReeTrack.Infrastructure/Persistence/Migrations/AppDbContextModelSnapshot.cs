@@ -948,6 +948,23 @@ namespace ReeTrack.Infrastructure.Persistence.Migrations
                     b.ToTable("time_entry_templates", (string)null);
                 });
 
+            modelBuilder.Entity("ReeTrack.Domain.Entities.TimeEntryTemplateTag", b =>
+                {
+                    b.Property<Guid>("TimeEntryTemplateId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("time_entry_template_id");
+
+                    b.Property<Guid>("TagId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tag_id");
+
+                    b.HasKey("TimeEntryTemplateId", "TagId");
+
+                    b.HasIndex("TagId");
+
+                    b.ToTable("time_entry_template_tags", (string)null);
+                });
+
             modelBuilder.Entity("ReeTrack.Domain.Entities.Timesheet", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1443,6 +1460,25 @@ namespace ReeTrack.Infrastructure.Persistence.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("ReeTrack.Domain.Entities.TimeEntryTemplateTag", b =>
+                {
+                    b.HasOne("ReeTrack.Domain.Entities.Tag", "Tag")
+                        .WithMany("TimeEntryTemplateTags")
+                        .HasForeignKey("TagId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ReeTrack.Domain.Entities.TimeEntryTemplate", "TimeEntryTemplate")
+                        .WithMany("TimeEntryTemplateTags")
+                        .HasForeignKey("TimeEntryTemplateId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Tag");
+
+                    b.Navigation("TimeEntryTemplate");
+                });
+
             modelBuilder.Entity("ReeTrack.Domain.Entities.Timesheet", b =>
                 {
                     b.HasOne("ReeTrack.Domain.Entities.User", "ReviewedByUser")
@@ -1564,11 +1600,18 @@ namespace ReeTrack.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("ReeTrack.Domain.Entities.Tag", b =>
                 {
                     b.Navigation("TimeEntryTags");
+
+                    b.Navigation("TimeEntryTemplateTags");
                 });
 
             modelBuilder.Entity("ReeTrack.Domain.Entities.TimeEntry", b =>
                 {
                     b.Navigation("TimeEntryTags");
+                });
+
+            modelBuilder.Entity("ReeTrack.Domain.Entities.TimeEntryTemplate", b =>
+                {
+                    b.Navigation("TimeEntryTemplateTags");
                 });
 
             modelBuilder.Entity("ReeTrack.Domain.Entities.User", b =>

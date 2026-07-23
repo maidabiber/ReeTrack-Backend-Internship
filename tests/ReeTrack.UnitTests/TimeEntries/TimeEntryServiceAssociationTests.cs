@@ -198,7 +198,10 @@ public class TimeEntryServiceAssociationTests : IDisposable
 
         Assert.Equal(_projectId, updated.Entry.ProjectId);
         Assert.Equal(_taskId, updated.Entry.ProjectTaskId);
+        Assert.Equal("Redesign", updated.Entry.ProjectName);
+        Assert.Equal("#4366E2", updated.Entry.ProjectColor);
         Assert.Single(updated.Entry.Tags);
+        Assert.Equal("Design", updated.Entry.Tags[0].Name);
     }
 
     public void Dispose() => _db.Dispose();

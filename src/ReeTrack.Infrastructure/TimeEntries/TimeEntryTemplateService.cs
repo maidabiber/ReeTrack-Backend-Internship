@@ -32,27 +32,18 @@ public class TimeEntryTemplateService : ITimeEntryTemplateService
         var totalCount = await query.CountAsync(cancellationToken);
 
         var items = await query
+            .Include(t => t.Project)
+            .Include(t => t.ProjectTask)
+            .Include(t => t.TimeEntryTemplateTags)
+                .ThenInclude(tt => tt.Tag)
             .OrderByDescending(t => t.CreatedAtUtc)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
-            .Select(t => new TimeEntryTemplateDto
-            {
-                Id = t.Id,
-                TimeEntryId = t.TimeEntryId,
-                ProjectId = t.ProjectId,
-                ProjectTaskId = t.ProjectTaskId,
-                Description = t.Description,
-                IsBillable = t.IsBillable,
-                StartTimeUtc = t.StartTimeUtc,
-                EndTimeUtc = t.EndTimeUtc,
-                DurationSeconds = t.DurationSeconds,
-                CreatedAtUtc = t.CreatedAtUtc
-            })
             .ToListAsync(cancellationToken);
 
         return new PagedResult<TimeEntryTemplateDto>
         {
-            Items = items,
+            Items = items.Select(MapTemplate).ToList(),
             TotalCount = totalCount,
             Page = page,
             PageSize = pageSize
@@ -66,6 +57,7 @@ public class TimeEntryTemplateService : ITimeEntryTemplateService
         var userId = _currentUser.UserId;
 
         var entry = await _db.TimeEntries.AsNoTracking()
+                .Include(e => e.TimeEntryTags)
                 .FirstOrDefaultAsync(e => e.Id == timeEntryId && e.UserId == userId, cancellationToken)
             ?? throw new AppException("Time entry was not found.", 404);
 
@@ -84,6 +76,14 @@ public class TimeEntryTemplateService : ITimeEntryTemplateService
             throw new AppException(ex.Message, 400);
         }
 
+        foreach (var tag in entry.TimeEntryTags)
+        {
+            template.TimeEntryTemplateTags.Add(new TimeEntryTemplateTag
+            {
+                TagId = tag.TagId
+            });
+        }
+
         var now = DateTime.UtcNow;
         template.CreatedAtUtc = now;
         template.UpdatedAtUtc = now;
@@ -99,7 +99,14 @@ public class TimeEntryTemplateService : ITimeEntryTemplateService
             throw new AppException("A favourite template for this time entry already exists.", 409);
         }
 
-        return MapTemplate(template);
+        var created = await _db.TimeEntryTemplates.AsNoTracking()
+                .Include(t => t.Project)
+                .Include(t => t.ProjectTask)
+                .Include(t => t.TimeEntryTemplateTags)
+                    .ThenInclude(tt => tt.Tag)
+                .FirstAsync(t => t.Id == template.Id, cancellationToken);
+
+        return MapTemplate(created);
     }
 
     public async Task DeleteAsync(Guid id, CancellationToken cancellationToken = default)
@@ -126,6 +133,19 @@ public class TimeEntryTemplateService : ITimeEntryTemplateService
             StartTimeUtc = template.StartTimeUtc,
             EndTimeUtc = template.EndTimeUtc,
             DurationSeconds = template.DurationSeconds,
-            CreatedAtUtc = template.CreatedAtUtc
+            CreatedAtUtc = template.CreatedAtUtc,
+            ProjectName = template.Project?.Name,
+            ProjectColor = template.Project?.Color,
+            ProjectTaskName = template.ProjectTask?.Name,
+            Tags = template.TimeEntryTemplateTags
+                .Where(t => t.Tag is not null)
+                .OrderBy(t => t.Tag.Name)
+                .Select(t => new TimeEntryTagDto
+                {
+                    Id = t.TagId,
+                    Name = t.Tag.Name,
+                    Color = t.Tag.Color
+                })
+                .ToList()
         };
 }

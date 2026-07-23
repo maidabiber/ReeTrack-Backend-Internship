@@ -20,7 +20,9 @@ public class AppDbContext : DbContext, IApplicationDbContext
     public DbSet<Tag> Tags => Set<Tag>();
     public DbSet<TimeEntry> TimeEntries => Set<TimeEntry>();
     public DbSet<TimeEntryTemplate> TimeEntryTemplates => Set<TimeEntryTemplate>();
+    public DbSet<TimeEntryTemplateTag> TimeEntryTemplateTags => Set<TimeEntryTemplateTag>();
     public DbSet<TimeEntryTag> TimeEntryTags => Set<TimeEntryTag>();
+
     public DbSet<Timesheet> Timesheets => Set<Timesheet>();
     public DbSet<UserCalendarConnection> UserCalendarConnections => Set<UserCalendarConnection>();
     public DbSet<SyncedCalendarEvent> SyncedCalendarEvents => Set<SyncedCalendarEvent>();

@@ -17,4 +17,8 @@ public sealed class TimeEntryTemplateResponse
     public required TimeOnly? EndTimeUtc { get; init; }
     public required int DurationSeconds { get; init; }
     public required DateTime CreatedAtUtc { get; init; }
+    public string? ProjectName { get; init; }
+    public string? ProjectColor { get; init; }
+    public string? ProjectTaskName { get; init; }
+    public IReadOnlyList<TimeEntryTagResponse> Tags { get; init; } = [];
 }

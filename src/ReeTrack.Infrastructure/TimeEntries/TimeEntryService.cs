@@ -187,7 +187,10 @@ public class TimeEntryService : ITimeEntryService
     {
         var userId = _currentUser.UserId;
         var entry = await _db.TimeEntries
+            .Include(e => e.Project)
+            .Include(e => e.ProjectTask)
             .Include(e => e.TimeEntryTags)
+                .ThenInclude(t => t.Tag)
             .FirstOrDefaultAsync(e => e.Id == entryId && e.UserId == userId, cancellationToken)
             ?? throw new AppException("Time entry not found.", 404);
 
@@ -219,7 +222,10 @@ public class TimeEntryService : ITimeEntryService
     {
         var userId = _currentUser.UserId;
         var entry = await _db.TimeEntries
+            .Include(e => e.Project)
+            .Include(e => e.ProjectTask)
             .Include(e => e.TimeEntryTags)
+                .ThenInclude(t => t.Tag)
             .FirstOrDefaultAsync(e => e.Id == entryId && e.UserId == userId, cancellationToken)
             ?? throw new AppException("Time entry not found.", 404);
 

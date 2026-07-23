@@ -1,7 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ReeTrack.Api.Contracts;
-using ReeTrack.Application.Common.Exceptions;
 using ReeTrack.Application.Common.Interfaces;
 using ReeTrack.Application.Common.Models;
 
@@ -68,6 +67,17 @@ public class TimeEntryTemplatesController : ControllerBase
             StartTimeUtc = template.StartTimeUtc,
             EndTimeUtc = template.EndTimeUtc,
             DurationSeconds = template.DurationSeconds,
-            CreatedAtUtc = template.CreatedAtUtc
+            CreatedAtUtc = template.CreatedAtUtc,
+            ProjectName = template.ProjectName,
+            ProjectColor = template.ProjectColor,
+            ProjectTaskName = template.ProjectTaskName,
+            Tags = template.Tags
+                .Select(tag => new TimeEntryTagResponse
+                {
+                    Id = tag.Id,
+                    Name = tag.Name,
+                    Color = tag.Color
+                })
+                .ToList()
         };
 }

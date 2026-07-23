@@ -15,6 +15,7 @@ public interface IApplicationDbContext
     DbSet<Tag> Tags { get; }
     DbSet<TimeEntry> TimeEntries { get; }
     DbSet<TimeEntryTemplate> TimeEntryTemplates { get; }
+    DbSet<TimeEntryTemplateTag> TimeEntryTemplateTags { get; }
     DbSet<TimeEntryTag> TimeEntryTags { get; }
     DbSet<Timesheet> Timesheets { get; }
     DbSet<UserCalendarConnection> UserCalendarConnections { get; }
