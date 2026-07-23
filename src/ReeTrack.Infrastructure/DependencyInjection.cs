@@ -18,6 +18,7 @@ using ReeTrack.Infrastructure.Tags;
 using ReeTrack.Infrastructure.Teammates;
 using ReeTrack.Infrastructure.TimeEntries;
 using ReeTrack.Infrastructure.Timesheets;
+using ReeTrack.Infrastructure.SmartTimeParse;
 using ReeTrack.Infrastructure.UserHourlyRates;
 using ReeTrack.Infrastructure.Background;
 using ReeTrack.Infrastructure.Calendar;
@@ -37,7 +38,7 @@ public static class DependencyInjection
         services.Configure<InvitationOptions>(configuration.GetSection(InvitationOptions.SectionName));
         services.Configure<AppOptions>(configuration.GetSection(AppOptions.SectionName));
         services.Configure<TimeEntryOptions>(configuration.GetSection(TimeEntryOptions.SectionName));
-        services.Configure<TimeEntryOptions>(configuration.GetSection(TimeEntryOptions.SectionName));
+        services.Configure<LlmOptions>(configuration.GetSection(LlmOptions.SectionName));
 
         services.AddHttpContextAccessor();
         services.Configure<CalendarSyncOptions>(configuration.GetSection(CalendarSyncOptions.SectionName));
@@ -79,6 +80,7 @@ public static class DependencyInjection
         services.AddScoped<ISharedTimeEntryEmailNotifier, SharedTimeEntryEmailNotifier>();
         services.AddScoped<ISharedTimeEntryApprovalService, SharedTimeEntryApprovalService>();
         services.AddScoped<ITimeEntryTemplateService, TimeEntryTemplateService>();
+        services.AddScoped<ISmartTimeParseService, SmartTimeParseService>();
         services.AddScoped<IProjectService, ProjectService>();
         services.AddScoped<IProjectCostService, ProjectCostService>();
         services.AddScoped<IRateMultiplierSettingsService, RateMultiplierSettingsService>();
