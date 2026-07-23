@@ -119,6 +119,7 @@ public class ProjectsController : ControllerBase
             HourlyRate = project.HourlyRate,
             FixedFeeAmount = project.FixedFeeAmount,
             TimeEstimateHours = project.TimeEstimateHours,
+            ActualHours = project.ActualHours,
             Color = project.Color,
             TaskCount = project.TaskCount,
             CreatedAtUtc = project.CreatedAtUtc

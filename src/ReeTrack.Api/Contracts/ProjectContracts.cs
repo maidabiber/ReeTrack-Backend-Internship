@@ -35,6 +35,7 @@ public sealed class ProjectResponse
     public required decimal? HourlyRate { get; init; }
     public required decimal? FixedFeeAmount { get; init; }
     public required decimal? TimeEstimateHours { get; init; }
+    public required decimal ActualHours { get; init; }
     public required string? Color { get; init; }
     public required int TaskCount { get; init; }
     public required DateTime CreatedAtUtc { get; init; }

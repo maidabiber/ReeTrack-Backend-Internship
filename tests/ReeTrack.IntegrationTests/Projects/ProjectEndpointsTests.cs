@@ -43,10 +43,12 @@ public class ProjectEndpointsTests
         Assert.Equal("EUR", created.CurrencyCode);
         Assert.Equal("Acme Corp", created.ClientName);
         Assert.Equal(0, created.TaskCount);
+        Assert.Equal(0, created.ActualHours);
 
         var list = await client.GetFromJsonAsync<PagedResult<ProjectResponse>>("/api/projects");
         var listed = Assert.Single(list!.Items);
         Assert.Equal(created.Id, listed.Id);
+        Assert.Equal(0, listed.ActualHours);
     }
 
     [Fact]
@@ -310,6 +312,33 @@ public class ProjectEndpointsTests
     }
 
     [Fact]
+    public async Task Get_ReturnsActualHours_FromConfirmedProjectAndTaskEntries()
+    {
+        using var factory = new ReeTrackWebApplicationFactory();
+        var (admin, token) = await factory.SeedAdminAsync();
+        var client = factory.CreateAuthenticatedClient(token);
+        var clientId = await SeedClientAsync(factory, "Acme Corp");
+        var projectId = await SeedProjectAsync(factory, clientId, "Redesign");
+        var taskId = await SeedTaskAsync(factory, projectId, "Design");
+
+        // 1h on project + 30m on task = 1.5h actual
+        await SeedTimeEntryAsync(factory, admin.Id, projectId: projectId, durationSeconds: 3600);
+        await SeedTimeEntryAsync(factory, admin.Id, projectTaskId: taskId, durationSeconds: 1800);
+        // Pending shared clone must not count
+        await SeedTimeEntryAsync(
+            factory,
+            admin.Id,
+            projectId: projectId,
+            durationSeconds: 7200,
+            status: TimeEntryStatus.Pending);
+
+        var found = await client.GetFromJsonAsync<ProjectResponse>($"/api/projects/{projectId}");
+
+        Assert.NotNull(found);
+        Assert.Equal(1.5m, found.ActualHours);
+    }
+
+    [Fact]
     public async Task Delete_WithoutTrackedTime_SoftDeletes_AndCascadesTasks()
     {
         using var factory = new ReeTrackWebApplicationFactory();
@@ -433,7 +462,9 @@ public class ProjectEndpointsTests
         ReeTrackWebApplicationFactory factory,
         Guid userId,
         Guid? projectId = null,
-        Guid? projectTaskId = null)
+        Guid? projectTaskId = null,
+        int durationSeconds = 3600,
+        TimeEntryStatus status = TimeEntryStatus.Confirmed)
     {
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -443,7 +474,8 @@ public class ProjectEndpointsTests
             ProjectId = projectId,
             ProjectTaskId = projectTaskId,
             Mode = TimeEntryMode.Manual,
-            DurationSeconds = 3600
+            DurationSeconds = durationSeconds,
+            Status = status
         });
         await db.SaveChangesAsync();
     }
@@ -484,6 +516,7 @@ public class ProjectEndpointsTests
         public decimal? HourlyRate { get; init; }
         public decimal? FixedFeeAmount { get; init; }
         public decimal? TimeEstimateHours { get; init; }
+        public decimal ActualHours { get; init; }
         public string? Color { get; init; }
         public int TaskCount { get; init; }
         public DateTime CreatedAtUtc { get; init; }

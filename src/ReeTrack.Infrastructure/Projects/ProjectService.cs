@@ -87,9 +87,15 @@ public class ProjectService : IProjectService
                 p.CreatedAtUtc))
             .ToListAsync(cancellationToken);
 
+        var actualByProject = await GetActualHoursByProjectAsync(
+            rows.Select(r => r.Id).ToList(),
+            cancellationToken);
+
         return new PagedResult<ProjectDto>
         {
-            Items = rows.Select(MapRow).ToList(),
+            Items = rows
+                .Select(r => MapRow(r, actualByProject.GetValueOrDefault(r.Id)))
+                .ToList(),
             TotalCount = totalCount,
             Page = page,
             PageSize = pageSize
@@ -117,7 +123,8 @@ public class ProjectService : IProjectService
             .FirstOrDefaultAsync(cancellationToken)
             ?? throw new AppException("Project was not found.", 404);
 
-        return MapRow(row);
+        var actualHours = await GetActualHoursAsync(id, cancellationToken);
+        return MapRow(row, actualHours);
     }
 
     public async Task<ProjectDto> CreateAsync(CreateProjectInput input, CancellationToken cancellationToken = default)
@@ -148,7 +155,7 @@ public class ProjectService : IProjectService
         _db.Projects.Add(project);
         await SaveGuardingNameConflictAsync(cancellationToken);
 
-        return MapEntity(project, clientName, taskCount: 0);
+        return MapEntity(project, clientName, taskCount: 0, actualHours: 0m);
     }
 
     public async Task<ProjectDto> UpdateAsync(Guid id, UpdateProjectInput input, CancellationToken cancellationToken = default)
@@ -197,8 +204,9 @@ public class ProjectService : IProjectService
             .Select(c => c.Name)
             .FirstAsync(cancellationToken);
         var taskCount = await _db.ProjectTasks.CountAsync(t => t.ProjectId == id, cancellationToken);
+        var actualHours = await GetActualHoursAsync(id, cancellationToken);
 
-        return MapEntity(project, clientName, taskCount);
+        return MapEntity(project, clientName, taskCount, actualHours);
     }
 
     public async Task DeleteAsync(Guid id, CancellationToken cancellationToken = default)
@@ -354,7 +362,63 @@ public class ProjectService : IProjectService
     private static bool IsUniqueViolation(DbUpdateException ex) =>
         ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation };
 
-    private static ProjectDto MapEntity(Project project, string clientName, int taskCount) =>
+    /// <summary>
+    /// Confirmed time on the project itself or on any of its tasks (same attribution
+    /// rule as the delete-with-tracked-time guard).
+    /// </summary>
+    private async Task<decimal> GetActualHoursAsync(Guid projectId, CancellationToken cancellationToken)
+    {
+        var byProject = await GetActualHoursByProjectAsync([projectId], cancellationToken);
+        return byProject.GetValueOrDefault(projectId);
+    }
+
+    private async Task<IReadOnlyDictionary<Guid, decimal>> GetActualHoursByProjectAsync(
+        IReadOnlyList<Guid> projectIds,
+        CancellationToken cancellationToken)
+    {
+        if (projectIds.Count == 0)
+            return new Dictionary<Guid, decimal>();
+
+        var tasks = await _db.ProjectTasks.AsNoTracking()
+            .Where(t => projectIds.Contains(t.ProjectId))
+            .Select(t => new { t.Id, t.ProjectId })
+            .ToListAsync(cancellationToken);
+
+        var taskToProject = tasks.ToDictionary(t => t.Id, t => t.ProjectId);
+        var taskIds = taskToProject.Keys.ToList();
+
+        var entries = await _db.TimeEntries.AsNoTracking()
+            .Where(e => e.Status == TimeEntryStatus.Confirmed)
+            .Where(e =>
+                (e.ProjectId != null && projectIds.Contains(e.ProjectId.Value)) ||
+                (e.ProjectTaskId != null && taskIds.Contains(e.ProjectTaskId.Value)))
+            .Select(e => new { e.ProjectId, e.ProjectTaskId, e.DurationSeconds })
+            .ToListAsync(cancellationToken);
+
+        var secondsByProject = projectIds.ToDictionary(id => id, _ => 0L);
+        foreach (var entry in entries)
+        {
+            Guid? attributedProjectId = entry.ProjectId;
+            if (attributedProjectId is null &&
+                entry.ProjectTaskId is Guid taskId &&
+                taskToProject.TryGetValue(taskId, out var fromTask))
+            {
+                attributedProjectId = fromTask;
+            }
+
+            if (attributedProjectId is Guid pid && secondsByProject.ContainsKey(pid))
+                secondsByProject[pid] += entry.DurationSeconds;
+        }
+
+        return secondsByProject.ToDictionary(
+            pair => pair.Key,
+            pair => SecondsToHours(pair.Value));
+    }
+
+    private static decimal SecondsToHours(long totalSeconds) =>
+        Math.Round(totalSeconds / 3600m, 2, MidpointRounding.AwayFromZero);
+
+    private static ProjectDto MapEntity(Project project, string clientName, int taskCount, decimal actualHours) =>
         new()
         {
             Id = project.Id,
@@ -367,12 +431,13 @@ public class ProjectService : IProjectService
             HourlyRate = project.HourlyRate,
             FixedFeeAmount = project.FixedFeeAmount,
             TimeEstimateHours = project.TimeEstimateHours,
+            ActualHours = actualHours,
             Color = project.Color,
             TaskCount = taskCount,
             CreatedAtUtc = project.CreatedAtUtc
         };
 
-    private static ProjectDto MapRow(ProjectRow row) =>
+    private static ProjectDto MapRow(ProjectRow row, decimal actualHours) =>
         new()
         {
             Id = row.Id,
@@ -385,6 +450,7 @@ public class ProjectService : IProjectService
             HourlyRate = row.HourlyRate,
             FixedFeeAmount = row.FixedFeeAmount,
             TimeEstimateHours = row.TimeEstimateHours,
+            ActualHours = actualHours,
             Color = row.Color,
             TaskCount = row.TaskCount,
             CreatedAtUtc = row.CreatedAtUtc
