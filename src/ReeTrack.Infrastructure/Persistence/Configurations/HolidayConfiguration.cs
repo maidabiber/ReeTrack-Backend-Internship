@@ -20,6 +20,24 @@ public class HolidayConfiguration : IEntityTypeConfiguration<Holiday>
             .HasColumnName("date")
             .IsRequired();
 
+        builder.Property(holiday => holiday.Name)
+            .HasColumnName("name")
+            .HasMaxLength(200)
+            .IsRequired();
+
+        builder.Property(holiday => holiday.IsActive)
+            .HasColumnName("is_active")
+            .IsRequired();
+
+        builder.Property(holiday => holiday.Source)
+            .HasColumnName("source")
+            .HasConversion<short>()
+            .IsRequired();
+
+        builder.Property(holiday => holiday.CountryCode)
+            .HasColumnName("country_code")
+            .HasMaxLength(2);
+
         builder.Property(holiday => holiday.CreatedAtUtc)
             .HasColumnName("created_at_utc")
             .IsRequired();

@@ -97,7 +97,10 @@ public sealed class ProjectCostService : IProjectCostService
 
             holidays = (await _db.Holidays
                     .AsNoTracking()
-                    .Where(holiday => holiday.Date >= firstWeekStart && holiday.Date <= lastWeekEnd)
+                    .Where(holiday =>
+                        holiday.IsActive &&
+                        holiday.Date >= firstWeekStart &&
+                        holiday.Date <= lastWeekEnd)
                     .Select(holiday => holiday.Date)
                     .ToListAsync(cancellationToken))
                 .ToHashSet();

@@ -23,6 +23,7 @@ public interface IApplicationDbContext
     DbSet<Currency> Currencies { get; }
     DbSet<ProjectCostSnapshot> ProjectCostSnapshots { get; }
     DbSet<Holiday> Holidays { get; }
+    DbSet<HolidayCalendarSettings> HolidayCalendarSettings { get; }
     DbSet<RateMultiplierSettings> RateMultiplierSettings { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);

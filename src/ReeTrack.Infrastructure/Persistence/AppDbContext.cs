@@ -28,6 +28,7 @@ public class AppDbContext : DbContext, IApplicationDbContext
     public DbSet<Currency> Currencies => Set<Currency>();
     public DbSet<ProjectCostSnapshot> ProjectCostSnapshots => Set<ProjectCostSnapshot>();
     public DbSet<Holiday> Holidays => Set<Holiday>();
+    public DbSet<HolidayCalendarSettings> HolidayCalendarSettings => Set<HolidayCalendarSettings>();
     public DbSet<RateMultiplierSettings> RateMultiplierSettings => Set<RateMultiplierSettings>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)

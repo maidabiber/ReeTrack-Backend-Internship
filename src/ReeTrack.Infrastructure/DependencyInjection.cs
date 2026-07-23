@@ -13,6 +13,7 @@ using ReeTrack.Infrastructure.Invitations;
 using ReeTrack.Infrastructure.Members;
 using ReeTrack.Infrastructure.Projects;
 using ReeTrack.Infrastructure.RateMultipliers;
+using ReeTrack.Infrastructure.Holidays;
 using ReeTrack.Infrastructure.Tags;
 using ReeTrack.Infrastructure.Teammates;
 using ReeTrack.Infrastructure.TimeEntries;
@@ -43,6 +44,11 @@ public static class DependencyInjection
 
         services.AddHttpClient<IGoogleCodeExchanger, GoogleCodeExchanger>();
         services.AddHttpClient<GoogleCalendarProvider>();
+        services.AddHttpClient<INagerDateClient, NagerDateClient>(client =>
+        {
+            client.BaseAddress = new Uri("https://date.nager.at/");
+            client.Timeout = TimeSpan.FromSeconds(30);
+        });
 
         services.AddScoped<IGoogleOAuthService, GoogleOAuthService>();
         services.AddScoped<IJwtTokenService, JwtTokenService>();
@@ -76,6 +82,7 @@ public static class DependencyInjection
         services.AddScoped<IProjectService, ProjectService>();
         services.AddScoped<IProjectCostService, ProjectCostService>();
         services.AddScoped<IRateMultiplierSettingsService, RateMultiplierSettingsService>();
+        services.AddScoped<IHolidayService, HolidayService>();
         services.AddScoped<IRateMultiplier, BaseRateMultiplier>();
         services.AddScoped<IRateMultiplier, WeekendRateMultiplier>();
         services.AddScoped<IRateMultiplier, HolidayRateMultiplier>();
