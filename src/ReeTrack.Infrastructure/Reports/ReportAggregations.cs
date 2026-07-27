@@ -1,4 +1,5 @@
 using ReeTrack.Application.Common.Models;
+using ReeTrack.Application.Reports;
 using ReeTrack.Infrastructure.Timesheets;
 
 namespace ReeTrack.Infrastructure.Reports;
@@ -71,8 +72,7 @@ public static class ReportAggregations
             .ToList();
     }
 
+    /// <inheritdoc cref="SummaryReportAnalytics.BillablePct"/>
     public static decimal BillablePct(long billableSeconds, long totalSeconds) =>
-        totalSeconds <= 0
-            ? 0m
-            : Math.Round(billableSeconds * 100m / totalSeconds, 2, MidpointRounding.AwayFromZero);
+        SummaryReportAnalytics.BillablePct(billableSeconds, totalSeconds);
 }

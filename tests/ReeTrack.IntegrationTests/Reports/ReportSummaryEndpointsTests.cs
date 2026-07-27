@@ -35,8 +35,8 @@ public class ReportSummaryEndpointsTests
         var client = factory.CreateAuthenticatedClient(adminToken);
 
         var clientId = await SeedClientAsync(factory, "Acme");
-        var projectA = await SeedProjectAsync(factory, clientId, "Alpha", hourlyRate: 50m, currencyCode: "EUR");
-        var projectB = await SeedProjectAsync(factory, clientId, "Beta", hourlyRate: 80m, currencyCode: "USD");
+        var projectA = await SeedProjectAsync(factory, clientId, "Alpha", hourlyRate: 50m, currencyCode: "EUR", timeEstimateHours: 2m);
+        var projectB = await SeedProjectAsync(factory, clientId, "Beta", hourlyRate: 80m, currencyCode: "USD", fixedFeeAmount: 500m);
 
         var monday = CurrentWeek.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
         var previousMonday = CurrentWeek.AddDays(-7).ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
@@ -78,15 +78,51 @@ public class ReportSummaryEndpointsTests
         Assert.Equal(10800, alpha.TotalSeconds);
         Assert.True(alpha.CalculatedCost > 0);
         Assert.True(alpha.WeekendHours >= 1m);
+        Assert.Equal("Acme", alpha.ClientName);
+        Assert.Equal("Active", alpha.Status);
+        Assert.Equal(50m, alpha.HourlyRate);
+        Assert.Equal(2m, alpha.TimeEstimateHours);
 
         var beta = Assert.Single(body.Projects, p => p.Name == "Beta");
         Assert.Equal("USD", beta.CurrencyCode);
         Assert.Equal(3600, beta.TotalSeconds);
+        Assert.Equal("Acme", beta.ClientName);
+        Assert.Equal(500m, beta.FixedFeeAmount);
 
         Assert.Equal(2, body.Members.Count);
         Assert.Contains(body.Members, m => m.DisplayName == "Alice" && m.TotalSeconds == 10800);
         Assert.Contains(body.Members, m => m.UserId == admin.Id && m.TotalSeconds == 3600);
         Assert.True(body.GeneratedAtUtc <= DateTime.UtcNow.AddMinutes(1));
+    }
+
+    [Fact]
+    public async Task GetSummary_WithTimeOnNoProject_ReportsItSoProjectRowsReconcile()
+    {
+        using var factory = new ReeTrackWebApplicationFactory();
+        var (admin, adminToken) = await factory.SeedAdminAsync();
+        var client = factory.CreateAuthenticatedClient(adminToken);
+
+        var clientId = await SeedClientAsync(factory, "Acme");
+        var projectId = await SeedProjectAsync(factory, clientId, "Alpha", hourlyRate: 50m);
+        var monday = CurrentWeek.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+
+        await SeedEntryAsync(factory, admin.Id, projectId, monday.AddHours(9), 7200, isBillable: true);
+        // No project — counted in the KPIs but never in the per-project breakdown.
+        await SeedEntryAsync(factory, admin.Id, null, monday.AddHours(14), 3600, isBillable: true);
+
+        var body = await client.GetFromJsonAsync<SummaryReportResponse>("/api/reports/summary");
+        Assert.NotNull(body);
+
+        Assert.Equal(10800, body.Kpis.TotalSeconds);
+        Assert.Equal(3600, body.Kpis.UnassignedSeconds);
+
+        // The whole point: project rows + unassigned == the portfolio total.
+        var projectSeconds = body.Projects.Sum(p => p.TotalSeconds);
+        Assert.Equal(7200, projectSeconds);
+        Assert.Equal(body.Kpis.TotalSeconds, projectSeconds + body.Kpis.UnassignedSeconds);
+
+        Assert.Equal(DateOnly.FromDateTime(monday), body.FirstEntryDate);
+        Assert.False(string.IsNullOrWhiteSpace(body.GeneratedByName));
     }
 
     private static async Task<Guid> SeedClientAsync(ReeTrackWebApplicationFactory factory, string name)
@@ -104,7 +140,9 @@ public class ReportSummaryEndpointsTests
         Guid clientId,
         string name,
         decimal? hourlyRate = null,
-        string currencyCode = "EUR")
+        string currencyCode = "EUR",
+        decimal? fixedFeeAmount = null,
+        decimal? timeEstimateHours = null)
     {
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -114,17 +152,20 @@ public class ReportSummaryEndpointsTests
             Name = name,
             Status = ProjectStatus.Active,
             HourlyRate = hourlyRate,
-            CurrencyCode = currencyCode
+            CurrencyCode = currencyCode,
+            FixedFeeAmount = fixedFeeAmount,
+            TimeEstimateHours = timeEstimateHours
         };
         db.Projects.Add(project);
         await db.SaveChangesAsync();
         return project.Id;
     }
 
+    /// <summary>Pass a null <paramref name="projectId"/> to seed unassigned time.</summary>
     private static async Task SeedEntryAsync(
         ReeTrackWebApplicationFactory factory,
         Guid userId,
-        Guid projectId,
+        Guid? projectId,
         DateTime startedAtUtc,
         int durationSeconds,
         bool isBillable)
@@ -153,6 +194,8 @@ public class ReportSummaryEndpointsTests
         public IReadOnlyList<ProjectSummaryResponse> Projects { get; init; } = [];
         public IReadOnlyList<MemberHoursResponse> Members { get; init; } = [];
         public DateTime GeneratedAtUtc { get; init; }
+        public DateOnly? FirstEntryDate { get; init; }
+        public string? GeneratedByName { get; init; }
     }
 
     private sealed class ReportKpisResponse
@@ -167,6 +210,7 @@ public class ReportSummaryEndpointsTests
         public decimal OvertimeHours { get; init; }
         public decimal WeekendHours { get; init; }
         public decimal HolidayHours { get; init; }
+        public long UnassignedSeconds { get; init; }
     }
 
     private sealed class DayOfWeekHoursResponse
@@ -191,6 +235,11 @@ public class ReportSummaryEndpointsTests
         public decimal OvertimeHours { get; init; }
         public decimal WeekendHours { get; init; }
         public decimal HolidayHours { get; init; }
+        public string ClientName { get; init; } = string.Empty;
+        public string Status { get; init; } = string.Empty;
+        public decimal? HourlyRate { get; init; }
+        public decimal? FixedFeeAmount { get; init; }
+        public decimal? TimeEstimateHours { get; init; }
     }
 
     private sealed class MemberHoursResponse

@@ -5,6 +5,7 @@ using ReeTrack.Application.Common.Models;
 using ReeTrack.Domain.Entities;
 using ReeTrack.Domain.Enums;
 using ReeTrack.Domain.Services;
+using ReeTrack.Infrastructure.Timesheets;
 
 namespace ReeTrack.Infrastructure.Projects;
 
@@ -12,11 +13,16 @@ public sealed class ProjectCostService : IProjectCostService
 {
     private readonly IApplicationDbContext _db;
     private readonly IProjectCostCalculator _calculator;
+    private readonly IRateMultiplierConfigProvider _multipliers;
 
-    public ProjectCostService(IApplicationDbContext db, IProjectCostCalculator calculator)
+    public ProjectCostService(
+        IApplicationDbContext db,
+        IProjectCostCalculator calculator,
+        IRateMultiplierConfigProvider multipliers)
     {
         _db = db;
         _calculator = calculator;
+        _multipliers = multipliers;
     }
 
     public async Task<ProjectCostDto?> GetLatestAsync(
@@ -75,15 +81,10 @@ public sealed class ProjectCostService : IProjectCostService
         var crossProjectUserEntries = Array.Empty<TimeEntry>();
         var holidays = new HashSet<DateOnly>();
 
-        if (entries.Count > 0)
+        if (WeekWindow.Covering(entries.Select(ResolveEntryDate)) is { } window)
         {
-            var entryDates = entries.Select(ResolveEntryDate).ToList();
-            var firstWeekStart = GetWeekStart(entryDates.Min());
-            var lastWeekEnd = GetWeekStart(entryDates.Max()).AddDays(6);
-            var rangeStart = firstWeekStart.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
-            var rangeEndExclusive = lastWeekEnd
-                .AddDays(1)
-                .ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+            var rangeStart = window.StartUtc;
+            var rangeEndExclusive = window.EndExclusiveUtc;
 
             crossProjectUserEntries = await _db.TimeEntries
                 .AsNoTracking()
@@ -99,14 +100,14 @@ public sealed class ProjectCostService : IProjectCostService
                     .AsNoTracking()
                     .Where(holiday =>
                         holiday.IsActive &&
-                        holiday.Date >= firstWeekStart &&
-                        holiday.Date <= lastWeekEnd)
+                        holiday.Date >= window.FirstWeekStart &&
+                        holiday.Date <= window.LastWeekEnd)
                     .Select(holiday => holiday.Date)
                     .ToListAsync(cancellationToken))
                 .ToHashSet();
         }
 
-        var multiplierConfig = await LoadMultiplierConfigAsync(cancellationToken);
+        var multiplierConfig = await _multipliers.GetAsync(cancellationToken);
 
         var result = _calculator.Calculate(
             project,
@@ -175,24 +176,4 @@ public sealed class ProjectCostService : IProjectCostService
 
     private static DateOnly ResolveEntryDate(TimeEntry entry) =>
         DateOnly.FromDateTime(entry.StartedAtUtc ?? entry.CreatedAtUtc);
-
-    private static DateOnly GetWeekStart(DateOnly date) =>
-        date.AddDays(-((7 + ((int)date.DayOfWeek - (int)DayOfWeek.Monday)) % 7));
-
-    private async Task<RateMultiplierConfig> LoadMultiplierConfigAsync(CancellationToken cancellationToken)
-    {
-        var settings = await _db.RateMultiplierSettings
-            .AsNoTracking()
-            .OrderBy(s => s.Id)
-            .FirstOrDefaultAsync(cancellationToken);
-
-        if (settings is null)
-            return RateMultiplierConfig.Defaults;
-
-        return new RateMultiplierConfig(
-            settings.WeekendPremium,
-            settings.HolidayPremium,
-            settings.OvertimePremium,
-            settings.WeeklyOvertimeThresholdHours);
-    }
 }

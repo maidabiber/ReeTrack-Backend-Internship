@@ -9,9 +9,14 @@ using ReeTrack.Api.Middleware;
 using ReeTrack.Infrastructure;
 using ReeTrack.Infrastructure.Auditing;
 using ReeTrack.Infrastructure.Persistence;
+using QuestPDF.Infrastructure;
 using Scalar.AspNetCore;
 
 LoadDotEnvFile();
+
+// QuestPDF Community — free under $1M annual revenue; paid Professional/Enterprise
+// required above that threshold (or for public-sector / publicly traded orgs).
+QuestPDF.Settings.License = LicenseType.Community;
 
 var builder = WebApplication.CreateBuilder(args);
 

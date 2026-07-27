@@ -141,6 +141,10 @@ public class ProjectCostCalculatorTests
         Assert.Equal(1m, result.WeekendHours);
         Assert.Equal(0m, result.HolidayHours);
         Assert.Equal(0m, result.OvertimeHours);
+        Assert.Equal(0m, result.NormalCost);
+        Assert.Equal(150m, result.WeekendCost);
+        Assert.Equal(0m, result.HolidayCost);
+        Assert.Equal(0m, result.OvertimeCost);
     }
 
     [Fact]
@@ -165,6 +169,10 @@ public class ProjectCostCalculatorTests
         Assert.Equal(0m, result.WeekendHours);
         Assert.Equal(1m, result.HolidayHours);
         Assert.Equal(0m, result.OvertimeHours);
+        Assert.Equal(0m, result.NormalCost);
+        Assert.Equal(0m, result.WeekendCost);
+        Assert.Equal(200m, result.HolidayCost);
+        Assert.Equal(0m, result.OvertimeCost);
     }
 
     [Fact]
@@ -189,6 +197,8 @@ public class ProjectCostCalculatorTests
         Assert.Equal(1m, result.WeekendHours);
         Assert.Equal(1m, result.HolidayHours);
         Assert.Equal(0m, result.OvertimeHours);
+        Assert.Equal(250m, result.WeekendCost);
+        Assert.Equal(0m, result.HolidayCost);
     }
 
     [Fact]
@@ -213,6 +223,8 @@ public class ProjectCostCalculatorTests
         Assert.Equal(1m, result.TotalHours);
         Assert.Equal(1m, result.WeekendHours);
         Assert.Equal(1m, result.OvertimeHours);
+        Assert.Equal(200m, result.WeekendCost);
+        Assert.Equal(0m, result.OvertimeCost);
     }
 
     [Fact]
@@ -236,6 +248,9 @@ public class ProjectCostCalculatorTests
         Assert.Equal(500m, result.CalculatedCost);
         Assert.Equal(4m, result.TotalHours);
         Assert.Equal(2m, result.OvertimeHours);
+        Assert.Equal(250m, result.NormalCost);
+        Assert.Equal(250m, result.OvertimeCost);
+        Assert.Equal(0m, result.WeekendCost);
     }
 
     [Fact]

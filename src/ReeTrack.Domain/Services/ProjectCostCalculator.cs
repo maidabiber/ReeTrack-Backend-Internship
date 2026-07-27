@@ -29,6 +29,10 @@ public sealed class ProjectCostCalculator : IProjectCostCalculator
         decimal weekendHours = 0m;
         decimal holidayHours = 0m;
         decimal overtimeHours = 0m;
+        decimal normalCost = 0m;
+        decimal weekendCost = 0m;
+        decimal holidayCost = 0m;
+        decimal overtimeCost = 0m;
         var taskTotals = new Dictionary<Guid, TaskAccumulator>();
 
         foreach (var entry in projectEntries)
@@ -43,9 +47,8 @@ public sealed class ProjectCostCalculator : IProjectCostCalculator
             var entryHours = entry.DurationSeconds / 3600m;
             var hoursBeforeEntry = cumulativeWeeklyHours.GetValueOrDefault(entry.Id);
             var isHoliday = holidays.Contains(entryDate);
-            var entryWeekendHours = entryDate.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday
-                ? entryHours
-                : 0m;
+            var isWeekend = entryDate.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday;
+            var entryWeekendHours = isWeekend ? entryHours : 0m;
             var entryHolidayHours = isHoliday ? entryHours : 0m;
             var entryOvertimeHours = CalculateOvertimeHours(
                 entryHours,
@@ -73,6 +76,16 @@ public sealed class ProjectCostCalculator : IProjectCostCalculator
 
             var entryCost = entryHours * appliedRate;
             total += entryCost;
+            AttributeEntryCost(
+                entryCost,
+                entryHours,
+                entryOvertimeHours,
+                isWeekend,
+                isHoliday,
+                ref normalCost,
+                ref weekendCost,
+                ref holidayCost,
+                ref overtimeCost);
 
             if (entry.ProjectTaskId is Guid taskId)
             {
@@ -107,7 +120,51 @@ public sealed class ProjectCostCalculator : IProjectCostCalculator
             Math.Round(weekendHours, 2, MidpointRounding.AwayFromZero),
             Math.Round(holidayHours, 2, MidpointRounding.AwayFromZero),
             Math.Round(overtimeHours, 2, MidpointRounding.AwayFromZero),
+            Math.Round(normalCost, 2, MidpointRounding.AwayFromZero),
+            Math.Round(weekendCost, 2, MidpointRounding.AwayFromZero),
+            Math.Round(holidayCost, 2, MidpointRounding.AwayFromZero),
+            Math.Round(overtimeCost, 2, MidpointRounding.AwayFromZero),
             taskCosts);
+    }
+
+    /// <summary>
+    /// Mutually exclusive cost buckets that sum to entry cost:
+    /// Weekend (any Sat/Sun) → WeekendCost;
+    /// else weekday holiday → HolidayCost;
+    /// else split weekday cost by OT hour share → NormalCost / OvertimeCost.
+    /// </summary>
+    private static void AttributeEntryCost(
+        decimal entryCost,
+        decimal entryHours,
+        decimal entryOvertimeHours,
+        bool isWeekend,
+        bool isHoliday,
+        ref decimal normalCost,
+        ref decimal weekendCost,
+        ref decimal holidayCost,
+        ref decimal overtimeCost)
+    {
+        if (isWeekend)
+        {
+            weekendCost += entryCost;
+            return;
+        }
+
+        if (isHoliday)
+        {
+            holidayCost += entryCost;
+            return;
+        }
+
+        if (entryHours > 0m && entryOvertimeHours > 0m)
+        {
+            var otRatio = Math.Clamp(entryOvertimeHours / entryHours, 0m, 1m);
+            overtimeCost += entryCost * otRatio;
+            normalCost += entryCost * (1m - otRatio);
+            return;
+        }
+
+        normalCost += entryCost;
     }
 
     private static decimal CalculateOvertimeHours(

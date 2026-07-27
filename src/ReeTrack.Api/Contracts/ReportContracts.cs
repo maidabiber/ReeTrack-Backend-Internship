@@ -8,6 +8,24 @@ public sealed class SummaryReportResponse
     public required IReadOnlyList<ProjectSummaryResponse> Projects { get; init; }
     public required IReadOnlyList<MemberHoursResponse> Members { get; init; }
     public required DateTime GeneratedAtUtc { get; init; }
+
+    /// <summary>Earliest confirmed entry date; null when there is no time logged.</summary>
+    public DateOnly? FirstEntryDate { get; init; }
+
+    /// <summary>Display name of the admin who ran the report; null when unresolvable.</summary>
+    public string? GeneratedByName { get; init; }
+
+    /// <summary>The rules the figures were produced under.</summary>
+    public required ReportBasisResponse Basis { get; init; }
+}
+
+public sealed class ReportBasisResponse
+{
+    /// <summary>Premiums as fractions, e.g. 0.5 = +50%.</summary>
+    public required decimal WeekendPremium { get; init; }
+    public required decimal HolidayPremium { get; init; }
+    public required decimal OvertimePremium { get; init; }
+    public required decimal WeeklyOvertimeThresholdHours { get; init; }
 }
 
 public sealed class ReportKpisResponse
@@ -22,6 +40,9 @@ public sealed class ReportKpisResponse
     public required decimal OvertimeHours { get; init; }
     public required decimal WeekendHours { get; init; }
     public required decimal HolidayHours { get; init; }
+
+    /// <summary>Confirmed time not linked to a project; excluded from the Projects list.</summary>
+    public required long UnassignedSeconds { get; init; }
 }
 
 public sealed class DayOfWeekHoursResponse
@@ -43,9 +64,25 @@ public sealed class ProjectSummaryResponse
     public required string CurrencyCode { get; init; }
     public required long TotalSeconds { get; init; }
     public required decimal CalculatedCost { get; init; }
+    public required decimal NormalCost { get; init; }
+    public required decimal WeekendCost { get; init; }
+    public required decimal HolidayCost { get; init; }
+    public required decimal OvertimeCost { get; init; }
     public required decimal OvertimeHours { get; init; }
     public required decimal WeekendHours { get; init; }
     public required decimal HolidayHours { get; init; }
+    public required string ClientName { get; init; }
+    public required string Status { get; init; }
+    public decimal? HourlyRate { get; init; }
+    public decimal? FixedFeeAmount { get; init; }
+    public decimal? TimeEstimateHours { get; init; }
+
+    // Derived server-side so the page and the exports can't drift apart.
+    /// <summary>Logged hours as a percent of the estimate (0–100+); null when no estimate is set.</summary>
+    public decimal? EstimateUsedPct { get; init; }
+
+    /// <summary>Fixed fee minus labour cost; null for non-fixed-fee projects.</summary>
+    public decimal? FixedFeeMargin { get; init; }
 }
 
 public sealed class MemberHoursResponse

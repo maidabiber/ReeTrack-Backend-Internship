@@ -90,7 +90,8 @@ public class ReportAggregationsTests
                 ActiveProjects = 2,
                 OvertimeHours = 1m,
                 WeekendHours = 2m,
-                HolidayHours = 0m
+                HolidayHours = 0m,
+                UnassignedSeconds = 0
             },
             Activity =
             [
@@ -111,6 +112,10 @@ public class ReportAggregationsTests
                     CurrencyCode = "EUR",
                     TotalSeconds = 7200,
                     CalculatedCost = 200m,
+                    NormalCost = 200m,
+                    WeekendCost = 0m,
+                    HolidayCost = 0m,
+                    OvertimeCost = 0m,
                     OvertimeHours = 1m,
                     WeekendHours = 0m,
                     HolidayHours = 0m
@@ -122,6 +127,10 @@ public class ReportAggregationsTests
                     CurrencyCode = "USD",
                     TotalSeconds = 3600,
                     CalculatedCost = 90m,
+                    NormalCost = 90m,
+                    WeekendCost = 0m,
+                    HolidayCost = 0m,
+                    OvertimeCost = 0m,
                     OvertimeHours = 0m,
                     WeekendHours = 2m,
                     HolidayHours = 0m
@@ -142,7 +151,14 @@ public class ReportAggregationsTests
                     TotalSeconds = 3600
                 }
             ],
-            GeneratedAtUtc = new DateTime(2026, 7, 22, 12, 0, 0, DateTimeKind.Utc)
+            GeneratedAtUtc = new DateTime(2026, 7, 22, 12, 0, 0, DateTimeKind.Utc),
+            Basis = new ReportBasisDto
+            {
+                WeekendPremium = 0.5m,
+                HolidayPremium = 1.0m,
+                OvertimePremium = 0.5m,
+                WeeklyOvertimeThresholdHours = 40m
+            }
         };
 
         Assert.Equal(10800, dto.Kpis.TotalSeconds);
