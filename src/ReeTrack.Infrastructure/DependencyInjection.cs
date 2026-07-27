@@ -83,6 +83,7 @@ public static class DependencyInjection
         services.AddScoped<ISharedTimeEntryApprovalService, SharedTimeEntryApprovalService>();
         services.AddScoped<ITimeEntryTemplateService, TimeEntryTemplateService>();
         services.AddScoped<ISmartTimeParseService, SmartTimeParseService>();
+        services.AddScoped<ITimeEntrySuggestionService, TimeEntrySuggestionService>();
         services.AddScoped<IProjectService, ProjectService>();
         services.AddScoped<IProjectCostService, ProjectCostService>();
         services.AddScoped<IReportService, ReportService>();
