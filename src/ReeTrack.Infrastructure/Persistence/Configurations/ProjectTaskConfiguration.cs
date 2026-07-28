@@ -37,6 +37,18 @@ public class ProjectTaskConfiguration : IEntityTypeConfiguration<ProjectTask>
             .HasColumnName("time_estimate_hours")
             .HasPrecision(10, 2);
 
+        builder.Property(t => t.ExternalProvider)
+            .HasColumnName("external_provider")
+            .HasConversion<short>();
+
+        builder.Property(t => t.ExternalId)
+            .HasColumnName("external_id")
+            .HasMaxLength(128);
+
+        builder.Property(t => t.ExternalKey)
+            .HasColumnName("external_key")
+            .HasMaxLength(64);
+
         builder.Property(t => t.CreatedAtUtc)
             .HasColumnName("created_at_utc")
             .IsRequired();
@@ -63,6 +75,11 @@ public class ProjectTaskConfiguration : IEntityTypeConfiguration<ProjectTask>
             .IsUnique()
             .HasDatabaseName("ix_project_tasks_project_id_name")
             .HasFilter("deleted_at_utc IS NULL");
+
+        builder.HasIndex(t => new { t.ExternalProvider, t.ExternalId })
+            .IsUnique()
+            .HasDatabaseName("ix_project_tasks_external_provider_external_id")
+            .HasFilter("deleted_at_utc IS NULL AND external_provider IS NOT NULL AND external_id IS NOT NULL");
 
         builder.HasOne(t => t.Project)
             .WithMany(p => p.Tasks)

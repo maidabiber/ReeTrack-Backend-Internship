@@ -26,6 +26,8 @@ using ReeTrack.Infrastructure.Background;
 using ReeTrack.Infrastructure.Calendar;
 using ReeTrack.Infrastructure.Integrations.Calendar;
 using ReeTrack.Infrastructure.Integrations.Calendar.Google;
+using ReeTrack.Infrastructure.Integrations.Jira;
+using ReeTrack.Application.Integrations.Jira;
 using ReeTrack.Domain.Services;
 
 namespace ReeTrack.Infrastructure;
@@ -41,12 +43,17 @@ public static class DependencyInjection
         services.Configure<AppOptions>(configuration.GetSection(AppOptions.SectionName));
         services.Configure<TimeEntryOptions>(configuration.GetSection(TimeEntryOptions.SectionName));
         services.Configure<LlmOptions>(configuration.GetSection(LlmOptions.SectionName));
+        services.Configure<JiraOptions>(configuration.GetSection(JiraOptions.SectionName));
 
         services.AddHttpContextAccessor();
         services.Configure<CalendarSyncOptions>(configuration.GetSection(CalendarSyncOptions.SectionName));
 
         services.AddHttpClient<IGoogleCodeExchanger, GoogleCodeExchanger>();
         services.AddHttpClient<GoogleCalendarProvider>();
+        services.AddHttpClient<IJiraApiClient, JiraApiClient>(client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(60);
+        });
         services.AddHttpClient<INagerDateClient, NagerDateClient>(client =>
         {
             client.BaseAddress = new Uri("https://date.nager.at/");
@@ -111,6 +118,7 @@ public static class DependencyInjection
         services.AddScoped<ICalendarSyncService, CalendarSyncService>();
         services.AddScoped<ICalendarViewService, CalendarViewService>();
         services.AddHostedService<CalendarSyncBackgroundService>();
+        services.AddScoped<IJiraIntegrationService, JiraIntegrationService>();
 
         return services;
     }

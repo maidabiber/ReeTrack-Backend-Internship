@@ -11,6 +11,10 @@ public class ProjectTask : BaseEntity, ISoftDeletable, IAuditable
     public Guid? AssignedToUserId { get; set; }
     public decimal? TimeEstimateHours { get; set; }
 
+    public ExternalProvider? ExternalProvider { get; set; }
+    public string? ExternalId { get; set; }
+    public string? ExternalKey { get; set; }
+
     public DateTime? DeletedAtUtc { get; set; }
     public Guid? DeletedByUserId { get; set; }
 

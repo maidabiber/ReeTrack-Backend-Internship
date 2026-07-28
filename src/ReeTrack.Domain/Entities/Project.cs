@@ -16,6 +16,10 @@ public class Project : BaseEntity, ISoftDeletable, IAuditable
     public decimal? TimeEstimateHours { get; set; }
     public string? Color { get; set; }
 
+    public ExternalProvider? ExternalProvider { get; set; }
+    public string? ExternalId { get; set; }
+    public string? ExternalKey { get; set; }
+
     public DateTime? DeletedAtUtc { get; set; }
     public Guid? DeletedByUserId { get; set; }
 

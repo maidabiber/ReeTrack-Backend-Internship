@@ -56,6 +56,18 @@ public class ProjectConfiguration : IEntityTypeConfiguration<Project>
             .HasColumnName("color")
             .HasMaxLength(7);
 
+        builder.Property(p => p.ExternalProvider)
+            .HasColumnName("external_provider")
+            .HasConversion<short>();
+
+        builder.Property(p => p.ExternalId)
+            .HasColumnName("external_id")
+            .HasMaxLength(128);
+
+        builder.Property(p => p.ExternalKey)
+            .HasColumnName("external_key")
+            .HasMaxLength(64);
+
         builder.Property(p => p.CreatedAtUtc)
             .HasColumnName("created_at_utc")
             .IsRequired();
@@ -79,6 +91,11 @@ public class ProjectConfiguration : IEntityTypeConfiguration<Project>
             .IsUnique()
             .HasDatabaseName("ix_projects_name")
             .HasFilter("deleted_at_utc IS NULL");
+
+        builder.HasIndex(p => new { p.ExternalProvider, p.ExternalId })
+            .IsUnique()
+            .HasDatabaseName("ix_projects_external_provider_external_id")
+            .HasFilter("deleted_at_utc IS NULL AND external_provider IS NOT NULL AND external_id IS NOT NULL");
 
         builder.HasOne(p => p.Client)
             .WithMany(c => c.Projects)
