@@ -7,6 +7,7 @@ using ReeTrack.Application.Common.Interfaces;
 using ReeTrack.Application.Common.Invitations;
 using ReeTrack.Application.Common.Models;
 using ReeTrack.Application.Common.Options;
+using ReeTrack.Application.Notifications;
 using ReeTrack.Domain.Entities;
 using ReeTrack.Domain.Enums;
 using ReeTrack.Infrastructure.Members;
@@ -17,7 +18,7 @@ namespace ReeTrack.Infrastructure.Invitations;
 public class InvitationService : IInvitationService
 {
     private readonly AppDbContext _db;
-    private readonly IEmailSender _emailSender;
+    private readonly ITransactionalEmailSender _emailSender;
     private readonly ICurrentUserService _currentUser;
     private readonly InvitationOptions _invitationOptions;
     private readonly AppOptions _appOptions;
@@ -25,7 +26,7 @@ public class InvitationService : IInvitationService
 
     public InvitationService(
         AppDbContext db,
-        IEmailSender emailSender,
+        ITransactionalEmailSender emailSender,
         ICurrentUserService currentUser,
         IOptions<InvitationOptions> invitationOptions,
         IOptions<AppOptions> appOptions,
@@ -486,13 +487,13 @@ public class InvitationService : IInvitationService
         try
         {
             var inviteUrl = BuildInviteUrl(rawToken);
-            await _emailSender.SendInviteEmailAsync(
-                toEmail,
-                inviteUrl,
-                inviterName,
-                roleName,
-                _appOptions.Name,
-                cancellationToken);
+            var subject = $"{inviterName} invited you to {_appOptions.Name}";
+            var body =
+                $"{inviterName} invited you to join {_appOptions.Name} as a {roleName}.\n\n" +
+                $"Accept your invite: {inviteUrl}\n\n" +
+                "Sign in with the Google account that matches this email address.";
+
+            await _emailSender.SendAsync(toEmail, subject, body, cancellationToken);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

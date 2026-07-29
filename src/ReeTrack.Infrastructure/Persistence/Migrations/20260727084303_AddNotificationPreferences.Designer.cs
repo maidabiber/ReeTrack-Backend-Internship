@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using ReeTrack.Infrastructure.Persistence;
@@ -11,9 +12,11 @@ using ReeTrack.Infrastructure.Persistence;
 namespace ReeTrack.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260727084303_AddNotificationPreferences")]
+    partial class AddNotificationPreferences
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -165,7 +168,6 @@ namespace ReeTrack.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("ReeTrack.Domain.Entities.HolidayCalendarSettings", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
                         .HasColumnName("id");
@@ -349,20 +351,6 @@ namespace ReeTrack.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("deleted_by_user_id");
 
-                    b.Property<string>("ExternalId")
-                        .HasMaxLength(128)
-                        .HasColumnType("character varying(128)")
-                        .HasColumnName("external_id");
-
-                    b.Property<string>("ExternalKey")
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)")
-                        .HasColumnName("external_key");
-
-                    b.Property<short?>("ExternalProvider")
-                        .HasColumnType("smallint")
-                        .HasColumnName("external_provider");
-
                     b.Property<decimal?>("FixedFeeAmount")
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)")
@@ -401,11 +389,6 @@ namespace ReeTrack.Infrastructure.Persistence.Migrations
                         .IsUnique()
                         .HasDatabaseName("ix_projects_name")
                         .HasFilter("deleted_at_utc IS NULL");
-
-                    b.HasIndex("ExternalProvider", "ExternalId")
-                        .IsUnique()
-                        .HasDatabaseName("ix_projects_external_provider_external_id")
-                        .HasFilter("deleted_at_utc IS NULL AND external_provider IS NOT NULL AND external_id IS NOT NULL");
 
                     b.ToTable("projects", (string)null);
                 });
@@ -491,20 +474,6 @@ namespace ReeTrack.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("deleted_by_user_id");
 
-                    b.Property<string>("ExternalId")
-                        .HasMaxLength(128)
-                        .HasColumnType("character varying(128)")
-                        .HasColumnName("external_id");
-
-                    b.Property<string>("ExternalKey")
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)")
-                        .HasColumnName("external_key");
-
-                    b.Property<short?>("ExternalProvider")
-                        .HasColumnType("smallint")
-                        .HasColumnName("external_provider");
-
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -536,77 +505,12 @@ namespace ReeTrack.Infrastructure.Persistence.Migrations
                     b.HasIndex("ProjectId")
                         .HasDatabaseName("ix_project_tasks_project_id");
 
-                    b.HasIndex("ExternalProvider", "ExternalId")
-                        .IsUnique()
-                        .HasDatabaseName("ix_project_tasks_external_provider_external_id")
-                        .HasFilter("deleted_at_utc IS NULL AND external_provider IS NOT NULL AND external_id IS NOT NULL");
-
                     b.HasIndex("ProjectId", "Name")
                         .IsUnique()
                         .HasDatabaseName("ix_project_tasks_project_id_name")
                         .HasFilter("deleted_at_utc IS NULL");
 
                     b.ToTable("project_tasks", (string)null);
-                });
-
-            modelBuilder.Entity("ReeTrack.Domain.Entities.ProjectTaskCostSnapshot", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id")
-                        .HasDefaultValueSql("gen_random_uuid()");
-
-                    b.Property<decimal>("CalculatedCost")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)")
-                        .HasColumnName("calculated_cost");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at_utc");
-
-                    b.Property<decimal>("HolidayHours")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)")
-                        .HasColumnName("holiday_hours");
-
-                    b.Property<decimal>("OvertimeHours")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)")
-                        .HasColumnName("overtime_hours");
-
-                    b.Property<Guid>("ProjectCostSnapshotId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("project_cost_snapshot_id");
-
-                    b.Property<Guid>("ProjectTaskId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("project_task_id");
-
-                    b.Property<decimal>("TotalHours")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)")
-                        .HasColumnName("total_hours");
-
-                    b.Property<DateTime>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at_utc");
-
-                    b.Property<decimal>("WeekendHours")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)")
-                        .HasColumnName("weekend_hours");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ProjectCostSnapshotId")
-                        .HasDatabaseName("ix_project_task_cost_snapshots_project_cost_snapshot_id");
-
-                    b.HasIndex("ProjectTaskId")
-                        .HasDatabaseName("ix_project_task_cost_snapshots_project_task_id");
-
-                    b.ToTable("project_task_cost_snapshots", (string)null);
                 });
 
             modelBuilder.Entity("ReeTrack.Domain.Entities.ProjectTaskCostSnapshot", b =>
@@ -1469,24 +1373,6 @@ namespace ReeTrack.Infrastructure.Persistence.Migrations
                         .HasForeignKey("ProjectId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-
-                    b.Navigation("Project");
-                });
-
-            modelBuilder.Entity("ReeTrack.Domain.Entities.ProjectTask", b =>
-                {
-                    b.HasOne("ReeTrack.Domain.Entities.User", "AssignedToUser")
-                        .WithMany("AssignedTasks")
-                        .HasForeignKey("AssignedToUserId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.HasOne("ReeTrack.Domain.Entities.Project", "Project")
-                        .WithMany("Tasks")
-                        .HasForeignKey("ProjectId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("AssignedToUser");
 
                     b.Navigation("Project");
                 });

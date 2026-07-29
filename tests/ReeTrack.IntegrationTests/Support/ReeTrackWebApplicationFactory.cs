@@ -5,6 +5,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using ReeTrack.Application.Common.Constants;
 using ReeTrack.Application.Common.Interfaces;
+using ReeTrack.Application.Notifications;
 using ReeTrack.Domain.Entities;
 using ReeTrack.Domain.Enums;
 using ReeTrack.Infrastructure.Persistence;
@@ -15,7 +16,8 @@ public class ReeTrackWebApplicationFactory : WebApplicationFactory<Program>
 {
     private readonly string _databaseName = $"ReeTrackTests_{Guid.NewGuid()}";
 
-    public FakeEmailSender EmailSender { get; } = new();
+    public FakeTransactionalEmailSender TransactionalEmail { get; } = new();
+    public FakeEmailChannelProvider EmailChannel { get; } = new();
 
     public ReeTrackWebApplicationFactory()
     {
@@ -52,10 +54,14 @@ public class ReeTrackWebApplicationFactory : WebApplicationFactory<Program>
 
         builder.ConfigureServices(services =>
         {
-            foreach (var descriptor in services.Where(d => d.ServiceType == typeof(IEmailSender)).ToList())
+            foreach (var descriptor in services.Where(d => d.ServiceType == typeof(ITransactionalEmailSender)).ToList())
                 services.Remove(descriptor);
 
-            services.AddSingleton<IEmailSender>(EmailSender);
+            foreach (var descriptor in services.Where(d => d.ServiceType == typeof(IChannelProvider)).ToList())
+                services.Remove(descriptor);
+
+            services.AddSingleton<ITransactionalEmailSender>(TransactionalEmail);
+            services.AddSingleton<IChannelProvider>(EmailChannel);
         });
     }
 

@@ -119,7 +119,7 @@ public class InvitationManagementTests : IClassFixture<ReeTrackWebApplicationFac
         var created = await create.Content.ReadFromJsonAsync<CreateInvitationResponse>();
         Assert.NotNull(created?.Invitation);
 
-        var inviteUrl = _factory.EmailSender.LastInviteUrl;
+        var inviteUrl = _factory.TransactionalEmail.LastInviteUrl;
         Assert.NotNull(inviteUrl);
         var rawToken = Uri.UnescapeDataString(inviteUrl.Split("token=", StringSplitOptions.None)[1]);
 

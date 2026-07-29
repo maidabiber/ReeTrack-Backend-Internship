@@ -61,8 +61,8 @@ public class SharedTimeEntryEndpointsTests
         Assert.Equal(pending.Id, pendingEntries![0].Id);
         Assert.Equal("Test Admin", pendingEntries[0].SubmittedByDisplayName);
 
-        await factory.EmailSender.WaitForMentionEmailAsync(member.Email);
-        Assert.Contains("/approvals", factory.EmailSender.LastMentionReviewUrl, StringComparison.Ordinal);
+        await factory.EmailChannel.WaitForMentionEmailAsync(member.Id);
+        Assert.Contains("/approvals", factory.EmailChannel.LastMentionReviewUrl, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -111,7 +111,7 @@ public class SharedTimeEntryEndpointsTests
         Assert.Single(memberEntries!);
         Assert.Equal("Pending", memberEntries![0].Status);
 
-        await factory.EmailSender.WaitForMentionEmailAsync(member.Email);
+        await factory.EmailChannel.WaitForMentionEmailAsync(member.Id);
     }
 
     [Fact]
@@ -159,7 +159,7 @@ public class SharedTimeEntryEndpointsTests
         Assert.Single(memberEntries!);
         Assert.Equal("Pending", memberEntries![0].Status);
 
-        await factory.EmailSender.WaitForMentionEmailAsync(member.Email);
+        await factory.EmailChannel.WaitForMentionEmailAsync(member.Id);
     }
 
     [Fact]

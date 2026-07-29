@@ -2,6 +2,8 @@ using Microsoft.EntityFrameworkCore;
 using ReeTrack.Application.Common.Exceptions;
 using ReeTrack.Application.Common.Interfaces;
 using ReeTrack.Application.Common.Models;
+using ReeTrack.Application.Notifications;
+using ReeTrack.Application.Notifications.Events;
 using ReeTrack.Domain.Enums;
 
 namespace ReeTrack.Infrastructure.Timesheets;
@@ -12,16 +14,16 @@ public class TimesheetReviewService : ITimesheetReviewService
 
     private readonly IApplicationDbContext _db;
     private readonly ICurrentUserService _currentUser;
-    private readonly ITimesheetDecisionEmailNotifier _emailNotifier;
+    private readonly IDomainEventPublisher _eventPublisher;
 
     public TimesheetReviewService(
         IApplicationDbContext db,
         ICurrentUserService currentUser,
-        ITimesheetDecisionEmailNotifier emailNotifier)
+        IDomainEventPublisher eventPublisher)
     {
         _db = db;
         _currentUser = currentUser;
-        _emailNotifier = emailNotifier;
+        _eventPublisher = eventPublisher;
     }
 
     public async Task<PagedResult<AdminTimesheetListItemDto>> ListAsync(
@@ -156,11 +158,16 @@ public class TimesheetReviewService : ITimesheetReviewService
 
         await _db.SaveChangesAsync(cancellationToken);
 
-        _emailNotifier.QueueDecisionEmail(
-            timesheet,
-            timesheet.User,
-            reviewer.DisplayName?.Trim() ?? reviewer.Email,
-            approved: decision == TimesheetStatus.Approved);
+        _ = _eventPublisher.PublishAsync(new TimesheetDecisionNotification
+        {
+            TimesheetId = timesheet.Id,
+            RecipientUserId = timesheet.UserId,
+            RecipientName = timesheet.User.DisplayName?.Trim() ?? timesheet.User.Email,
+            ReviewerName = reviewer.DisplayName?.Trim() ?? reviewer.Email,
+            WeekStartDate = timesheet.WeekStartDate,
+            Approved = decision == TimesheetStatus.Approved,
+            Comment = timesheet.ReviewComment
+        });
 
         return TimesheetMapping.MapTimesheet(timesheet);
     }

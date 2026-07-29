@@ -1,59 +1,27 @@
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using ReeTrack.Application.Common.Interfaces;
 using ReeTrack.Application.Common.Options;
+using ReeTrack.Application.Notifications;
+using ReeTrack.Domain.Events;
 using ReeTrack.Infrastructure.Persistence;
 using ReeTrack.Infrastructure.TimeEntries;
 
 namespace ReeTrack.UnitTests.TimeEntries;
 
-internal sealed class FakeEmailSender : IEmailSender
+internal sealed class NoOpDomainEventPublisher : IDomainEventPublisher
 {
-    public bool ThrowOnMentionEmail { get; set; }
-
-    public Task SendInviteEmailAsync(
-        string toEmail,
-        string inviteUrl,
-        string inviterName,
-        string roleName,
-        string appName,
-        CancellationToken cancellationToken = default) =>
-        Task.CompletedTask;
-
-    public Task SendTimeEntryMentionEmailAsync(
-        string toEmail,
-        string assigneeName,
-        string submitterName,
-        string? description,
-        string reviewUrl,
-        string appName,
-        CancellationToken cancellationToken = default) =>
-        ThrowOnMentionEmail
-            ? throw new InvalidOperationException("SMTP unavailable.")
-            : Task.CompletedTask;
-
-    public Task SendTimesheetDecisionEmailAsync(
-        string toEmail,
-        string recipientName,
-        string reviewerName,
-        string weekLabel,
-        bool approved,
-        string? comment,
-        string timesheetUrl,
-        string appName,
-        CancellationToken cancellationToken = default) =>
+    public Task PublishAsync<TEvent>(TEvent domainEvent, CancellationToken cancellationToken = default)
+        where TEvent : IDomainEvent =>
         Task.CompletedTask;
 }
 
 internal static class TimeEntryServiceTestDependencies
 {
     public static (
-        FakeEmailSender EmailSender,
         IConfiguration Configuration,
         IOptions<AppOptions> AppOptions,
-        ISharedTimeEntryEmailNotifier EmailNotifier) Create()
+        IDomainEventPublisher EventPublisher) Create()
     {
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
@@ -62,15 +30,8 @@ internal static class TimeEntryServiceTestDependencies
             })
             .Build();
 
-        var emailSender = new FakeEmailSender();
         var appOptions = Options.Create(new AppOptions());
-        var emailNotifier = new SharedTimeEntryEmailNotifier(
-            emailSender,
-            NullLogger<SharedTimeEntryEmailNotifier>.Instance,
-            configuration,
-            appOptions);
-
-        return (emailSender, configuration, appOptions, emailNotifier);
+        return (configuration, appOptions, new NoOpDomainEventPublisher());
     }
 
     public static TimeEntryService CreateTimeEntryService(
@@ -87,10 +48,10 @@ internal static class TimeEntryServiceTestDependencies
         AppDbContext db,
         ICurrentUserService currentUser,
         ITimeEntryGuardService entryGuard,
-        ISharedTimeEntryEmailNotifier emailNotifier)
+        IDomainEventPublisher eventPublisher)
     {
         var associations = new TimeEntryAssociationService(db);
         var timeEntries = new TimeEntryService(db, currentUser, entryGuard, associations);
-        return new SharedTimeEntryService(db, currentUser, timeEntries, emailNotifier, entryGuard, associations);
+        return new SharedTimeEntryService(db, currentUser, timeEntries, eventPublisher, entryGuard, associations);
     }
 }

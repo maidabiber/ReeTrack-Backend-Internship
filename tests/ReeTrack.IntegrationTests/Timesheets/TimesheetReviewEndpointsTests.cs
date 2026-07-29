@@ -140,8 +140,8 @@ public class TimesheetReviewEndpointsTests
         Assert.NotNull(body.ReviewedAtUtc);
         Assert.Null(body.ReviewComment); // blank comment stored as null
 
-        var email = Assert.Single(factory.EmailSender.DecisionEmails);
-        Assert.Equal("member@reetrack.test", email.ToEmail);
+        await factory.EmailChannel.WaitForDecisionEmailCountAsync(1);
+        var email = Assert.Single(factory.EmailChannel.DecisionEmails);
         Assert.True(email.Approved);
         Assert.Null(email.Comment);
         Assert.Contains($"week={PreviousWeek:yyyy-MM-dd}", email.TimesheetUrl);
@@ -174,7 +174,8 @@ public class TimesheetReviewEndpointsTests
         Assert.Equal("Rejected", body!.Status);
         Assert.Equal("Missing Tuesday entries.", body.ReviewComment);
 
-        var email = Assert.Single(factory.EmailSender.DecisionEmails);
+        await factory.EmailChannel.WaitForDecisionEmailCountAsync(1);
+        var email = Assert.Single(factory.EmailChannel.DecisionEmails);
         Assert.False(email.Approved);
         Assert.Equal("Missing Tuesday entries.", email.Comment);
 
@@ -238,8 +239,9 @@ public class TimesheetReviewEndpointsTests
         Assert.Equal("Wrong project on Monday.", body.ReviewComment);
 
         // A second decision email is queued for the send-back.
-        Assert.Equal(2, factory.EmailSender.DecisionEmails.Count);
-        var latest = factory.EmailSender.DecisionEmails[^1];
+        await factory.EmailChannel.WaitForDecisionEmailCountAsync(2);
+        Assert.Equal(2, factory.EmailChannel.DecisionEmails.Count);
+        var latest = factory.EmailChannel.DecisionEmails[^1];
         Assert.False(latest.Approved);
         Assert.Equal("Wrong project on Monday.", latest.Comment);
 

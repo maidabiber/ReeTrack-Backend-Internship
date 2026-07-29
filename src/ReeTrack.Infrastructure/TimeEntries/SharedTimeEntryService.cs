@@ -3,6 +3,8 @@ using Microsoft.EntityFrameworkCore;
 using ReeTrack.Application.Common.Exceptions;
 using ReeTrack.Application.Common.Interfaces;
 using ReeTrack.Application.Common.Models;
+using ReeTrack.Application.Notifications;
+using ReeTrack.Application.Notifications.Events;
 using ReeTrack.Domain.Entities;
 using ReeTrack.Domain.Enums;
 
@@ -13,7 +15,7 @@ public class SharedTimeEntryService : ISharedTimeEntryService
     private readonly IApplicationDbContext _db;
     private readonly ICurrentUserService _currentUser;
     private readonly ITimeEntryService _timeEntries;
-    private readonly ISharedTimeEntryEmailNotifier _emailNotifier;
+    private readonly IDomainEventPublisher _eventPublisher;
     private readonly ITimeEntryGuardService _entryGuard;
     private readonly ITimeEntryAssociationService _associations;
 
@@ -21,14 +23,14 @@ public class SharedTimeEntryService : ISharedTimeEntryService
         IApplicationDbContext db,
         ICurrentUserService currentUser,
         ITimeEntryService timeEntries,
-        ISharedTimeEntryEmailNotifier emailNotifier,
+        IDomainEventPublisher eventPublisher,
         ITimeEntryGuardService entryGuard,
         ITimeEntryAssociationService associations)
     {
         _db = db;
         _currentUser = currentUser;
         _timeEntries = timeEntries;
-        _emailNotifier = emailNotifier;
+        _eventPublisher = eventPublisher;
         _entryGuard = entryGuard;
         _associations = associations;
     }
@@ -328,7 +330,18 @@ public class SharedTimeEntryService : ISharedTimeEntryService
             entry.SubmittedByUser = submitter;
         }
 
-        _emailNotifier.QueueShareNotificationEmails(pendingEntries, assigneeById, submitterName);
+        foreach (var entry in pendingEntries)
+        {
+            var assignee = assigneeById[entry.UserId];
+            _ = _eventPublisher.PublishAsync(new TimeEntrySharedNotification
+            {
+                EntryId = entry.Id,
+                AssigneeUserId = assignee.Id,
+                AssigneeName = assignee.DisplayName?.Trim() ?? assignee.Email,
+                SubmitterName = submitterName,
+                Description = entry.Description
+            });
+        }
 
         var groupRows = new List<TimeEntry>();
         if (ownedEntryForResponse is not null)

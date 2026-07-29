@@ -26,6 +26,7 @@ public interface IApplicationDbContext
     DbSet<Holiday> Holidays { get; }
     DbSet<HolidayCalendarSettings> HolidayCalendarSettings { get; }
     DbSet<RateMultiplierSettings> RateMultiplierSettings { get; }
+    DbSet<NotificationPreference> NotificationPreferences { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

@@ -3,18 +3,18 @@ using Microsoft.Extensions.DependencyInjection;
 using ReeTrack.Application.Calendar;
 using ReeTrack.Application.Common.Interfaces;
 using ReeTrack.Application.Common.Options;
+using ReeTrack.Application.Notifications;
 using ReeTrack.Infrastructure.Auditing;
 using ReeTrack.Application.Integrations.Calendar;
 using ReeTrack.Infrastructure.Auth;
 using ReeTrack.Infrastructure.Clients;
 using ReeTrack.Infrastructure.Currencies;
-using ReeTrack.Infrastructure.Email;
 using ReeTrack.Infrastructure.Invitations;
 using ReeTrack.Infrastructure.Members;
+using ReeTrack.Infrastructure.Notifications;
 using ReeTrack.Infrastructure.Projects;
 using ReeTrack.Infrastructure.RateMultipliers;
 using ReeTrack.Infrastructure.Reports;
-using ReeTrack.Infrastructure.Reports.Writers;
 using ReeTrack.Infrastructure.Holidays;
 using ReeTrack.Infrastructure.Tags;
 using ReeTrack.Infrastructure.Teammates;
@@ -68,11 +68,12 @@ public static class DependencyInjection
         services.AddScoped<AuditSaveChangesInterceptor>();
         services.AddScoped<IAuditLogService, AuditLogService>();
 
-        var smtpConfigured = !string.IsNullOrWhiteSpace(configuration[$"{EmailOptions.SectionName}:SmtpHost"]);
-        if (smtpConfigured)
-            services.AddScoped<IEmailSender, SmtpEmailSender>();
-        else
-            services.AddScoped<IEmailSender, NoOpEmailSender>();
+        services.AddScoped<ITransactionalEmailSender, TransactionalEmailSender>();
+        services.AddScoped<IDomainEventPublisher, DomainEventPublisher>();
+        services.AddScoped<INotificationDispatcher, NotificationDispatcher>();
+        services.AddScoped<INotificationPreferenceService, NotificationPreferenceService>();
+        services.AddScoped<IChannelProvider, EmailChannelProvider>();
+        services.AddDomainEventHandlers(typeof(IDomainEventHandler<>).Assembly);
 
         services.AddScoped<IInvitationService, InvitationService>();
         services.AddScoped<IMemberService, MemberService>();
@@ -82,11 +83,9 @@ public static class DependencyInjection
         services.AddScoped<ITimeEntryGuardService, TimeEntryGuardService>();
         services.AddScoped<ITimesheetService, TimesheetService>();
         services.AddScoped<ITimesheetReviewService, TimesheetReviewService>();
-        services.AddScoped<ITimesheetDecisionEmailNotifier, TimesheetDecisionEmailNotifier>();
         services.AddScoped<ITimeEntryAssociationService, TimeEntryAssociationService>();
         services.AddScoped<ITimeEntryService, TimeEntryService>();
         services.AddScoped<ISharedTimeEntryService, SharedTimeEntryService>();
-        services.AddScoped<ISharedTimeEntryEmailNotifier, SharedTimeEntryEmailNotifier>();
         services.AddScoped<ISharedTimeEntryApprovalService, SharedTimeEntryApprovalService>();
         services.AddScoped<ITimeEntryTemplateService, TimeEntryTemplateService>();
         services.AddScoped<ISmartTimeParseService, SmartTimeParseService>();
@@ -94,10 +93,6 @@ public static class DependencyInjection
         services.AddScoped<IProjectService, ProjectService>();
         services.AddScoped<IProjectCostService, ProjectCostService>();
         services.AddScoped<IReportService, ReportService>();
-        services.AddScoped<IReportWriter, CsvReportWriter>();
-        services.AddScoped<IReportWriter, ExcelReportWriter>();
-        services.AddScoped<IReportWriter, PdfReportWriter>();
-        services.AddScoped<IReportExportService, ReportExportService>();
         services.AddScoped<IRateMultiplierSettingsService, RateMultiplierSettingsService>();
         services.AddScoped<IRateMultiplierConfigProvider, RateMultiplierConfigProvider>();
         services.AddScoped<IHolidayService, HolidayService>();

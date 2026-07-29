@@ -52,8 +52,8 @@ public class InvitationEndpointsTests : IClassFixture<ReeTrackWebApplicationFact
         Assert.Equal("Invited", body.Member.Status);
         Assert.Equal("Member", body.Member.Role);
         Assert.NotNull(body.Member.PendingInvitationId);
-        Assert.Equal("new.user@reetrack.test", _factory.EmailSender.LastToEmail);
-        Assert.Contains("token=", _factory.EmailSender.LastInviteUrl, StringComparison.Ordinal);
+        Assert.Equal("new.user@reetrack.test", _factory.TransactionalEmail.LastToEmail);
+        Assert.Contains("token=", _factory.TransactionalEmail.LastInviteUrl, StringComparison.Ordinal);
 
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -115,7 +115,7 @@ public class InvitationEndpointsTests : IClassFixture<ReeTrackWebApplicationFact
         });
         createResponse.EnsureSuccessStatusCode();
 
-        var inviteUrl = _factory.EmailSender.LastInviteUrl;
+        var inviteUrl = _factory.TransactionalEmail.LastInviteUrl;
         Assert.NotNull(inviteUrl);
         var rawToken = Uri.UnescapeDataString(inviteUrl.Split("token=", StringSplitOptions.None)[1]);
 
