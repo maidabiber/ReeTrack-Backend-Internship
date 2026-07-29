@@ -12,6 +12,10 @@ public sealed class SummaryReportResponse
     /// <summary>Earliest confirmed entry date; null when there is no time logged.</summary>
     public DateOnly? FirstEntryDate { get; init; }
 
+    /// <summary>Inclusive UTC date filters applied to this report.</summary>
+    public DateOnly? FilterFromDate { get; init; }
+    public DateOnly? FilterToDate { get; init; }
+
     /// <summary>Display name of the admin who ran the report; null when unresolvable.</summary>
     public string? GeneratedByName { get; init; }
 
@@ -90,4 +94,17 @@ public sealed class MemberHoursResponse
     public required Guid UserId { get; init; }
     public required string DisplayName { get; init; }
     public required long TotalSeconds { get; init; }
+}
+
+public sealed class ReportQueryRequest
+{
+    public Guid[]? UserIds { get; init; } = [];
+    public Guid[]? ProjectIds { get; init; } = [];
+    public Guid[]? ClientIds { get; init; } = [];
+    public Guid[]? TaskIds { get; init; } = [];
+    public Guid[]? TagIds { get; init; } = [];
+    public bool? Billable { get; init; }
+    public DateOnly? From { get; init; }
+    public DateOnly? To { get; init; }
+    public string?[]? GroupBy { get; init; } = [];
 }

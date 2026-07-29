@@ -27,6 +27,7 @@ public class ProjectsController : ControllerBase
     public async Task<ActionResult<PagedResult<ProjectResponse>>> List(
         [FromQuery] string? status,
         [FromQuery] Guid? clientId,
+        [FromQuery] Guid[]? clientIds,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 50,
         [FromQuery] string? q = null,
@@ -36,6 +37,7 @@ public class ProjectsController : ControllerBase
         {
             Status = status,
             ClientId = clientId,
+            ClientIds = clientIds,
             Page = page,
             PageSize = pageSize,
             Q = q

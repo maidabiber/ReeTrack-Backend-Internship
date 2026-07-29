@@ -17,12 +17,13 @@ public sealed class ReportExportService : IReportExportService
 
     public async Task<ReportFile> ExportSummaryAsync(
         ReportExportFormat format,
+        ReportQuery query,
         CancellationToken cancellationToken = default)
     {
         if (!_writers.TryGetValue(format, out var writer))
             throw new AppException($"Unsupported export format '{format}'.", 400);
 
-        var summary = await _reports.GetSummaryAsync(cancellationToken);
+        var summary = await _reports.GetSummaryAsync(query, cancellationToken);
         return writer.Write(summary);
     }
 }

@@ -7,7 +7,7 @@ using ReeTrack.Application.Common.Models;
 namespace ReeTrack.Api.Controllers;
 
 /// <summary>
-/// Cross-project task listing for the timer project/task picker.
+/// Cross-project task listing for timer and report pickers.
 /// Nested create/update/delete remains under /api/projects/{projectId}/tasks.
 /// </summary>
 [ApiController]
@@ -23,14 +23,18 @@ public class TasksController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<ActionResult<PagedResult<TaskResponse>>> ListOpen(
+    public async Task<ActionResult<PagedResult<TaskResponse>>> List(
+        [FromQuery] string? status,
         [FromQuery] string? q,
+        [FromQuery] Guid[]? projectIds,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 50,
         CancellationToken cancellationToken = default)
     {
-        var result = await _taskService.ListOpenAsync(new TaskListQuery
+        var result = await _taskService.ListAcrossProjectsAsync(new TaskListQuery
         {
+            Status = status,
+            ProjectIds = projectIds,
             Page = page,
             PageSize = pageSize,
             Q = q

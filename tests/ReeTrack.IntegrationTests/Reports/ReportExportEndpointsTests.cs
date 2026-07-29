@@ -1,4 +1,5 @@
 using System.Net;
+using System.Text;
 using Microsoft.Extensions.DependencyInjection;
 using ReeTrack.Domain.Entities;
 using ReeTrack.Domain.Enums;
@@ -66,6 +67,28 @@ public class ReportExportEndpointsTests
         var response = await client.GetAsync("/api/reports/summary/export?format=docx");
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Export_WithProjectFilter_ExportsOnlySelectedProject()
+    {
+        using var factory = new ReeTrackWebApplicationFactory();
+        var (admin, token) = await factory.SeedAdminAsync();
+        var client = factory.CreateAuthenticatedClient(token);
+        var clientId = await SeedClientAsync(factory, "Acme");
+        var alphaId = await SeedProjectAsync(factory, clientId, "Alpha", hourlyRate: 50m);
+        var betaId = await SeedProjectAsync(factory, clientId, "Beta", hourlyRate: 50m);
+        var monday = CurrentWeek.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+        await SeedEntryAsync(factory, admin.Id, alphaId, monday.AddHours(9), 3600, true);
+        await SeedEntryAsync(factory, admin.Id, betaId, monday.AddHours(11), 3600, true);
+
+        var response = await client.GetAsync(
+            $"/api/reports/summary/export?format=csv&projectIds={alphaId}");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var csv = Encoding.UTF8.GetString(await response.Content.ReadAsByteArrayAsync());
+        Assert.Contains("Alpha", csv);
+        Assert.DoesNotContain("Beta", csv);
     }
 
     private static async Task<Guid> SeedClientAsync(ReeTrackWebApplicationFactory factory, string name)

@@ -142,7 +142,7 @@ public class SmartTimeParseController : ControllerBase
 
         while (true)
         {
-            var result = await projectTaskService.ListOpenAsync(new TaskListQuery
+        var result = await projectTaskService.ListAcrossProjectsAsync(new TaskListQuery
             {
                 Status = "open",
                 Page = page,

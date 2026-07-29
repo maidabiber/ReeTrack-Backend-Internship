@@ -13,5 +13,6 @@ public interface IReportExportService
 {
     Task<ReportFile> ExportSummaryAsync(
         ReportExportFormat format,
+        ReportQuery query,
         CancellationToken cancellationToken = default);
 }

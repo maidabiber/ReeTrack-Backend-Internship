@@ -32,8 +32,8 @@ public class MemberService : IMemberService
         if (!string.IsNullOrEmpty(q))
         {
             filtered = filtered.Where(u =>
-                u.Email.ToLower().Contains(q) ||
-                (u.DisplayName != null && u.DisplayName.ToLower().Contains(q)));
+                (u.DisplayName != null && u.DisplayName.ToLower().Contains(q)) ||
+                u.Email.ToLower().Contains(q));
         }
 
         var totalCount = await filtered.CountAsync(cancellationToken);

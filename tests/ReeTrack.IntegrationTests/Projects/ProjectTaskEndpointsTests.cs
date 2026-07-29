@@ -250,6 +250,69 @@ public class ProjectTaskEndpointsTests
         Assert.Equal("Task 2", Assert.Single(filtered.Items).Name);
     }
 
+    [Fact]
+    public async Task ListAcrossProjects_StatusFilter_IncludesCompletedTasksForReports()
+    {
+        using var factory = new ReeTrackWebApplicationFactory();
+        var (_, token) = await factory.SeedAdminAsync();
+        var client = factory.CreateAuthenticatedClient(token);
+        var projectId = await SeedProjectAsync(factory, "Redesign");
+        var open = await (await client.PostAsJsonAsync(
+            $"/api/projects/{projectId}/tasks",
+            new { name = "Open task" })).Content.ReadFromJsonAsync<TaskResponse>();
+        var done = await (await client.PostAsJsonAsync(
+            $"/api/projects/{projectId}/tasks",
+            new { name = "Done task" })).Content.ReadFromJsonAsync<TaskResponse>();
+        await client.PatchAsJsonAsync(
+            $"/api/projects/{projectId}/tasks/{done!.Id}",
+            new { status = "done" });
+
+        var defaultOpen = await client.GetFromJsonAsync<PagedResult<TaskResponse>>("/api/tasks");
+        var all = await client.GetFromJsonAsync<PagedResult<TaskResponse>>("/api/tasks?status=all");
+        var completed = await client.GetFromJsonAsync<PagedResult<TaskResponse>>("/api/tasks?status=done");
+
+        Assert.Equal(open!.Id, Assert.Single(defaultOpen!.Items).Id);
+        Assert.Equal(2, all!.TotalCount);
+        Assert.Equal(done.Id, Assert.Single(completed!.Items).Id);
+    }
+
+    [Fact]
+    public async Task ListAcrossProjects_InvalidStatus_Returns400()
+    {
+        using var factory = new ReeTrackWebApplicationFactory();
+        var (_, token) = await factory.SeedAdminAsync();
+        var client = factory.CreateAuthenticatedClient(token);
+
+        var response = await client.GetAsync("/api/tasks?status=unknown");
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task ListAcrossProjects_ProjectIds_FiltersAndReturnsClientId()
+    {
+        using var factory = new ReeTrackWebApplicationFactory();
+        var (_, token) = await factory.SeedAdminAsync();
+        var client = factory.CreateAuthenticatedClient(token);
+        var projectA = await SeedProjectAsync(factory, "Project A");
+        var projectB = await SeedProjectAsync(factory, "Project B");
+
+        var taskA = await (await client.PostAsJsonAsync(
+            $"/api/projects/{projectA}/tasks",
+            new { name = "Task A" })).Content.ReadFromJsonAsync<TaskResponse>();
+        await client.PostAsJsonAsync($"/api/projects/{projectB}/tasks", new { name = "Task B" });
+
+        var result = await client.GetFromJsonAsync<PagedResult<TaskResponse>>(
+            $"/api/tasks?status=all&projectIds={projectA}");
+
+        var listed = Assert.Single(result!.Items);
+        Assert.Equal(taskA!.Id, listed.Id);
+        Assert.Equal(projectA, listed.ProjectId);
+        Assert.True(listed.ClientId != Guid.Empty);
+        Assert.Equal("Project A", listed.ProjectName);
+        Assert.Equal("#4366E2", listed.ProjectColor);
+    }
+
     private static async Task<Guid> SeedProjectAsync(ReeTrackWebApplicationFactory factory, string name)
     {
         using var scope = factory.Services.CreateScope();
@@ -260,6 +323,7 @@ public class ProjectTaskEndpointsTests
         {
             Client = client,
             Name = name,
+            Color = "#4366E2",
             Status = ProjectStatus.Active
         };
         db.Projects.Add(project);
@@ -314,8 +378,12 @@ public class ProjectTaskEndpointsTests
     {
         public Guid Id { get; init; }
         public Guid ProjectId { get; init; }
+        public Guid ClientId { get; init; }
         public string Name { get; init; } = string.Empty;
         public string Status { get; init; } = string.Empty;
+        public string? ProjectName { get; init; }
+        public string? ProjectColor { get; init; }
+        public string? ClientName { get; init; }
         public Guid? AssignedToUserId { get; init; }
         public string? AssignedToName { get; init; }
         public decimal? TimeEstimateHours { get; init; }

@@ -33,6 +33,7 @@ public class AppDbContext : DbContext, IApplicationDbContext
     public DbSet<HolidayCalendarSettings> HolidayCalendarSettings => Set<HolidayCalendarSettings>();
     public DbSet<RateMultiplierSettings> RateMultiplierSettings => Set<RateMultiplierSettings>();
     public DbSet<NotificationPreference> NotificationPreferences => Set<NotificationPreference>();
+    public DbSet<ReportFilterSet> ReportFilterSets => Set<ReportFilterSet>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

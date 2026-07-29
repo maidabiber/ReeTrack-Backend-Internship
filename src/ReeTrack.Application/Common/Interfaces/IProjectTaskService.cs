@@ -7,9 +7,11 @@ public interface IProjectTaskService
     Task<PagedResult<ProjectTaskDto>> ListAsync(TaskListQuery query, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Lists open tasks across all projects, optionally filtered by name (or project name).
+    /// Lists tasks across all projects, optionally filtered by status and name (or project name).
     /// </summary>
-    Task<PagedResult<ProjectTaskDto>> ListOpenAsync(TaskListQuery query, CancellationToken cancellationToken = default);
+    Task<PagedResult<ProjectTaskDto>> ListAcrossProjectsAsync(
+        TaskListQuery query,
+        CancellationToken cancellationToken = default);
 
     Task<ProjectTaskDto> CreateAsync(Guid projectId, CreateTaskInput input, CancellationToken cancellationToken = default);
 

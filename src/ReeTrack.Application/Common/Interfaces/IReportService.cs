@@ -4,5 +4,7 @@ namespace ReeTrack.Application.Common.Interfaces;
 
 public interface IReportService
 {
-    Task<SummaryReportDto> GetSummaryAsync(CancellationToken cancellationToken = default);
+    Task<SummaryReportDto> GetSummaryAsync(
+        ReportQuery query,
+        CancellationToken cancellationToken = default);
 }

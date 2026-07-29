@@ -142,7 +142,7 @@ public class ClientEndpointsTests
     }
 
     [Fact]
-    public async Task List_PaginationAndSearch_Work()
+    public async Task List_PagesAndFiltersByName()
     {
         using var factory = new ReeTrackWebApplicationFactory();
         var (_, token) = await factory.SeedAdminAsync();
@@ -163,6 +163,17 @@ public class ClientEndpointsTests
         var filtered = await client.GetFromJsonAsync<PagedResult<ClientResponse>>("/api/clients?q=beta");
         Assert.Equal(1, filtered!.TotalCount);
         Assert.Equal("Beta Co", Assert.Single(filtered.Items).Name);
+    }
+
+    [Fact]
+    public async Task List_Unauthenticated_Returns401()
+    {
+        using var factory = new ReeTrackWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        var response = await client.GetAsync("/api/clients");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
     [Fact]

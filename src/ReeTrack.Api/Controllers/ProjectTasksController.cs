@@ -96,8 +96,12 @@ public class ProjectTasksController : ControllerBase
         {
             Id = task.Id,
             ProjectId = task.ProjectId,
+            ClientId = task.ClientId,
             Name = task.Name,
             Status = task.Status,
+            ProjectName = task.ProjectName,
+            ProjectColor = task.ProjectColor,
+            ClientName = task.ClientName,
             AssignedToUserId = task.AssignedToUserId,
             AssignedToName = task.AssignedToName,
             TimeEstimateHours = task.TimeEstimateHours,

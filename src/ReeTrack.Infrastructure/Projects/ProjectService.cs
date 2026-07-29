@@ -53,8 +53,13 @@ public class ProjectService : IProjectService
                 throw new AppException("Status must be one of: active, archived, all.");
         }
 
+        var clientFilterIds = new List<Guid>();
         if (query.ClientId.HasValue)
-            filtered = filtered.Where(p => p.ClientId == query.ClientId.Value);
+            clientFilterIds.Add(query.ClientId.Value);
+        if (query.ClientIds is { Count: > 0 })
+            clientFilterIds.AddRange(query.ClientIds);
+        if (clientFilterIds.Count > 0)
+            filtered = filtered.Where(p => clientFilterIds.Contains(p.ClientId));
 
         var q = query.Q?.Trim().ToLowerInvariant();
         if (!string.IsNullOrEmpty(q))

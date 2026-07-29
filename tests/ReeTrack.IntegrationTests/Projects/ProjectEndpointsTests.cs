@@ -227,6 +227,29 @@ public class ProjectEndpointsTests
     }
 
     [Fact]
+    public async Task List_ClientIds_FiltersToThoseClients()
+    {
+        using var factory = new ReeTrackWebApplicationFactory();
+        var (_, token) = await factory.SeedAdminAsync();
+        var client = factory.CreateAuthenticatedClient(token);
+        var acme = await SeedClientAsync(factory, "Acme Corp");
+        var globex = await SeedClientAsync(factory, "Globex");
+        var initech = await SeedClientAsync(factory, "Initech");
+
+        await SeedProjectAsync(factory, acme, "Acme One");
+        await SeedProjectAsync(factory, globex, "Globex One");
+        await SeedProjectAsync(factory, initech, "Initech One");
+
+        var result = await client.GetFromJsonAsync<PagedResult<ProjectResponse>>(
+            $"/api/projects?status=all&clientIds={acme}&clientIds={globex}");
+
+        Assert.Equal(2, result!.TotalCount);
+        Assert.Contains(result.Items, p => p.Name == "Acme One");
+        Assert.Contains(result.Items, p => p.Name == "Globex One");
+        Assert.DoesNotContain(result.Items, p => p.Name == "Initech One");
+    }
+
+    [Fact]
     public async Task Get_ReturnsProject_AndUnknownId_Returns404()
     {
         using var factory = new ReeTrackWebApplicationFactory();

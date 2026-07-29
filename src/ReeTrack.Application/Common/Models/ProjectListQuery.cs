@@ -4,6 +4,8 @@ public sealed class ProjectListQuery
 {
     public string? Status { get; init; }
     public Guid? ClientId { get; init; }
+    /// <summary>When set, projects whose client is in this set. Combined with ClientId via union of ids.</summary>
+    public IReadOnlyList<Guid>? ClientIds { get; init; }
     public int Page { get; init; } = 1;
     public int PageSize { get; init; } = 50;
 

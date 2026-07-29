@@ -2,7 +2,6 @@ using Microsoft.EntityFrameworkCore;
 using ReeTrack.Application.Common.Interfaces;
 using ReeTrack.Application.Common.Models;
 using ReeTrack.Domain.Entities;
-using ReeTrack.Domain.Enums;
 using ReeTrack.Domain.Services;
 using ReeTrack.Infrastructure.Timesheets;
 
@@ -13,49 +12,27 @@ public sealed class ReportService : IReportService
     private readonly IApplicationDbContext _db;
     private readonly IProjectCostCalculator _calculator;
     private readonly ICurrentUserService _currentUser;
-    private readonly IRateMultiplierConfigProvider _multipliers;
+    private readonly ReportEntryPipeline _pipeline;
 
     public ReportService(
         IApplicationDbContext db,
         IProjectCostCalculator calculator,
         ICurrentUserService currentUser,
-        IRateMultiplierConfigProvider multipliers)
+        ReportEntryPipeline pipeline)
     {
         _db = db;
         _calculator = calculator;
         _currentUser = currentUser;
-        _multipliers = multipliers;
+        _pipeline = pipeline;
     }
 
-    public async Task<SummaryReportDto> GetSummaryAsync(CancellationToken cancellationToken = default)
+    public async Task<SummaryReportDto> GetSummaryAsync(
+        ReportQuery query,
+        CancellationToken cancellationToken = default)
     {
-        // IgnoreQueryFilters so soft-deleted projects still resolve on Include;
-        // live confirmed entries on a deleted project must appear in the breakdown.
-        var entries = await _db.TimeEntries
-            .IgnoreQueryFilters()
-            .AsNoTracking()
-            .Where(e => e.Status == TimeEntryStatus.Confirmed && e.DeletedAtUtc == null)
-            .Include(e => e.User)
-            .Include(e => e.Project)
-                .ThenInclude(p => p!.Client)
-            .ToListAsync(cancellationToken);
-
-        var userIds = entries.Select(e => e.UserId).Distinct().ToList();
-        var userRates = userIds.Count == 0
-            ? new List<UserHourlyRate>()
-            : await _db.UserHourlyRates
-                .AsNoTracking()
-                .Where(r => userIds.Contains(r.UserId))
-                .ToListAsync(cancellationToken);
-        var ratesByUser = userRates.ToLookup(r => r.UserId);
-
-        var holidays = (await _db.Holidays
-                .AsNoTracking()
-                .Select(h => h.Date)
-                .ToListAsync(cancellationToken))
-            .ToHashSet();
-
-        var multiplierConfig = await _multipliers.GetAsync(cancellationToken);
+        var data = await _pipeline.LoadAsync(query, cancellationToken);
+        var entries = data.Entries;
+        var ratesByUser = data.UserRates.ToLookup(rate => rate.UserId);
 
         var totalSeconds = entries.Sum(e => (long)e.DurationSeconds);
         var billableSeconds = entries.Where(e => e.IsBillable).Sum(e => (long)e.DurationSeconds);
@@ -69,11 +46,13 @@ public sealed class ReportService : IReportService
         var activity = ReportAggregations.BuildActivity(
             entries.Select(e => (ResolveEntryDate(e).DayOfWeek, (long)e.DurationSeconds)));
 
-        var currentWeek = TimesheetWeek.ToWeekStart(DateTime.UtcNow);
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var trendEndDate = data.Query.To is { } to && to < today ? to : today;
+        var trendEndWeek = TimesheetWeek.ToWeekStart(trendEndDate);
         // Same StartedAtUtc ?? CreatedAtUtc rule as activity / cost calculator.
         var weeklyTrend = ReportAggregations.BuildWeeklyTrend(
             entries.Select(e => (ResolveEntryInstant(e), (long)e.DurationSeconds)),
-            currentWeek);
+            trendEndWeek);
 
         var members = entries
             .GroupBy(e => e.UserId)
@@ -93,7 +72,12 @@ public sealed class ReportService : IReportService
             .ThenBy(m => m.DisplayName, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
-        var projects = BuildProjectSummaries(entries, ratesByUser, holidays, multiplierConfig);
+        var projects = BuildProjectSummaries(
+            entries,
+            data.OvertimeContext,
+            ratesByUser,
+            data.Holidays,
+            data.MultiplierConfig);
 
         return new SummaryReportDto
         {
@@ -119,24 +103,27 @@ public sealed class ReportService : IReportService
             FirstEntryDate = entries.Count == 0
                 ? null
                 : entries.Min(ResolveEntryDate),
+            FilterFromDate = data.Query.From,
+            FilterToDate = data.Query.To,
             GeneratedByName = await ResolveGeneratedByAsync(cancellationToken),
             Basis = new ReportBasisDto
             {
-                WeekendPremium = multiplierConfig.WeekendPremium,
-                HolidayPremium = multiplierConfig.HolidayPremium,
-                OvertimePremium = multiplierConfig.OvertimePremium,
-                WeeklyOvertimeThresholdHours = multiplierConfig.WeeklyOvertimeThresholdHours
+                WeekendPremium = data.MultiplierConfig.WeekendPremium,
+                HolidayPremium = data.MultiplierConfig.HolidayPremium,
+                OvertimePremium = data.MultiplierConfig.OvertimePremium,
+                WeeklyOvertimeThresholdHours = data.MultiplierConfig.WeeklyOvertimeThresholdHours
             }
         };
     }
 
     private IReadOnlyList<ProjectSummaryDto> BuildProjectSummaries(
-        IReadOnlyList<TimeEntry> allEntries,
+        IReadOnlyList<TimeEntry> selectedEntries,
+        IReadOnlyList<TimeEntry> overtimeContext,
         ILookup<Guid, UserHourlyRate> ratesByUser,
         IReadOnlySet<DateOnly> holidays,
         RateMultiplierConfig multiplierConfig)
     {
-        var projectGroups = allEntries
+        var projectGroups = selectedEntries
             .Where(e => e.ProjectId is not null && e.Project is not null)
             .GroupBy(e => e.ProjectId!.Value)
             .ToList();
@@ -144,7 +131,7 @@ public sealed class ReportService : IReportService
         // Index once instead of rescanning the whole portfolio per project: the window
         // slice below was O(projects × entries) and allocated a fresh list each pass.
         // Order is irrelevant — ProjectCostCalculator sorts by instant itself.
-        var entriesByUser = allEntries
+        var entriesByUser = overtimeContext
             .GroupBy(e => e.UserId)
             .ToDictionary(g => g.Key, g => g.ToList());
 

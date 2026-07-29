@@ -67,13 +67,23 @@ public static class ReportFormat
     public const string UnassignedLabel = "Unassigned";
 
     /// <summary>
-    /// The window the report covers. Date filtering isn't built yet, so this is always
-    /// all-time — stated explicitly so lifetime totals don't read as a recent figure.
+    /// The inclusive UTC date window the report covers.
     /// </summary>
-    public static string PeriodLabel(SummaryReportDto model) =>
-        model.FirstEntryDate is { } first
+    public static string PeriodLabel(SummaryReportDto model)
+    {
+        if (model.FilterFromDate is { } from && model.FilterToDate is { } to)
+            return $"{FriendlyDate(from)} – {FriendlyDate(to)}";
+
+        if (model.FilterFromDate is { } fromOnly)
+            return $"Since {FriendlyDate(fromOnly)}";
+
+        if (model.FilterToDate is { } toOnly)
+            return $"Through {FriendlyDate(toOnly)}";
+
+        return model.FirstEntryDate is { } first
             ? $"All time · {FriendlyDate(first)} – {FriendlyDate(DateOnly.FromDateTime(model.GeneratedAtUtc))}"
             : "All time";
+    }
 
     /// <summary>
     /// The rules behind the figures, one statement per line. Every export carries these:

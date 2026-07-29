@@ -59,10 +59,12 @@ public class CsvReportWriterTests
     public void Write_EmitsMoneyAsRawDecimalsWithASeparateCurrencyColumn()
     {
         var text = Encoding.UTF8.GetString(new CsvReportWriter().Write(SampleSummary("Alpha")).Bytes);
+        var dataRows = text[text.IndexOf("Name,Client,Status,CurrencyCode", StringComparison.Ordinal)..];
 
         // Cost is a number a spreadsheet can sum, not the "100.00 EUR" label the PDF shows.
-        Assert.Contains("Alpha,,,EUR,2h,2,100,,,None,,,100,,100,0,0,0,0,0,0", text);
-        Assert.DoesNotContain("100.00 EUR", text);
+        // The Highlights cell above is prose and does carry formatted money.
+        Assert.Contains("Alpha,,,EUR,2h,2,100,,,None,,,100,,100,0,0,0,0,0,0", dataRows);
+        Assert.DoesNotContain("100.00 EUR", dataRows);
     }
 
     [Fact]

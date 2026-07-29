@@ -162,7 +162,9 @@ public class UserHourlyRateEndpointsTests
             rateId = initial.Id;
         }
 
-        var midFrom = new DateOnly(initialFrom.Year, initialFrom.Month, 1).AddMonths(1);
+        // Use offsets from the seeded ValidFrom so this stays valid regardless of
+        // calendar day (month-boundary math can make correctedTo < correctedFrom).
+        var midFrom = initialFrom.AddDays(20);
         var create = await client.PostAsJsonAsync($"/api/members/{member.Id}/hourly-rates", new
         {
             hourlyRate = 20m,

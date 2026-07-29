@@ -23,6 +23,10 @@ public sealed class SummaryReportDto
     /// </summary>
     public DateOnly? FirstEntryDate { get; init; }
 
+    /// <summary>Inclusive UTC date filters applied to this report.</summary>
+    public DateOnly? FilterFromDate { get; init; }
+    public DateOnly? FilterToDate { get; init; }
+
     /// <summary>Display name of the admin who ran the report; null when unresolvable.</summary>
     public string? GeneratedByName { get; init; }
 

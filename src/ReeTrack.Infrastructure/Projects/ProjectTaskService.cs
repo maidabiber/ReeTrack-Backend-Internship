@@ -65,8 +65,12 @@ public class ProjectTaskService : IProjectTaskService
             .Select(t => new TaskRow(
                 t.Id,
                 t.ProjectId,
+                t.Project.ClientId,
                 t.Name,
                 t.Status,
+                t.Project.Name,
+                t.Project.Color,
+                t.Project.Client.Name,
                 t.AssignedToUserId,
                 t.AssignedToUser != null ? (t.AssignedToUser.DisplayName ?? t.AssignedToUser.Email) : null,
                 t.TimeEstimateHours,
@@ -82,7 +86,7 @@ public class ProjectTaskService : IProjectTaskService
         };
     }
 
-    public async Task<PagedResult<ProjectTaskDto>> ListOpenAsync(
+    public async Task<PagedResult<ProjectTaskDto>> ListAcrossProjectsAsync(
         TaskListQuery query,
         CancellationToken cancellationToken = default)
     {
@@ -91,9 +95,27 @@ public class ProjectTaskService : IProjectTaskService
 
         var q = query.Q?.Trim().ToLowerInvariant();
 
-        var filtered = _db.ProjectTasks
-            .AsNoTracking()
-            .Where(t => t.Status == ProjectTaskStatus.Open);
+        var filtered = _db.ProjectTasks.AsNoTracking();
+
+        switch (query.Status?.Trim().ToLowerInvariant())
+        {
+            case null or "" or "open":
+                filtered = filtered.Where(t => t.Status == ProjectTaskStatus.Open);
+                break;
+            case "done":
+                filtered = filtered.Where(t => t.Status == ProjectTaskStatus.Done);
+                break;
+            case "all":
+                break;
+            default:
+                throw new AppException("Status must be one of: open, done, all.");
+        }
+
+        if (query.ProjectIds is { Count: > 0 })
+        {
+            var projectIds = query.ProjectIds;
+            filtered = filtered.Where(t => projectIds.Contains(t.ProjectId));
+        }
 
         if (!string.IsNullOrEmpty(q))
         {
@@ -112,8 +134,12 @@ public class ProjectTaskService : IProjectTaskService
             .Select(t => new TaskRow(
                 t.Id,
                 t.ProjectId,
+                t.Project.ClientId,
                 t.Name,
                 t.Status,
+                t.Project.Name,
+                t.Project.Color,
+                t.Project.Client.Name,
                 t.AssignedToUserId,
                 t.AssignedToUser != null ? (t.AssignedToUser.DisplayName ?? t.AssignedToUser.Email) : null,
                 t.TimeEstimateHours,
@@ -153,7 +179,8 @@ public class ProjectTaskService : IProjectTaskService
         _db.ProjectTasks.Add(task);
         await SaveGuardingNameConflictAsync(cancellationToken);
 
-        return MapEntity(task, assignedToName);
+        var projectInfo = await GetProjectInfoAsync(projectId, cancellationToken);
+        return MapEntity(task, assignedToName, projectInfo);
     }
 
     public async Task<ProjectTaskDto> UpdateAsync(
@@ -189,7 +216,8 @@ public class ProjectTaskService : IProjectTaskService
 
         await SaveGuardingNameConflictAsync(cancellationToken);
 
-        return MapEntity(task, assignedToName);
+        var projectInfo = await GetProjectInfoAsync(projectId, cancellationToken);
+        return MapEntity(task, assignedToName, projectInfo);
     }
 
     public async Task DeleteAsync(Guid projectId, Guid taskId, CancellationToken cancellationToken = default)
@@ -299,13 +327,40 @@ public class ProjectTaskService : IProjectTaskService
     private static bool IsUniqueViolation(DbUpdateException ex) =>
         ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation };
 
-    private static ProjectTaskDto MapEntity(ProjectTask task, string? assignedToName) =>
+    private async Task<(Guid ClientId, string ProjectName, string? ProjectColor, string ClientName)> GetProjectInfoAsync(
+        Guid projectId,
+        CancellationToken cancellationToken)
+    {
+        var info = await _db.Projects
+            .AsNoTracking()
+            .Where(p => p.Id == projectId)
+            .Select(p => new
+            {
+                p.ClientId,
+                ProjectName = p.Name,
+                ProjectColor = p.Color,
+                ClientName = p.Client.Name
+            })
+            .FirstOrDefaultAsync(cancellationToken)
+            ?? throw new AppException("Project was not found.", 404);
+
+        return (info.ClientId, info.ProjectName, info.ProjectColor, info.ClientName);
+    }
+
+    private static ProjectTaskDto MapEntity(
+        ProjectTask task,
+        string? assignedToName,
+        (Guid ClientId, string ProjectName, string? ProjectColor, string ClientName) project) =>
         new()
         {
             Id = task.Id,
             ProjectId = task.ProjectId,
+            ClientId = project.ClientId,
             Name = task.Name,
             Status = FormatStatus(task.Status),
+            ProjectName = project.ProjectName,
+            ProjectColor = project.ProjectColor,
+            ClientName = project.ClientName,
             AssignedToUserId = task.AssignedToUserId,
             AssignedToName = assignedToName,
             TimeEstimateHours = task.TimeEstimateHours,
@@ -317,8 +372,12 @@ public class ProjectTaskService : IProjectTaskService
         {
             Id = row.Id,
             ProjectId = row.ProjectId,
+            ClientId = row.ClientId,
             Name = row.Name,
             Status = FormatStatus(row.Status),
+            ProjectName = row.ProjectName,
+            ProjectColor = row.ProjectColor,
+            ClientName = row.ClientName,
             AssignedToUserId = row.AssignedToUserId,
             AssignedToName = row.AssignedToName,
             TimeEstimateHours = row.TimeEstimateHours,
@@ -328,8 +387,12 @@ public class ProjectTaskService : IProjectTaskService
     private sealed record TaskRow(
         Guid Id,
         Guid ProjectId,
+        Guid ClientId,
         string Name,
         ProjectTaskStatus Status,
+        string ProjectName,
+        string? ProjectColor,
+        string ClientName,
         Guid? AssignedToUserId,
         string? AssignedToName,
         decimal? TimeEstimateHours,
