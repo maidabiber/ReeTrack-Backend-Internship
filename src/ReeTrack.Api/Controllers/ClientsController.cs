@@ -22,12 +22,28 @@ public class ClientsController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<ActionResult<IReadOnlyList<ClientResponse>>> List(
+    public async Task<ActionResult<PagedResult<ClientResponse>>> List(
         [FromQuery] string? status,
-        CancellationToken cancellationToken)
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 50,
+        [FromQuery] string? q = null,
+        CancellationToken cancellationToken = default)
     {
-        var clients = await _clientService.ListAsync(status, cancellationToken);
-        return Ok(clients.Select(MapClient).ToList());
+        var result = await _clientService.ListAsync(new ClientListQuery
+        {
+            Status = status,
+            Page = page,
+            PageSize = pageSize,
+            Q = q
+        }, cancellationToken);
+
+        return Ok(new PagedResult<ClientResponse>
+        {
+            Items = result.Items.Select(MapClient).ToList(),
+            TotalCount = result.TotalCount,
+            Page = result.Page,
+            PageSize = result.PageSize
+        });
     }
 
     [HttpPost]

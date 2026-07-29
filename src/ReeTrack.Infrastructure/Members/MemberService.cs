@@ -19,24 +19,47 @@ public class MemberService : IMemberService
         _currentUser = currentUser;
     }
 
-    public async Task<IReadOnlyList<MemberDto>> ListAsync(CancellationToken cancellationToken = default)
+    public async Task<PagedResult<MemberDto>> ListAsync(
+        MemberListQuery query,
+        CancellationToken cancellationToken = default)
     {
-        var users = await _db.Users
-            .AsNoTracking()
+        var page = Math.Max(1, query.Page);
+        var pageSize = Math.Clamp(query.PageSize, 1, 200);
+
+        var filtered = _db.Users.AsNoTracking();
+
+        var q = query.Q?.Trim().ToLowerInvariant();
+        if (!string.IsNullOrEmpty(q))
+        {
+            filtered = filtered.Where(u =>
+                u.Email.ToLower().Contains(q) ||
+                (u.DisplayName != null && u.DisplayName.ToLower().Contains(q)));
+        }
+
+        var totalCount = await filtered.CountAsync(cancellationToken);
+
+        var users = await filtered
             .Include(u => u.UserRoles)
             .ThenInclude(ur => ur.Role)
             .OrderBy(u => u.DisplayName)
             .ThenBy(u => u.Email)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
             .ToListAsync(cancellationToken);
 
+        var emails = users.Select(u => u.Email).ToList();
         var pendingInvitations = await _db.Invitations
             .AsNoTracking()
-            .Where(i => i.Status == InvitationStatus.Pending)
+            .Where(i => i.Status == InvitationStatus.Pending && emails.Contains(i.Email))
             .ToDictionaryAsync(i => i.Email, i => i.Id, StringComparer.OrdinalIgnoreCase, cancellationToken);
 
-        return users
-            .Select(user => MapMember(user, pendingInvitations))
-            .ToList();
+        return new PagedResult<MemberDto>
+        {
+            Items = users.Select(user => MapMember(user, pendingInvitations)).ToList(),
+            TotalCount = totalCount,
+            Page = page,
+            PageSize = pageSize
+        };
     }
 
     public async Task<MemberDto> UpdateAsync(

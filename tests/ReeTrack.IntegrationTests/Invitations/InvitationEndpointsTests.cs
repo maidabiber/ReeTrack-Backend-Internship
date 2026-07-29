@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using ReeTrack.Application.Common.Models;
 using ReeTrack.Domain.Enums;
 using ReeTrack.Infrastructure.Persistence;
 using ReeTrack.IntegrationTests.Support;
@@ -146,11 +147,12 @@ public class InvitationEndpointsTests : IClassFixture<ReeTrackWebApplicationFact
         var response = await client.GetAsync("/api/members");
         response.EnsureSuccessStatusCode();
 
-        var members = await response.Content.ReadFromJsonAsync<List<MemberResponse>>();
-        Assert.NotNull(members);
-        Assert.Equal(2, members.Count);
-        Assert.Contains(members, member => member.Id == admin.Id && member.Status == "Active");
-        Assert.Contains(members, member => member.Email == "listed.user@reetrack.test" && member.Status == "Invited");
+        var page = await response.Content.ReadFromJsonAsync<PagedResult<MemberResponse>>();
+        Assert.NotNull(page);
+        Assert.Equal(2, page.TotalCount);
+        Assert.Equal(2, page.Items.Count);
+        Assert.Contains(page.Items, member => member.Id == admin.Id && member.Status == "Active");
+        Assert.Contains(page.Items, member => member.Email == "listed.user@reetrack.test" && member.Status == "Invited");
     }
 
     private sealed class CreateInvitationResponse

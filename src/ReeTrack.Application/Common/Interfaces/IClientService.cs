@@ -4,7 +4,7 @@ namespace ReeTrack.Application.Common.Interfaces;
 
 public interface IClientService
 {
-    Task<IReadOnlyList<ClientDto>> ListAsync(string? status, CancellationToken cancellationToken = default);
+    Task<PagedResult<ClientDto>> ListAsync(ClientListQuery query, CancellationToken cancellationToken = default);
 
     Task<ClientDto> CreateAsync(string? name, CancellationToken cancellationToken = default);
 

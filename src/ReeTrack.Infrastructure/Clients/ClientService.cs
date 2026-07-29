@@ -19,19 +19,22 @@ public class ClientService : IClientService
         _currentUser = currentUser;
     }
 
-    public async Task<IReadOnlyList<ClientDto>> ListAsync(
-        string? status,
+    public async Task<PagedResult<ClientDto>> ListAsync(
+        ClientListQuery query,
         CancellationToken cancellationToken = default)
     {
-        var query = _db.Clients.AsNoTracking();
+        var page = Math.Max(1, query.Page);
+        var pageSize = Math.Clamp(query.PageSize, 1, 200);
 
-        switch (status?.Trim().ToLowerInvariant())
+        var filtered = _db.Clients.AsNoTracking();
+
+        switch (query.Status?.Trim().ToLowerInvariant())
         {
             case null or "" or "active":
-                query = query.Where(c => c.IsActive);
+                filtered = filtered.Where(c => c.IsActive);
                 break;
             case "archived":
-                query = query.Where(c => !c.IsActive);
+                filtered = filtered.Where(c => !c.IsActive);
                 break;
             case "all":
                 break;
@@ -39,8 +42,16 @@ public class ClientService : IClientService
                 throw new AppException("Status must be one of: active, archived, all.");
         }
 
-        return await query
+        var q = query.Q?.Trim().ToLowerInvariant();
+        if (!string.IsNullOrEmpty(q))
+            filtered = filtered.Where(c => c.Name.ToLower().Contains(q));
+
+        var totalCount = await filtered.CountAsync(cancellationToken);
+
+        var items = await filtered
             .OrderBy(c => c.Name)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
             .Select(c => new ClientDto
             {
                 Id = c.Id,
@@ -50,6 +61,14 @@ public class ClientService : IClientService
                 CreatedAtUtc = c.CreatedAtUtc
             })
             .ToListAsync(cancellationToken);
+
+        return new PagedResult<ClientDto>
+        {
+            Items = items,
+            TotalCount = totalCount,
+            Page = page,
+            PageSize = pageSize
+        };
     }
 
     public async Task<ClientDto> CreateAsync(string? name, CancellationToken cancellationToken = default)

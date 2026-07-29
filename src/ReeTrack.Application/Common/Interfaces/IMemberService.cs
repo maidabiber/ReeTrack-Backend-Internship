@@ -5,7 +5,7 @@ namespace ReeTrack.Application.Common.Interfaces;
 
 public interface IMemberService
 {
-    Task<IReadOnlyList<MemberDto>> ListAsync(CancellationToken cancellationToken = default);
+    Task<PagedResult<MemberDto>> ListAsync(MemberListQuery query, CancellationToken cancellationToken = default);
 
     Task<MemberDto> UpdateAsync(
         Guid userId,

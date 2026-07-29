@@ -20,11 +20,26 @@ public class MembersController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<ActionResult<IReadOnlyList<MemberResponse>>> List(CancellationToken cancellationToken)
+    public async Task<ActionResult<PagedResult<MemberResponse>>> List(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 50,
+        [FromQuery] string? q = null,
+        CancellationToken cancellationToken = default)
     {
-        var members = await _memberService.ListAsync(cancellationToken);
+        var result = await _memberService.ListAsync(new MemberListQuery
+        {
+            Page = page,
+            PageSize = pageSize,
+            Q = q
+        }, cancellationToken);
 
-        return Ok(members.Select(MapMember).ToList());
+        return Ok(new PagedResult<MemberResponse>
+        {
+            Items = result.Items.Select(MapMember).ToList(),
+            TotalCount = result.TotalCount,
+            Page = result.Page,
+            PageSize = result.PageSize
+        });
     }
 
     [HttpPatch("{id:guid}")]
