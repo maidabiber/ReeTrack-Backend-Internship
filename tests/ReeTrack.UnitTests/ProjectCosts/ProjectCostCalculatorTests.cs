@@ -358,6 +358,35 @@ public class ProjectCostCalculatorTests
         Assert.Equal(2m, taskBCost.TotalHours);
     }
 
+    [Fact]
+    public void CalculateEntries_ReconcilesToProjectCalculate()
+    {
+        var project = CreateProject(hourlyRate: 100m);
+        var entries = new List<TimeEntry>
+        {
+            CreateEntry(UserId, 3600, new DateTime(2026, 1, 14, 9, 0, 0, DateTimeKind.Utc)),
+            CreateEntry(UserId, 7200, new DateTime(2026, 1, 15, 9, 0, 0, DateTimeKind.Utc)),
+            CreateEntry(UserId, 3600, new DateTime(2026, 1, 17, 9, 0, 0, DateTimeKind.Utc)) // Saturday
+        };
+        foreach (var entry in entries)
+            entry.Project = project;
+
+        var calc = CreateCalculator();
+        var config = RateMultiplierConfig.Defaults;
+        var holidays = new HashSet<DateOnly>();
+
+        var projectResult = calc.Calculate(project, entries, entries, [], holidays, config);
+        var lines = calc.CalculateEntries(entries, entries, [], holidays, config);
+
+        Assert.Equal(3, lines.Count);
+        Assert.Equal(projectResult.CalculatedCost, lines.Sum(line => line.CalculatedCost));
+        Assert.Equal(projectResult.NormalCost, lines.Sum(line => line.NormalCost));
+        Assert.Equal(projectResult.WeekendCost, lines.Sum(line => line.WeekendCost));
+        Assert.Equal(projectResult.HolidayCost, lines.Sum(line => line.HolidayCost));
+        Assert.Equal(projectResult.OvertimeCost, lines.Sum(line => line.OvertimeCost));
+        Assert.True(Assert.Single(lines, line => line.IsWeekend).WeekendCost > 0);
+    }
+
     private static ProjectCostCalculator CreateCalculator() =>
         new([
             new BaseRateMultiplier(),

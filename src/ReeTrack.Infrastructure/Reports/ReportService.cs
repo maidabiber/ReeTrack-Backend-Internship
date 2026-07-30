@@ -116,6 +116,148 @@ public sealed class ReportService : IReportService
         };
     }
 
+    public async Task<DetailedReportDto> GetDetailedAsync(
+        ReportQuery query,
+        int page = 1,
+        int pageSize = 50,
+        CancellationToken cancellationToken = default)
+    {
+        var data = await _pipeline.LoadAsync(query, cancellationToken);
+        var entries = data.Entries;
+
+        var costLines = _calculator.CalculateEntries(
+            entries,
+            data.OvertimeContext,
+            data.UserRates,
+            data.Holidays,
+            data.MultiplierConfig);
+        var costByEntryId = costLines.ToDictionary(line => line.EntryId);
+
+        var detailedEntries = entries
+            .Select(entry => MapDetailedEntry(entry, costByEntryId.GetValueOrDefault(entry.Id)))
+            .ToList();
+
+        var sorted = DetailedReportGrouping.Sort(detailedEntries, data.Query.GroupBy);
+        var groups = DetailedReportGrouping.BuildGroups(sorted, data.Query.GroupBy);
+
+        var totalCount = sorted.Count;
+        var effectivePage = page < 1 ? 1 : page;
+        IReadOnlyList<DetailedEntryDto> pageEntries;
+        int effectivePageSize;
+
+        if (pageSize <= 0)
+        {
+            effectivePageSize = totalCount == 0 ? 1 : totalCount;
+            effectivePage = 1;
+            pageEntries = sorted;
+        }
+        else
+        {
+            effectivePageSize = pageSize;
+            pageEntries = sorted
+                .Skip((effectivePage - 1) * effectivePageSize)
+                .Take(effectivePageSize)
+                .ToList();
+        }
+
+        var totalSeconds = entries.Sum(e => (long)e.DurationSeconds);
+        var billableSeconds = entries.Where(e => e.IsBillable).Sum(e => (long)e.DurationSeconds);
+        var unassignedSeconds = entries
+            .Where(e => e.ProjectId is null || e.Project is null)
+            .Sum(e => (long)e.DurationSeconds);
+
+        return new DetailedReportDto
+        {
+            Kpis = new ReportKpisDto
+            {
+                TotalSeconds = totalSeconds,
+                BillableSeconds = billableSeconds,
+                NonBillableSeconds = totalSeconds - billableSeconds,
+                BillablePct = ReportAggregations.BillablePct(billableSeconds, totalSeconds),
+                EntryCount = entries.Count,
+                ActiveMembers = entries.Select(e => e.UserId).Distinct().Count(),
+                ActiveProjects = entries
+                    .Where(e => e.ProjectId is not null && e.Project is not null)
+                    .Select(e => e.ProjectId!.Value)
+                    .Distinct()
+                    .Count(),
+                OvertimeHours = costLines.Sum(line => line.OvertimeHours),
+                WeekendHours = costLines.Sum(line => line.WeekendHours),
+                HolidayHours = costLines.Sum(line => line.HolidayHours),
+                UnassignedSeconds = unassignedSeconds
+            },
+            Basis = new ReportBasisDto
+            {
+                WeekendPremium = data.MultiplierConfig.WeekendPremium,
+                HolidayPremium = data.MultiplierConfig.HolidayPremium,
+                OvertimePremium = data.MultiplierConfig.OvertimePremium,
+                WeeklyOvertimeThresholdHours = data.MultiplierConfig.WeeklyOvertimeThresholdHours
+            },
+            GeneratedAtUtc = DateTime.UtcNow,
+            GeneratedByName = await ResolveGeneratedByAsync(cancellationToken),
+            FirstEntryDate = entries.Count == 0 ? null : entries.Min(ResolveEntryDate),
+            FilterFromDate = data.Query.From,
+            FilterToDate = data.Query.To,
+            Entries = pageEntries,
+            Page = effectivePage,
+            PageSize = effectivePageSize,
+            TotalCount = totalCount,
+            Groups = groups
+        };
+    }
+
+    private static DetailedEntryDto MapDetailedEntry(TimeEntry entry, EntryCostLine? cost)
+    {
+        var user = entry.User;
+        var displayName = string.IsNullOrWhiteSpace(user?.DisplayName)
+            ? user?.Email ?? entry.UserId.ToString()
+            : user.DisplayName;
+
+        var clientName = entry.Client?.Name
+            ?? entry.Project?.Client?.Name;
+        var clientId = entry.ClientId
+            ?? entry.Project?.ClientId
+            ?? entry.Client?.Id
+            ?? entry.Project?.Client?.Id;
+
+        var emptyCost = cost is null;
+        return new DetailedEntryDto
+        {
+            EntryId = entry.Id,
+            EntryDate = ResolveEntryDate(entry),
+            StartedAtUtc = entry.StartedAtUtc,
+            EndedAtUtc = entry.EndedAtUtc,
+            UserId = entry.UserId,
+            DisplayName = displayName,
+            ClientId = clientId,
+            ClientName = clientName,
+            ProjectId = entry.ProjectId,
+            ProjectName = entry.Project?.Name,
+            TaskId = entry.ProjectTaskId,
+            TaskName = entry.ProjectTask?.Name,
+            Tags = entry.TimeEntryTags
+                .Where(t => t.Tag is not null && t.Tag.DeletedAtUtc is null)
+                .Select(t => t.Tag.Name)
+                .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
+                .ToList(),
+            Description = entry.Description,
+            IsBillable = entry.IsBillable,
+            DurationSeconds = entry.DurationSeconds,
+            CurrencyCode = entry.Project?.CurrencyCode,
+            CalculatedCost = emptyCost ? 0m : cost!.CalculatedCost,
+            NormalCost = emptyCost ? 0m : cost!.NormalCost,
+            WeekendCost = emptyCost ? 0m : cost!.WeekendCost,
+            HolidayCost = emptyCost ? 0m : cost!.HolidayCost,
+            OvertimeCost = emptyCost ? 0m : cost!.OvertimeCost,
+            OvertimeHours = emptyCost ? 0m : cost!.OvertimeHours,
+            WeekendHours = emptyCost ? 0m : cost!.WeekendHours,
+            HolidayHours = emptyCost ? 0m : cost!.HolidayHours,
+            IsWeekend = cost?.IsWeekend
+                ?? ResolveEntryDate(entry).DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday,
+            IsHoliday = cost?.IsHoliday ?? false
+        };
+    }
+
     private IReadOnlyList<ProjectSummaryDto> BuildProjectSummaries(
         IReadOnlyList<TimeEntry> selectedEntries,
         IReadOnlyList<TimeEntry> overtimeContext,

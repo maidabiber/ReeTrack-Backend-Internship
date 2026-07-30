@@ -49,6 +49,39 @@ public class ReportsController : ControllerBase
         return File(file.Bytes, file.ContentType, file.FileName);
     }
 
+    [HttpGet("detailed")]
+    public async Task<ActionResult<DetailedReportResponse>> GetDetailed(
+        [FromQuery] ReportQueryRequest query,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 50,
+        CancellationToken cancellationToken = default)
+    {
+        if (page < 1)
+            throw new AppException("page must be >= 1.", 400);
+        if (pageSize < 1 || pageSize > 200)
+            throw new AppException("pageSize must be between 1 and 200.", 400);
+
+        var detailed = await _reports.GetDetailedAsync(
+            MapQuery(query),
+            page,
+            pageSize,
+            cancellationToken);
+        return Ok(MapDetailed(detailed));
+    }
+
+    [HttpGet("detailed/export")]
+    public async Task<IActionResult> ExportDetailed(
+        [FromQuery] string format,
+        [FromQuery] ReportQueryRequest query,
+        CancellationToken cancellationToken)
+    {
+        if (!TryParseFormat(format, out var parsed))
+            throw new AppException("format must be csv, xlsx, or pdf.", 400);
+
+        var file = await _export.ExportDetailedAsync(parsed, MapQuery(query), cancellationToken);
+        return File(file.Bytes, file.ContentType, file.FileName);
+    }
+
     [HttpGet("filter-sets")]
     public async Task<ActionResult<PagedResult<ReportFilterSetResponse>>> ListFilterSets(
         [FromQuery] int page = 1,
@@ -202,6 +235,85 @@ public class ReportsController : ControllerBase
                 OvertimePremium = dto.Basis.OvertimePremium,
                 WeeklyOvertimeThresholdHours = dto.Basis.WeeklyOvertimeThresholdHours
             }
+        };
+
+    private static DetailedReportResponse MapDetailed(DetailedReportDto dto) =>
+        new()
+        {
+            Kpis = new ReportKpisResponse
+            {
+                TotalSeconds = dto.Kpis.TotalSeconds,
+                BillableSeconds = dto.Kpis.BillableSeconds,
+                NonBillableSeconds = dto.Kpis.NonBillableSeconds,
+                BillablePct = dto.Kpis.BillablePct,
+                EntryCount = dto.Kpis.EntryCount,
+                ActiveMembers = dto.Kpis.ActiveMembers,
+                ActiveProjects = dto.Kpis.ActiveProjects,
+                OvertimeHours = dto.Kpis.OvertimeHours,
+                WeekendHours = dto.Kpis.WeekendHours,
+                HolidayHours = dto.Kpis.HolidayHours,
+                UnassignedSeconds = dto.Kpis.UnassignedSeconds
+            },
+            Basis = new ReportBasisResponse
+            {
+                WeekendPremium = dto.Basis.WeekendPremium,
+                HolidayPremium = dto.Basis.HolidayPremium,
+                OvertimePremium = dto.Basis.OvertimePremium,
+                WeeklyOvertimeThresholdHours = dto.Basis.WeeklyOvertimeThresholdHours
+            },
+            GeneratedAtUtc = dto.GeneratedAtUtc,
+            GeneratedByName = dto.GeneratedByName,
+            FirstEntryDate = dto.FirstEntryDate,
+            FilterFromDate = dto.FilterFromDate,
+            FilterToDate = dto.FilterToDate,
+            Entries = dto.Entries.Select(MapDetailedEntry).ToList(),
+            Page = dto.Page,
+            PageSize = dto.PageSize,
+            TotalCount = dto.TotalCount,
+            Groups = dto.Groups
+                .Select(g => new DetailedGroupResponse
+                {
+                    Label = g.Label,
+                    Keys = g.Keys,
+                    TotalSeconds = g.TotalSeconds,
+                    CalculatedCost = g.CalculatedCost,
+                    EntryCount = g.EntryCount,
+                    StartIndex = g.StartIndex,
+                    EndIndexExclusive = g.EndIndexExclusive
+                })
+                .ToList()
+        };
+
+    private static DetailedEntryResponse MapDetailedEntry(DetailedEntryDto entry) =>
+        new()
+        {
+            EntryId = entry.EntryId,
+            EntryDate = entry.EntryDate,
+            StartedAtUtc = entry.StartedAtUtc,
+            EndedAtUtc = entry.EndedAtUtc,
+            UserId = entry.UserId,
+            DisplayName = entry.DisplayName,
+            ClientId = entry.ClientId,
+            ClientName = entry.ClientName,
+            ProjectId = entry.ProjectId,
+            ProjectName = entry.ProjectName,
+            TaskId = entry.TaskId,
+            TaskName = entry.TaskName,
+            Tags = entry.Tags,
+            Description = entry.Description,
+            IsBillable = entry.IsBillable,
+            DurationSeconds = entry.DurationSeconds,
+            CurrencyCode = entry.CurrencyCode,
+            CalculatedCost = entry.CalculatedCost,
+            NormalCost = entry.NormalCost,
+            WeekendCost = entry.WeekendCost,
+            HolidayCost = entry.HolidayCost,
+            OvertimeCost = entry.OvertimeCost,
+            OvertimeHours = entry.OvertimeHours,
+            WeekendHours = entry.WeekendHours,
+            HolidayHours = entry.HolidayHours,
+            IsWeekend = entry.IsWeekend,
+            IsHoliday = entry.IsHoliday
         };
 
     private static ReportQuery MapQuery(ReportQueryRequest request) =>

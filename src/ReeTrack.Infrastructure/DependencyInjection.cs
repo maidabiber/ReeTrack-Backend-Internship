@@ -99,6 +99,9 @@ public static class DependencyInjection
         services.AddScoped<IReportWriter, CsvReportWriter>();
         services.AddScoped<IReportWriter, ExcelReportWriter>();
         services.AddScoped<IReportWriter, PdfReportWriter>();
+        services.AddScoped<IDetailedReportWriter, CsvDetailedReportWriter>();
+        services.AddScoped<IDetailedReportWriter, ExcelDetailedReportWriter>();
+        services.AddScoped<IDetailedReportWriter, PdfDetailedReportWriter>();
         services.AddScoped<IReportExportService, ReportExportService>();
         services.AddScoped<IRateMultiplierSettingsService, RateMultiplierSettingsService>();
         services.AddScoped<IRateMultiplierConfigProvider, RateMultiplierConfigProvider>();

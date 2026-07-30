@@ -31,6 +31,10 @@ public sealed class ReportEntryPipeline
 
         var entries = await selectedQuery
             .Include(entry => entry.User)
+            .Include(entry => entry.Client)
+            .Include(entry => entry.ProjectTask)
+            .Include(entry => entry.TimeEntryTags)
+                .ThenInclude(tag => tag.Tag)
             .Include($"{nameof(TimeEntry.Project)}.{nameof(Project.Client)}")
             .ToListAsync(cancellationToken);
 

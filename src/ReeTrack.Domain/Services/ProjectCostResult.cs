@@ -8,6 +8,24 @@ public sealed record ProjectTaskCostResult(
     decimal HolidayHours,
     decimal OvertimeHours);
 
+/// <summary>
+/// Per-entry labour cost using the same weekend / holiday / OT bucket rules as
+/// <see cref="ProjectCostResult"/>. Used by the detailed (audit) report.
+/// </summary>
+public sealed record EntryCostLine(
+    Guid EntryId,
+    decimal CalculatedCost,
+    decimal NormalCost,
+    decimal WeekendCost,
+    decimal HolidayCost,
+    decimal OvertimeCost,
+    decimal TotalHours,
+    decimal WeekendHours,
+    decimal HolidayHours,
+    decimal OvertimeHours,
+    bool IsWeekend,
+    bool IsHoliday);
+
 public sealed record ProjectCostResult(
     decimal CalculatedCost,
     decimal TotalHours,

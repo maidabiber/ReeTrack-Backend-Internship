@@ -69,19 +69,29 @@ public static class ReportFormat
     /// <summary>
     /// The inclusive UTC date window the report covers.
     /// </summary>
-    public static string PeriodLabel(SummaryReportDto model)
+    public static string PeriodLabel(SummaryReportDto model) =>
+        PeriodLabel(model.FilterFromDate, model.FilterToDate, model.FirstEntryDate, model.GeneratedAtUtc);
+
+    public static string PeriodLabel(DetailedReportDto model) =>
+        PeriodLabel(model.FilterFromDate, model.FilterToDate, model.FirstEntryDate, model.GeneratedAtUtc);
+
+    public static string PeriodLabel(
+        DateOnly? filterFrom,
+        DateOnly? filterTo,
+        DateOnly? firstEntryDate,
+        DateTime generatedAtUtc)
     {
-        if (model.FilterFromDate is { } from && model.FilterToDate is { } to)
+        if (filterFrom is { } from && filterTo is { } to)
             return $"{FriendlyDate(from)} – {FriendlyDate(to)}";
 
-        if (model.FilterFromDate is { } fromOnly)
+        if (filterFrom is { } fromOnly)
             return $"Since {FriendlyDate(fromOnly)}";
 
-        if (model.FilterToDate is { } toOnly)
+        if (filterTo is { } toOnly)
             return $"Through {FriendlyDate(toOnly)}";
 
-        return model.FirstEntryDate is { } first
-            ? $"All time · {FriendlyDate(first)} – {FriendlyDate(DateOnly.FromDateTime(model.GeneratedAtUtc))}"
+        return firstEntryDate is { } first
+            ? $"All time · {FriendlyDate(first)} – {FriendlyDate(DateOnly.FromDateTime(generatedAtUtc))}"
             : "All time";
     }
 
@@ -90,10 +100,13 @@ public static class ReportFormat
     /// weekend / holiday / overtime money is indefensible without the premiums that
     /// produced it, and the confirmed-only and UTC caveats change what the totals mean.
     /// </summary>
-    public static IReadOnlyList<string> BasisLines(SummaryReportDto model)
-    {
-        var basis = model.Basis;
-        return
+    public static IReadOnlyList<string> BasisLines(SummaryReportDto model) =>
+        BasisLines(model.Basis);
+
+    public static IReadOnlyList<string> BasisLines(DetailedReportDto model) =>
+        BasisLines(model.Basis);
+
+    public static IReadOnlyList<string> BasisLines(ReportBasisDto basis) =>
         [
             "Confirmed time entries only; pending and rejected time is excluded.",
             $"Weekend +{Multiplier(basis.WeekendPremium)}, holiday +{Multiplier(basis.HolidayPremium)}, " +
@@ -103,7 +116,6 @@ public static class ReportFormat
             "Amounts are never summed across currencies.",
             "Days, weekends and holidays are determined in UTC."
         ];
-    }
 
     /// <summary>A premium fraction as a percentage, e.g. 0.5 → "50%".</summary>
     private static string Multiplier(decimal premium) =>

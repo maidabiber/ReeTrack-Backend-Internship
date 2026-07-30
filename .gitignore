@@ -3,11 +3,12 @@ bin/
 obj/
 out/
 
-# Visual Studio / Rider / VS Code
+# Visual Studio / Rider / VS Code / Cursor
 .vs/
 .vscode/*
 !.vscode/extensions.json
 .idea/
+.cursor/
 *.suo
 *.user
 *.userosscache

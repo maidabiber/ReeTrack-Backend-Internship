@@ -96,6 +96,64 @@ public sealed class MemberHoursResponse
     public required long TotalSeconds { get; init; }
 }
 
+public sealed class DetailedReportResponse
+{
+    public required ReportKpisResponse Kpis { get; init; }
+    public required ReportBasisResponse Basis { get; init; }
+    public required DateTime GeneratedAtUtc { get; init; }
+    public string? GeneratedByName { get; init; }
+    public DateOnly? FirstEntryDate { get; init; }
+    public DateOnly? FilterFromDate { get; init; }
+    public DateOnly? FilterToDate { get; init; }
+    public required IReadOnlyList<DetailedEntryResponse> Entries { get; init; }
+    public required int Page { get; init; }
+    public required int PageSize { get; init; }
+    public required int TotalCount { get; init; }
+    public required IReadOnlyList<DetailedGroupResponse> Groups { get; init; }
+}
+
+public sealed class DetailedEntryResponse
+{
+    public required Guid EntryId { get; init; }
+    public required DateOnly EntryDate { get; init; }
+    public DateTime? StartedAtUtc { get; init; }
+    public DateTime? EndedAtUtc { get; init; }
+    public required Guid UserId { get; init; }
+    public required string DisplayName { get; init; }
+    public Guid? ClientId { get; init; }
+    public string? ClientName { get; init; }
+    public Guid? ProjectId { get; init; }
+    public string? ProjectName { get; init; }
+    public Guid? TaskId { get; init; }
+    public string? TaskName { get; init; }
+    public required IReadOnlyList<string> Tags { get; init; }
+    public string? Description { get; init; }
+    public required bool IsBillable { get; init; }
+    public required long DurationSeconds { get; init; }
+    public string? CurrencyCode { get; init; }
+    public required decimal CalculatedCost { get; init; }
+    public required decimal NormalCost { get; init; }
+    public required decimal WeekendCost { get; init; }
+    public required decimal HolidayCost { get; init; }
+    public required decimal OvertimeCost { get; init; }
+    public required decimal OvertimeHours { get; init; }
+    public required decimal WeekendHours { get; init; }
+    public required decimal HolidayHours { get; init; }
+    public required bool IsWeekend { get; init; }
+    public required bool IsHoliday { get; init; }
+}
+
+public sealed class DetailedGroupResponse
+{
+    public required string Label { get; init; }
+    public required IReadOnlyList<string> Keys { get; init; }
+    public required long TotalSeconds { get; init; }
+    public required decimal CalculatedCost { get; init; }
+    public required int EntryCount { get; init; }
+    public required int StartIndex { get; init; }
+    public required int EndIndexExclusive { get; init; }
+}
+
 public sealed class ReportQueryRequest
 {
     public Guid[]? UserIds { get; init; } = [];
