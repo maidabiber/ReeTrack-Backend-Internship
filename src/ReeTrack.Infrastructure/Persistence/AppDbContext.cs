@@ -34,6 +34,7 @@ public class AppDbContext : DbContext, IApplicationDbContext
     public DbSet<RateMultiplierSettings> RateMultiplierSettings => Set<RateMultiplierSettings>();
     public DbSet<NotificationPreference> NotificationPreferences => Set<NotificationPreference>();
     public DbSet<ReportFilterSet> ReportFilterSets => Set<ReportFilterSet>();
+    public DbSet<InAppNotification> InAppNotifications => Set<InAppNotification>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

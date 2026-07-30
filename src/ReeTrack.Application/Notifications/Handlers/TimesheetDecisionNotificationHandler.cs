@@ -48,7 +48,11 @@ public sealed class TimesheetDecisionNotificationHandler : IDomainEventHandler<T
                     $"Hi {domainEvent.RecipientName},\n\n" +
                     $"{domainEvent.ReviewerName} {decision} your timesheet for {weekLabel} in {_appName}.\n\n" +
                     (commentLine is null ? "" : $"Comment: {commentLine}\n\n") +
-                    $"{callToAction}: {timesheetUrl}"
+                    $"{callToAction}: {timesheetUrl}",
+                Metadata = new Dictionary<string, string>
+                {
+                    [NotificationMetadataKeys.FrontendUrl] = timesheetUrl
+                }
             };
 
             await _dispatcher.DispatchAsync(

@@ -9,6 +9,9 @@ using ReeTrack.Api.Middleware;
 using ReeTrack.Infrastructure;
 using ReeTrack.Infrastructure.Auditing;
 using ReeTrack.Infrastructure.Persistence;
+using ReeTrack.Api.Hubs;
+using ReeTrack.Api.Realtime;
+using ReeTrack.Application.Notifications;
 using QuestPDF.Infrastructure;
 using Scalar.AspNetCore;
 
@@ -60,11 +63,11 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 
         options.Events = new JwtBearerEvents
         {
-            OnMessageReceived = ctx =>
+           OnMessageReceived = ctx =>
             {
                 ctx.Token = ctx.Request.Cookies["rt.session"];
                 return Task.CompletedTask;
-            }
+            } 
         };
     });
 
@@ -74,6 +77,8 @@ builder.Services.AddExceptionHandler<AppExceptionHandler>();
 builder.Services.AddProblemDetails();
 
 builder.Services.AddControllers();
+builder.Services.AddSignalR();
+builder.Services.AddScoped<IInAppNotificationRealtimePublisher, SignalRInAppNotificationRealtimePublisher>();
 builder.Services.AddOpenApi();
 
 var frontendOrigin = builder.Configuration["Frontend:Origin"] ?? "http://localhost:5173";
@@ -104,6 +109,7 @@ app.UseCors("frontend");
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
+app.MapHub<NotificationHub>("/hubs/notifications");
 app.MapGet("/api/health", () => Results.Ok(new { status = "ok" }));
 
 app.Run();

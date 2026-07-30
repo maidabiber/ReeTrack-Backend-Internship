@@ -43,7 +43,11 @@ public sealed class TimeEntrySharedNotificationHandler : IDomainEventHandler<Tim
                 Body =
                     $"{domainEvent.SubmitterName} logged time on your behalf in {_appName}.\n\n" +
                     $"Description: {descriptionLine}\n\n" +
-                    $"Review and approve: {reviewUrl}"
+                    $"Review and approve: {reviewUrl}",
+                Metadata = new Dictionary<string, string>
+                {
+                    [NotificationMetadataKeys.FrontendUrl] = reviewUrl
+                }
             };
 
             await _dispatcher.DispatchAsync(

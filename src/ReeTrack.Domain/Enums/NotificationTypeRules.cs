@@ -11,11 +11,4 @@ public static class NotificationTypeRules
     /// </summary>
     public static bool IsInAppMandatory(NotificationType type) =>
         type is NotificationType.TimeEntryShared or NotificationType.TimesheetDecision;
-
-    /// <summary>
-    /// Workflow types default to Email when the user has no Email preference row yet.
-    /// An explicit Email preference with <c>IsEnabled = false</c> opts out of email.
-    /// </summary>
-    public static bool DefaultsEmailWhenUnset(NotificationType type) =>
-        type is NotificationType.TimeEntryShared or NotificationType.TimesheetDecision;
 }

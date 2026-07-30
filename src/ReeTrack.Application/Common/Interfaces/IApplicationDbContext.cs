@@ -28,6 +28,7 @@ public interface IApplicationDbContext
     DbSet<RateMultiplierSettings> RateMultiplierSettings { get; }
     DbSet<NotificationPreference> NotificationPreferences { get; }
     DbSet<ReportFilterSet> ReportFilterSets { get; }
+    DbSet<InAppNotification> InAppNotifications { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

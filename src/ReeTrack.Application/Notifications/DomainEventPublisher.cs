@@ -29,14 +29,6 @@ public sealed class DomainEventPublisher : IDomainEventPublisher
         if (handlers.Count == 0)
             return;
 
-        if (handlers.Count == 1)
-        {
-            await using var singleScope = _scopeFactory.CreateAsyncScope();
-            var handler = singleScope.ServiceProvider.GetRequiredService(handlers[0].GetType());
-            await ((IDomainEventHandler<TEvent>)handler).HandleAsync(domainEvent, cancellationToken);
-            return;
-        }
-
         var handlerTypes = handlers.Select(h => h.GetType()).ToList();
 
         await Task.WhenAll(handlerTypes.Select(async handlerType =>

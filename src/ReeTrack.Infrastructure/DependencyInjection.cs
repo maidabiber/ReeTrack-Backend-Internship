@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using ReeTrack.Application.Calendar;
@@ -73,7 +74,9 @@ public static class DependencyInjection
         services.AddScoped<IDomainEventPublisher, DomainEventPublisher>();
         services.AddScoped<INotificationDispatcher, NotificationDispatcher>();
         services.AddScoped<INotificationPreferenceService, NotificationPreferenceService>();
+        services.AddScoped<IInAppNotificationService, InAppNotificationService>();
         services.AddScoped<IChannelProvider, EmailChannelProvider>();
+        services.AddScoped<IChannelProvider, InAppChannelProvider>();
         services.AddDomainEventHandlers(typeof(IDomainEventHandler<>).Assembly);
 
         services.AddScoped<IInvitationService, InvitationService>();

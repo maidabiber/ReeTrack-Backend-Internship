@@ -13,16 +13,13 @@ public sealed class NotificationDispatcher : INotificationDispatcher
 {
     private readonly IEnumerable<IChannelProvider> _channelProviders;
     private readonly IApplicationDbContext _db;
-    private readonly ILogger<NotificationDispatcher> _logger;
 
     public NotificationDispatcher(
         IEnumerable<IChannelProvider> channelProviders,
-        IApplicationDbContext db,
-        ILogger<NotificationDispatcher> logger)
+        IApplicationDbContext db)
     {
         _channelProviders = channelProviders;
         _db = db;
-        _logger = logger;
     }
 
     public async Task DispatchAsync(
@@ -46,19 +43,9 @@ public sealed class NotificationDispatcher : INotificationDispatcher
         if (NotificationTypeRules.IsInAppMandatory(notificationType))
             enabledChannels.Add(DeliveryChannel.InApp);
 
-        if (NotificationTypeRules.DefaultsEmailWhenUnset(notificationType))
-        {
-            var hasEmailPreference = preferences.Any(p => p.DeliveryChannel == DeliveryChannel.Email);
-            if (!hasEmailPreference)
-                enabledChannels.Add(DeliveryChannel.Email);
-        }
-
         if (enabledChannels.Count == 0)
         {
-            _logger.LogDebug(
-                "No enabled preferences for user {UserId} and notification type {NotificationType}.",
-                userId,
-                notificationType);
+            // Could be logged
             return;
         }
 
@@ -68,14 +55,13 @@ public sealed class NotificationDispatcher : INotificationDispatcher
 
         if (providers.Count == 0)
         {
-            _logger.LogDebug(
-                "No channel providers match enabled preferences for user {UserId} and type {NotificationType}.",
-                userId,
-                notificationType);
+            // Could be logged
             return;
         }
 
-        await Task.WhenAll(providers.Select(provider =>
-            provider.SendAsync(userId, payload, cancellationToken)));
+        foreach (var provider in providers)
+        {
+            await provider.SendAsync(userId, payload, cancellationToken);
+        }
     }
 }

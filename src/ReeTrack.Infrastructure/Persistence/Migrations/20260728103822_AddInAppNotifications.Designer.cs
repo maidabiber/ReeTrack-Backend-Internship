@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using ReeTrack.Infrastructure.Persistence;
@@ -11,9 +12,11 @@ using ReeTrack.Infrastructure.Persistence;
 namespace ReeTrack.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260728103822_AddInAppNotifications")]
+    partial class AddInAppNotifications
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -394,20 +397,6 @@ namespace ReeTrack.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("deleted_by_user_id");
 
-                    b.Property<string>("ExternalId")
-                        .HasMaxLength(128)
-                        .HasColumnType("character varying(128)")
-                        .HasColumnName("external_id");
-
-                    b.Property<string>("ExternalKey")
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)")
-                        .HasColumnName("external_key");
-
-                    b.Property<short?>("ExternalProvider")
-                        .HasColumnType("smallint")
-                        .HasColumnName("external_provider");
-
                     b.Property<decimal?>("FixedFeeAmount")
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)")
@@ -446,11 +435,6 @@ namespace ReeTrack.Infrastructure.Persistence.Migrations
                         .IsUnique()
                         .HasDatabaseName("ix_projects_name")
                         .HasFilter("deleted_at_utc IS NULL");
-
-                    b.HasIndex("ExternalProvider", "ExternalId")
-                        .IsUnique()
-                        .HasDatabaseName("ix_projects_external_provider_external_id")
-                        .HasFilter("deleted_at_utc IS NULL AND external_provider IS NOT NULL AND external_id IS NOT NULL");
 
                     b.ToTable("projects", (string)null);
                 });
@@ -536,20 +520,6 @@ namespace ReeTrack.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("deleted_by_user_id");
 
-                    b.Property<string>("ExternalId")
-                        .HasMaxLength(128)
-                        .HasColumnType("character varying(128)")
-                        .HasColumnName("external_id");
-
-                    b.Property<string>("ExternalKey")
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)")
-                        .HasColumnName("external_key");
-
-                    b.Property<short?>("ExternalProvider")
-                        .HasColumnType("smallint")
-                        .HasColumnName("external_provider");
-
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -580,11 +550,6 @@ namespace ReeTrack.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("ProjectId")
                         .HasDatabaseName("ix_project_tasks_project_id");
-
-                    b.HasIndex("ExternalProvider", "ExternalId")
-                        .IsUnique()
-                        .HasDatabaseName("ix_project_tasks_external_provider_external_id")
-                        .HasFilter("deleted_at_utc IS NULL AND external_provider IS NOT NULL AND external_id IS NOT NULL");
 
                     b.HasIndex("ProjectId", "Name")
                         .IsUnique()
@@ -704,57 +669,6 @@ namespace ReeTrack.Infrastructure.Persistence.Migrations
                             WeekendPremium = 0.5m,
                             WeeklyOvertimeThresholdHours = 40m
                         });
-                });
-
-            modelBuilder.Entity("ReeTrack.Domain.Entities.ReportFilterSet", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id")
-                        .HasDefaultValueSql("gen_random_uuid()");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at_utc");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("name");
-
-                    b.Property<string>("NormalizedName")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("normalized_name");
-
-                    b.Property<string>("QueryJson")
-                        .IsRequired()
-                        .HasMaxLength(8000)
-                        .HasColumnType("character varying(8000)")
-                        .HasColumnName("query_json");
-
-                    b.Property<int>("SchemaVersion")
-                        .HasColumnType("integer")
-                        .HasColumnName("schema_version");
-
-                    b.Property<DateTime>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at_utc");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("user_id");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("UserId", "NormalizedName")
-                        .IsUnique()
-                        .HasDatabaseName("ux_report_filter_sets_user_id_normalized_name");
-
-                    b.ToTable("report_filter_sets", (string)null);
                 });
 
             modelBuilder.Entity("ReeTrack.Domain.Entities.Role", b =>
@@ -1555,17 +1469,6 @@ namespace ReeTrack.Infrastructure.Persistence.Migrations
                     b.Navigation("ProjectCostSnapshot");
 
                     b.Navigation("ProjectTask");
-                });
-
-            modelBuilder.Entity("ReeTrack.Domain.Entities.ReportFilterSet", b =>
-                {
-                    b.HasOne("ReeTrack.Domain.Entities.User", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("ReeTrack.Domain.Entities.SyncedCalendarEvent", b =>
