@@ -75,6 +75,12 @@ public static class ReportFormat
     public static string PeriodLabel(DetailedReportDto model) =>
         PeriodLabel(model.FilterFromDate, model.FilterToDate, model.FirstEntryDate, model.GeneratedAtUtc);
 
+    public static string PeriodLabel(WorkloadReportDto model) =>
+        PeriodLabel(model.FilterFromDate, model.FilterToDate, model.FirstEntryDate, model.GeneratedAtUtc);
+
+    public static string PeriodLabel(ProfitabilityReportDto model) =>
+        PeriodLabel(model.FilterFromDate, model.FilterToDate, model.FirstEntryDate, model.GeneratedAtUtc);
+
     public static string PeriodLabel(
         DateOnly? filterFrom,
         DateOnly? filterTo,
@@ -95,26 +101,72 @@ public static class ReportFormat
             : "All time";
     }
 
+    private const string ConfirmedOnlyLine =
+        "Confirmed time entries only; pending and rejected time is excluded.";
+
+    private const string CostNotRevenueLine =
+        "Cost is internal labour cost from member hourly rates, not client revenue.";
+
+    private const string NeverSummedAcrossCurrenciesLine =
+        "Amounts are never summed across currencies.";
+
+    private const string UtcLine =
+        "Days, weekends and holidays are determined in UTC.";
+
+    private static string PremiumsLine(ReportBasisDto basis) =>
+        $"Weekend +{Multiplier(basis.WeekendPremium)}, holiday +{Multiplier(basis.HolidayPremium)}, " +
+        $"overtime +{Multiplier(basis.OvertimePremium)} above {Hours2(basis.WeeklyOvertimeThresholdHours)}h " +
+        "per person per week.";
+
     /// <summary>
-    /// The rules behind the figures, one statement per line. Every export carries these:
-    /// weekend / holiday / overtime money is indefensible without the premiums that
-    /// produced it, and the confirmed-only and UTC caveats change what the totals mean.
+    /// Workload carries no money at all (no cost, no revenue, no currency), so none of the
+    /// money-basis lines apply to it — only the confirmed-only caveat changes what its hours mean.
     /// </summary>
-    public static IReadOnlyList<string> BasisLines(SummaryReportDto model) =>
-        BasisLines(model.Basis);
+    public static IReadOnlyList<string> WorkloadBasisLines(ReportBasisDto basis) => [ConfirmedOnlyLine];
 
-    public static IReadOnlyList<string> BasisLines(DetailedReportDto model) =>
-        BasisLines(model.Basis);
+    public static IReadOnlyList<string> WorkloadBasisLines(WorkloadReportDto model) =>
+        WorkloadBasisLines(model.Basis);
 
-    public static IReadOnlyList<string> BasisLines(ReportBasisDto basis) =>
+    /// <summary>
+    /// Summary and Detailed show cost (so the premiums and cost-vs-revenue caveats apply)
+    /// but never present a single figure that mixes currencies the way Profitability's
+    /// cross-currency KPIs can, so they skip that line.
+    /// </summary>
+    public static IReadOnlyList<string> SummaryBasisLines(ReportBasisDto basis) =>
+        [ConfirmedOnlyLine, PremiumsLine(basis), CostNotRevenueLine, UtcLine];
+
+    public static IReadOnlyList<string> SummaryBasisLines(SummaryReportDto model) =>
+        SummaryBasisLines(model.Basis);
+
+    public static IReadOnlyList<string> DetailedBasisLines(DetailedReportDto model) =>
+        SummaryBasisLines(model.Basis);
+
+    /// <summary>
+    /// Profitability additionally shows revenue and margin and can span currencies, so it
+    /// keeps the currency-summing caveat and appends the revenue-recognition rules.
+    /// </summary>
+    public static IReadOnlyList<string> ProfitabilityBasisLines(ReportBasisDto basis) =>
         [
-            "Confirmed time entries only; pending and rejected time is excluded.",
-            $"Weekend +{Multiplier(basis.WeekendPremium)}, holiday +{Multiplier(basis.HolidayPremium)}, " +
-            $"overtime +{Multiplier(basis.OvertimePremium)} above {Hours2(basis.WeeklyOvertimeThresholdHours)}h " +
-            "per person per week.",
-            "Cost is internal labour cost from member hourly rates, not client revenue.",
-            "Amounts are never summed across currencies.",
-            "Days, weekends and holidays are determined in UTC."
+            ConfirmedOnlyLine,
+            PremiumsLine(basis),
+            CostNotRevenueLine,
+            NeverSummedAcrossCurrenciesLine,
+            UtcLine,
+            .. ProfitabilityRevenueLines()
+        ];
+
+    public static IReadOnlyList<string> ProfitabilityBasisLines(ProfitabilityReportDto model) =>
+        ProfitabilityBasisLines(model.Basis);
+
+    /// <summary>
+    /// Revenue recognition rules, specific to the Profitability report. Lives here next to
+    /// the rest of the export copy rather than inline in a service method.
+    /// </summary>
+    public static IReadOnlyList<string> ProfitabilityRevenueLines() =>
+        [
+            "Fixed-fee projects recognize the full fee when the filtered period has any activity (not prorated).",
+            "Hourly projects recognize billable hours × project hourly rate.",
+            "Margin = revenue − labour cost from ProjectCostCalculator (max of member and project rate)."
         ];
 
     /// <summary>A premium fraction as a percentage, e.g. 0.5 → "50%".</summary>

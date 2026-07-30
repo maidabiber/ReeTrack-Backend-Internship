@@ -8,14 +8,8 @@ using ReeTrack.Application.Reports;
 
 namespace ReeTrack.Infrastructure.Reports.Writers;
 
-public sealed class PdfReportWriter : IReportWriter
+public sealed class PdfReportWriter : IReportWriter<SummaryReportDto>
 {
-    static PdfReportWriter()
-    {
-        // Idempotent; Program.cs also sets this at API startup.
-        QuestPDF.Settings.License = LicenseType.Community;
-    }
-
     public ReportExportFormat Format => ReportExportFormat.Pdf;
 
     public ReportFile Write(SummaryReportDto model)
@@ -113,25 +107,8 @@ public sealed class PdfReportWriter : IReportWriter
     }
 
     /// <summary>Closing "how these numbers were made" block — the audit trail for the figures.</summary>
-    private static void ComposeBasis(IContainer container, SummaryReportDto model)
-    {
-        container.Column(col =>
-        {
-            col.Item().Text("Basis & assumptions").SemiBold().FontSize(11);
-            col.Item().PaddingTop(4).PaddingBottom(8)
-                .Height(1).Width(36).Background(ReportColors.Brand);
-
-            foreach (var line in ReportFormat.BasisLines(model))
-            {
-                col.Item().PaddingBottom(3).Row(row =>
-                {
-                    row.ConstantItem(10).Text("•").FontSize(7.5f).FontColor(ReportColors.NavyMuted);
-                    row.RelativeItem().Text(line)
-                        .FontSize(7.5f).FontColor(ReportColors.NavyMuted).LineHeight(1.3f);
-                });
-            }
-        });
-    }
+    private static void ComposeBasis(IContainer container, SummaryReportDto model) =>
+        PdfBasisBlock.Compose(container, ReportFormat.SummaryBasisLines(model));
 
     private static void ComposeKpiCards(IContainer container, ReportKpisDto kpis)
     {

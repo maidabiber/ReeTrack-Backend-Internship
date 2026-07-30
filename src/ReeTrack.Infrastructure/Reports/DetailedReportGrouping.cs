@@ -41,24 +41,33 @@ internal static class DetailedReportGrouping
         var groups = new List<DetailedGroupDto>();
         var start = 0;
 
+        // Two-pointer scan over the already-sorted list: start/end each only move
+        // forward, so this whole loop is O(n) — the O(n²) cost previously came from
+        // `sortedEntries.Skip(start).Take(...)` below, which re-walks from the front of
+        // the sequence every time (LINQ's Skip/Take don't use indexed access), and from
+        // reallocating a keys list on every single adjacent-pair comparison.
         while (start < sortedEntries.Count)
         {
-            var keys = KeysFor(sortedEntries[start], groupBy);
             var end = start + 1;
-            while (end < sortedEntries.Count
-                   && KeysEqual(keys, KeysFor(sortedEntries[end], groupBy)))
-            {
+            while (end < sortedEntries.Count && KeysEqual(sortedEntries[start], sortedEntries[end], groupBy))
                 end++;
+
+            long totalSeconds = 0;
+            decimal calculatedCost = 0;
+            for (var i = start; i < end; i++)
+            {
+                totalSeconds += sortedEntries[i].DurationSeconds;
+                calculatedCost += sortedEntries[i].CalculatedCost;
             }
 
-            var slice = sortedEntries.Skip(start).Take(end - start).ToList();
+            var keys = KeysFor(sortedEntries[start], groupBy);
             groups.Add(new DetailedGroupDto
             {
                 Label = string.Join(" / ", keys),
                 Keys = keys,
-                TotalSeconds = slice.Sum(e => e.DurationSeconds),
-                CalculatedCost = slice.Sum(e => e.CalculatedCost),
-                EntryCount = slice.Count,
+                TotalSeconds = totalSeconds,
+                CalculatedCost = calculatedCost,
+                EntryCount = end - start,
                 StartIndex = start,
                 EndIndexExclusive = end
             });
@@ -73,13 +82,14 @@ internal static class DetailedReportGrouping
         IReadOnlyList<ReportGroupBy> groupBy) =>
         groupBy.Select(dimension => GroupKey(entry, dimension)).ToList();
 
-    private static bool KeysEqual(IReadOnlyList<string> left, IReadOnlyList<string> right)
+    private static bool KeysEqual(
+        DetailedEntryDto left,
+        DetailedEntryDto right,
+        IReadOnlyList<ReportGroupBy> groupBy)
     {
-        if (left.Count != right.Count)
-            return false;
-        for (var i = 0; i < left.Count; i++)
+        foreach (var dimension in groupBy)
         {
-            if (!string.Equals(left[i], right[i], StringComparison.OrdinalIgnoreCase))
+            if (!string.Equals(GroupKey(left, dimension), GroupKey(right, dimension), StringComparison.OrdinalIgnoreCase))
                 return false;
         }
 

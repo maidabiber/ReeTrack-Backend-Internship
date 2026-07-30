@@ -7,12 +7,31 @@ public static class ReportQueryRules
 {
     private const int MaxValuesPerDimension = 200;
 
+    /// <summary>
+    /// Widest explicit date range a report query can request. `ReportEntryPipeline`
+    /// materialises every matching entry with no other bound — an unfiltered multi-year
+    /// range on a large team can pull the whole time-entry table into memory. A fully
+    /// open range (both From and To unset — the "All time" report) is left alone here;
+    /// bounding *that* safely is a bigger, product-facing question (a sensible default
+    /// cutoff, or server-side pagination) tracked separately rather than solved by
+    /// silently truncating an intentionally-supported feature.
+    /// </summary>
+    private const int MaxExplicitRangeDays = 400;
+
     public static ReportQuery NormalizeAndValidate(ReportQuery query)
     {
         ArgumentNullException.ThrowIfNull(query);
 
         if (query.From is { } from && query.To is { } to && from > to)
             throw new AppException("The report start date must be on or before the end date.", 400);
+
+        if (query.From is { } rangeFrom && query.To is { } rangeTo
+            && rangeTo.DayNumber - rangeFrom.DayNumber > MaxExplicitRangeDays)
+        {
+            throw new AppException(
+                $"A report can cover at most {MaxExplicitRangeDays} days — narrow the date range.",
+                400);
+        }
 
         if (query.GroupBy.Any(group => !Enum.IsDefined(group)))
             throw new AppException("The report contains an unsupported grouping.", 400);

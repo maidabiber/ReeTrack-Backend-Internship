@@ -11,6 +11,9 @@ public sealed record ProjectTaskCostResult(
 /// <summary>
 /// Per-entry labour cost using the same weekend / holiday / OT bucket rules as
 /// <see cref="ProjectCostResult"/>. Used by the detailed (audit) report.
+/// Values are unrounded — callers must round at their own presentation boundary
+/// (e.g. when mapping to a DTO or summing across entries) rather than relying on
+/// pre-rounded figures, which double-rounds and drifts from the true total.
 /// </summary>
 public sealed record EntryCostLine(
     Guid EntryId,

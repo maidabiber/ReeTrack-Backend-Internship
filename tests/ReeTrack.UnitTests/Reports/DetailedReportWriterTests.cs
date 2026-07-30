@@ -40,6 +40,41 @@ public class DetailedReportWriterTests
     }
 
     [Fact]
+    public void Csv_Write_NeutralisesFormulaInjectionInUserSuppliedFields()
+    {
+        // Regression guard: before the CSV writers shared CsvWriterSupport.Escape, only
+        // the Summary writer neutralised formula-trigger characters (=+-@) — Detailed,
+        // Workload and Profitability quoted commas/quotes but would let a display name
+        // like "=cmd|'/c calc'!A1" execute as a formula when the file opens in Excel/Sheets.
+        var model = SampleDetailed(grouped: false);
+        var maliciousEntry = Entry(
+            Guid.Parse("33333333-3333-3333-3333-333333333333"),
+            new DateOnly(2026, 7, 20),
+            displayName: "=cmd|'/c calc'!A1",
+            clientName: "Acme",
+            projectName: "Alpha",
+            seconds: 3600,
+            cost: 50m);
+        model = new DetailedReportDto
+        {
+            Kpis = model.Kpis,
+            Basis = model.Basis,
+            GeneratedAtUtc = model.GeneratedAtUtc,
+            GeneratedByName = model.GeneratedByName,
+            FirstEntryDate = model.FirstEntryDate,
+            Entries = [maliciousEntry],
+            Page = model.Page,
+            PageSize = model.PageSize,
+            TotalCount = model.TotalCount,
+            Groups = model.Groups
+        };
+
+        var text = Encoding.UTF8.GetString(new CsvDetailedReportWriter().Write(model).Bytes);
+
+        Assert.Contains("'=cmd|'/c calc'!A1", text);
+    }
+
+    [Fact]
     public void Excel_Write_WithGroups_InsertsMergedGroupRows()
     {
         var model = SampleDetailed(grouped: true);

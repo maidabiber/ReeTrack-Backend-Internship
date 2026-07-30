@@ -13,7 +13,9 @@ namespace ReeTrack.Application.Reports;
 /// </summary>
 public static class SummaryReportAnalytics
 {
-    private const string NoCurrencyCode = "—";
+    /// <summary>Sentinel currency code for entries/projects with no currency set. The one
+    /// named constant for this — do not repeat the "—" literal elsewhere.</summary>
+    public const string NoCurrencyCode = "—";
 
     /// <summary>Decimal hours from duration seconds (sortable / summable).</summary>
     public static decimal Hours(long seconds) =>

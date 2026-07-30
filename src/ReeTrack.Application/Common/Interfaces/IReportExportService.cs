@@ -2,18 +2,17 @@ using ReeTrack.Application.Common.Models;
 
 namespace ReeTrack.Application.Common.Interfaces;
 
-public interface IReportWriter
+/// <summary>
+/// One export writer for one report format (CSV/Excel/PDF), for one report model type.
+/// Was 4 near-identical interfaces (one per report type) differing only in the model
+/// type passed to <c>Write</c> — collapsed once generic, since every implementation
+/// already had the exact same shape.
+/// </summary>
+public interface IReportWriter<TModel>
 {
     ReportExportFormat Format { get; }
 
-    ReportFile Write(SummaryReportDto model);
-}
-
-public interface IDetailedReportWriter
-{
-    ReportExportFormat Format { get; }
-
-    ReportFile Write(DetailedReportDto model);
+    ReportFile Write(TModel model);
 }
 
 public interface IReportExportService
@@ -24,6 +23,16 @@ public interface IReportExportService
         CancellationToken cancellationToken = default);
 
     Task<ReportFile> ExportDetailedAsync(
+        ReportExportFormat format,
+        ReportQuery query,
+        CancellationToken cancellationToken = default);
+
+    Task<ReportFile> ExportWorkloadAsync(
+        ReportExportFormat format,
+        ReportQuery query,
+        CancellationToken cancellationToken = default);
+
+    Task<ReportFile> ExportProfitabilityAsync(
         ReportExportFormat format,
         ReportQuery query,
         CancellationToken cancellationToken = default);

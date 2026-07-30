@@ -4,7 +4,7 @@ using ReeTrack.Application.Common.Models;
 
 namespace ReeTrack.Infrastructure.Reports.Writers;
 
-public sealed class ExcelDetailedReportWriter : IDetailedReportWriter
+public sealed class ExcelDetailedReportWriter : IReportWriter<DetailedReportDto>
 {
     private const int EntryColumnCount = 18;
 
@@ -59,7 +59,7 @@ public sealed class ExcelDetailedReportWriter : IDetailedReportWriter
 
         row++;
         ws.Cell(row, 1).Value = "Basis";
-        foreach (var line in ReportFormat.BasisLines(model))
+        foreach (var line in ReportFormat.DetailedBasisLines(model))
         {
             row++;
             ws.Cell(row, 2).Value = line;

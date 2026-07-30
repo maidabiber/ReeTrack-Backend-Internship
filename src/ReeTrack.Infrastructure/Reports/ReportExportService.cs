@@ -7,41 +7,72 @@ namespace ReeTrack.Infrastructure.Reports;
 public sealed class ReportExportService : IReportExportService
 {
     private readonly IReportService _reports;
-    private readonly IReadOnlyDictionary<ReportExportFormat, IReportWriter> _summaryWriters;
-    private readonly IReadOnlyDictionary<ReportExportFormat, IDetailedReportWriter> _detailedWriters;
+    private readonly IReadOnlyDictionary<ReportExportFormat, IReportWriter<SummaryReportDto>> _summaryWriters;
+    private readonly IReadOnlyDictionary<ReportExportFormat, IReportWriter<DetailedReportDto>> _detailedWriters;
+    private readonly IReadOnlyDictionary<ReportExportFormat, IReportWriter<WorkloadReportDto>> _workloadWriters;
+    private readonly IReadOnlyDictionary<ReportExportFormat, IReportWriter<ProfitabilityReportDto>> _profitabilityWriters;
 
     public ReportExportService(
         IReportService reports,
-        IEnumerable<IReportWriter> summaryWriters,
-        IEnumerable<IDetailedReportWriter> detailedWriters)
+        IEnumerable<IReportWriter<SummaryReportDto>> summaryWriters,
+        IEnumerable<IReportWriter<DetailedReportDto>> detailedWriters,
+        IEnumerable<IReportWriter<WorkloadReportDto>> workloadWriters,
+        IEnumerable<IReportWriter<ProfitabilityReportDto>> profitabilityWriters)
     {
         _reports = reports;
-        _summaryWriters = summaryWriters.ToDictionary(w => w.Format);
-        _detailedWriters = detailedWriters.ToDictionary(w => w.Format);
+        _summaryWriters = ToDictionary(summaryWriters);
+        _detailedWriters = ToDictionary(detailedWriters);
+        _workloadWriters = ToDictionary(workloadWriters);
+        _profitabilityWriters = ToDictionary(profitabilityWriters);
     }
 
-    public async Task<ReportFile> ExportSummaryAsync(
+    public Task<ReportFile> ExportSummaryAsync(
         ReportExportFormat format,
         ReportQuery query,
-        CancellationToken cancellationToken = default)
-    {
-        if (!_summaryWriters.TryGetValue(format, out var writer))
-            throw new AppException($"Unsupported export format '{format}'.", 400);
+        CancellationToken cancellationToken = default) =>
+        ExportAsync(_summaryWriters, format, () => _reports.GetSummaryAsync(query, cancellationToken));
 
-        var summary = await _reports.GetSummaryAsync(query, cancellationToken);
-        return writer.Write(summary);
-    }
-
-    public async Task<ReportFile> ExportDetailedAsync(
+    public Task<ReportFile> ExportDetailedAsync(
         ReportExportFormat format,
         ReportQuery query,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default) =>
+        ExportAsync(
+            _detailedWriters,
+            format,
+            () => _reports.GetDetailedAsync(query, page: 1, pageSize: 0, cancellationToken));
+
+    public Task<ReportFile> ExportWorkloadAsync(
+        ReportExportFormat format,
+        ReportQuery query,
+        CancellationToken cancellationToken = default) =>
+        ExportAsync(_workloadWriters, format, () => _reports.GetWorkloadAsync(query, cancellationToken));
+
+    public Task<ReportFile> ExportProfitabilityAsync(
+        ReportExportFormat format,
+        ReportQuery query,
+        CancellationToken cancellationToken = default) =>
+        ExportAsync(_profitabilityWriters, format, () => _reports.GetProfitabilityAsync(query, cancellationToken));
+
+    /// <summary>
+    /// The four Export*Async methods above were textually identical modulo which
+    /// dictionary they looked in and which <see cref="IReportService"/> call loaded the
+    /// model — <see cref="IReportService"/> has four differently-shaped methods (e.g.
+    /// Detailed takes paging params), so this takes the load as a delegate rather than
+    /// unifying <see cref="IReportService"/> itself.
+    /// </summary>
+    private static async Task<ReportFile> ExportAsync<TModel>(
+        IReadOnlyDictionary<ReportExportFormat, IReportWriter<TModel>> writers,
+        ReportExportFormat format,
+        Func<Task<TModel>> loadModel)
     {
-        if (!_detailedWriters.TryGetValue(format, out var writer))
+        if (!writers.TryGetValue(format, out var writer))
             throw new AppException($"Unsupported export format '{format}'.", 400);
 
-        // pageSize <= 0 returns every filtered row for the audit export.
-        var detailed = await _reports.GetDetailedAsync(query, page: 1, pageSize: 0, cancellationToken);
-        return writer.Write(detailed);
+        var model = await loadModel();
+        return writer.Write(model);
     }
+
+    private static IReadOnlyDictionary<ReportExportFormat, IReportWriter<TModel>> ToDictionary<TModel>(
+        IEnumerable<IReportWriter<TModel>> writers) =>
+        writers.ToDictionary(w => w.Format);
 }

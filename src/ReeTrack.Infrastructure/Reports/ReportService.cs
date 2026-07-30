@@ -1,8 +1,9 @@
-using Microsoft.EntityFrameworkCore;
 using ReeTrack.Application.Common.Interfaces;
 using ReeTrack.Application.Common.Models;
+using ReeTrack.Application.Reports;
 using ReeTrack.Domain.Entities;
 using ReeTrack.Domain.Services;
+using ReeTrack.Infrastructure.Reports.Writers;
 using ReeTrack.Infrastructure.Timesheets;
 
 namespace ReeTrack.Infrastructure.Reports;
@@ -34,24 +35,16 @@ public sealed class ReportService : IReportService
         var entries = data.Entries;
         var ratesByUser = data.UserRates.ToLookup(rate => rate.UserId);
 
-        var totalSeconds = entries.Sum(e => (long)e.DurationSeconds);
-        var billableSeconds = entries.Where(e => e.IsBillable).Sum(e => (long)e.DurationSeconds);
-        var nonBillableSeconds = totalSeconds - billableSeconds;
-        // Entries with no project never reach BuildProjectSummaries, so the project
-        // rows alone do not add up to TotalSeconds. Surfaced so every breakdown ties.
-        var unassignedSeconds = entries
-            .Where(e => e.ProjectId is null || e.Project is null)
-            .Sum(e => (long)e.DurationSeconds);
+        var basics = ComputeBasicKpis(entries);
 
         var activity = ReportAggregations.BuildActivity(
-            entries.Select(e => (ResolveEntryDate(e).DayOfWeek, (long)e.DurationSeconds)));
+            entries.Select(e => (ReportMetadataResolver.ResolveEntryDate(e).DayOfWeek, (long)e.DurationSeconds)));
 
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var trendEndDate = data.Query.To is { } to && to < today ? to : today;
         var trendEndWeek = TimesheetWeek.ToWeekStart(trendEndDate);
-        // Same StartedAtUtc ?? CreatedAtUtc rule as activity / cost calculator.
         var weeklyTrend = ReportAggregations.BuildWeeklyTrend(
-            entries.Select(e => (ResolveEntryInstant(e), (long)e.DurationSeconds)),
+            entries.Select(e => (ReportMetadataResolver.ResolveEntryInstant(e), (long)e.DurationSeconds)),
             trendEndWeek);
 
         var members = entries
@@ -72,7 +65,8 @@ public sealed class ReportService : IReportService
             .ThenBy(m => m.DisplayName, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
-        var projects = BuildProjectSummaries(
+        var projects = ProjectSummaryBuilder.Build(
+            _calculator,
             entries,
             data.OvertimeContext,
             ratesByUser,
@@ -81,20 +75,15 @@ public sealed class ReportService : IReportService
 
         return new SummaryReportDto
         {
-            Kpis = new ReportKpisDto
-            {
-                TotalSeconds = totalSeconds,
-                BillableSeconds = billableSeconds,
-                NonBillableSeconds = nonBillableSeconds,
-                BillablePct = ReportAggregations.BillablePct(billableSeconds, totalSeconds),
-                EntryCount = entries.Count,
-                ActiveMembers = members.Count,
-                ActiveProjects = projects.Count,
-                OvertimeHours = projects.Sum(p => p.OvertimeHours),
-                WeekendHours = projects.Sum(p => p.WeekendHours),
-                HolidayHours = projects.Sum(p => p.HolidayHours),
-                UnassignedSeconds = unassignedSeconds
-            },
+            Kpis = BuildKpis(
+                basics,
+                entries.Count,
+                activeMembers: members.Count,
+                activeProjects: projects.Count,
+                overtimeHours: projects.Sum(p => p.OvertimeHours),
+                weekendHours: projects.Sum(p => p.WeekendHours),
+                holidayHours: projects.Sum(p => p.HolidayHours)),
+            Basis = MapBasis(data.MultiplierConfig),
             Activity = activity,
             WeeklyTrend = weeklyTrend,
             Projects = projects,
@@ -102,17 +91,10 @@ public sealed class ReportService : IReportService
             GeneratedAtUtc = DateTime.UtcNow,
             FirstEntryDate = entries.Count == 0
                 ? null
-                : entries.Min(ResolveEntryDate),
+                : entries.Min(ReportMetadataResolver.ResolveEntryDate),
             FilterFromDate = data.Query.From,
             FilterToDate = data.Query.To,
             GeneratedByName = await ResolveGeneratedByAsync(cancellationToken),
-            Basis = new ReportBasisDto
-            {
-                WeekendPremium = data.MultiplierConfig.WeekendPremium,
-                HolidayPremium = data.MultiplierConfig.HolidayPremium,
-                OvertimePremium = data.MultiplierConfig.OvertimePremium,
-                WeeklyOvertimeThresholdHours = data.MultiplierConfig.WeeklyOvertimeThresholdHours
-            }
         };
     }
 
@@ -134,7 +116,7 @@ public sealed class ReportService : IReportService
         var costByEntryId = costLines.ToDictionary(line => line.EntryId);
 
         var detailedEntries = entries
-            .Select(entry => MapDetailedEntry(entry, costByEntryId.GetValueOrDefault(entry.Id)))
+            .Select(entry => DetailedEntryMapper.Map(entry, costByEntryId.GetValueOrDefault(entry.Id)))
             .ToList();
 
         var sorted = DetailedReportGrouping.Sort(detailedEntries, data.Query.GroupBy);
@@ -160,42 +142,26 @@ public sealed class ReportService : IReportService
                 .ToList();
         }
 
-        var totalSeconds = entries.Sum(e => (long)e.DurationSeconds);
-        var billableSeconds = entries.Where(e => e.IsBillable).Sum(e => (long)e.DurationSeconds);
-        var unassignedSeconds = entries
-            .Where(e => e.ProjectId is null || e.Project is null)
-            .Sum(e => (long)e.DurationSeconds);
+        var basics = ComputeBasicKpis(entries);
 
         return new DetailedReportDto
         {
-            Kpis = new ReportKpisDto
-            {
-                TotalSeconds = totalSeconds,
-                BillableSeconds = billableSeconds,
-                NonBillableSeconds = totalSeconds - billableSeconds,
-                BillablePct = ReportAggregations.BillablePct(billableSeconds, totalSeconds),
-                EntryCount = entries.Count,
-                ActiveMembers = entries.Select(e => e.UserId).Distinct().Count(),
-                ActiveProjects = entries
+            Kpis = BuildKpis(
+                basics,
+                entries.Count,
+                activeMembers: entries.Select(e => e.UserId).Distinct().Count(),
+                activeProjects: entries
                     .Where(e => e.ProjectId is not null && e.Project is not null)
                     .Select(e => e.ProjectId!.Value)
                     .Distinct()
                     .Count(),
-                OvertimeHours = costLines.Sum(line => line.OvertimeHours),
-                WeekendHours = costLines.Sum(line => line.WeekendHours),
-                HolidayHours = costLines.Sum(line => line.HolidayHours),
-                UnassignedSeconds = unassignedSeconds
-            },
-            Basis = new ReportBasisDto
-            {
-                WeekendPremium = data.MultiplierConfig.WeekendPremium,
-                HolidayPremium = data.MultiplierConfig.HolidayPremium,
-                OvertimePremium = data.MultiplierConfig.OvertimePremium,
-                WeeklyOvertimeThresholdHours = data.MultiplierConfig.WeeklyOvertimeThresholdHours
-            },
+                overtimeHours: ReportRounding.Hours(costLines.Sum(line => line.OvertimeHours)),
+                weekendHours: ReportRounding.Hours(costLines.Sum(line => line.WeekendHours)),
+                holidayHours: ReportRounding.Hours(costLines.Sum(line => line.HolidayHours))),
+            Basis = MapBasis(data.MultiplierConfig),
             GeneratedAtUtc = DateTime.UtcNow,
             GeneratedByName = await ResolveGeneratedByAsync(cancellationToken),
-            FirstEntryDate = entries.Count == 0 ? null : entries.Min(ResolveEntryDate),
+            FirstEntryDate = entries.Count == 0 ? null : entries.Min(ReportMetadataResolver.ResolveEntryDate),
             FilterFromDate = data.Query.From,
             FilterToDate = data.Query.To,
             Entries = pageEntries,
@@ -206,159 +172,222 @@ public sealed class ReportService : IReportService
         };
     }
 
-    private static DetailedEntryDto MapDetailedEntry(TimeEntry entry, EntryCostLine? cost)
+    public async Task<WorkloadReportDto> GetWorkloadAsync(
+        ReportQuery query,
+        CancellationToken cancellationToken = default)
     {
-        var user = entry.User;
-        var displayName = string.IsNullOrWhiteSpace(user?.DisplayName)
-            ? user?.Email ?? entry.UserId.ToString()
-            : user.DisplayName;
+        var data = await _pipeline.LoadAsync(query, cancellationToken);
+        var entries = data.Entries;
+        var (allocations, grandTotal, grandBillable) = WorkloadMatrixBuilder.Build(entries);
 
-        var clientName = entry.Client?.Name
-            ?? entry.Project?.Client?.Name;
-        var clientId = entry.ClientId
-            ?? entry.Project?.ClientId
-            ?? entry.Client?.Id
-            ?? entry.Project?.Client?.Id;
+        var costLines = _calculator.CalculateEntries(
+            entries,
+            data.OvertimeContext,
+            data.UserRates,
+            data.Holidays,
+            data.MultiplierConfig);
 
-        var emptyCost = cost is null;
-        return new DetailedEntryDto
+        var basics = ComputeBasicKpis(entries);
+
+        var overtimeHours = ReportRounding.Hours(costLines.Sum(line => line.OvertimeHours));
+        var weekendHours = ReportRounding.Hours(costLines.Sum(line => line.WeekendHours));
+        var holidayHours = ReportRounding.Hours(costLines.Sum(line => line.HolidayHours));
+
+        return new WorkloadReportDto
         {
-            EntryId = entry.Id,
-            EntryDate = ResolveEntryDate(entry),
-            StartedAtUtc = entry.StartedAtUtc,
-            EndedAtUtc = entry.EndedAtUtc,
-            UserId = entry.UserId,
-            DisplayName = displayName,
-            ClientId = clientId,
-            ClientName = clientName,
-            ProjectId = entry.ProjectId,
-            ProjectName = entry.Project?.Name,
-            TaskId = entry.ProjectTaskId,
-            TaskName = entry.ProjectTask?.Name,
-            Tags = entry.TimeEntryTags
-                .Where(t => t.Tag is not null && t.Tag.DeletedAtUtc is null)
-                .Select(t => t.Tag.Name)
-                .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
-                .ToList(),
-            Description = entry.Description,
-            IsBillable = entry.IsBillable,
-            DurationSeconds = entry.DurationSeconds,
-            CurrencyCode = entry.Project?.CurrencyCode,
-            CalculatedCost = emptyCost ? 0m : cost!.CalculatedCost,
-            NormalCost = emptyCost ? 0m : cost!.NormalCost,
-            WeekendCost = emptyCost ? 0m : cost!.WeekendCost,
-            HolidayCost = emptyCost ? 0m : cost!.HolidayCost,
-            OvertimeCost = emptyCost ? 0m : cost!.OvertimeCost,
-            OvertimeHours = emptyCost ? 0m : cost!.OvertimeHours,
-            WeekendHours = emptyCost ? 0m : cost!.WeekendHours,
-            HolidayHours = emptyCost ? 0m : cost!.HolidayHours,
-            IsWeekend = cost?.IsWeekend
-                ?? ResolveEntryDate(entry).DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday,
-            IsHoliday = cost?.IsHoliday ?? false
+            Kpis = BuildKpis(
+                basics,
+                entries.Count,
+                activeMembers: allocations.Select(a => a.UserId).Distinct().Count(),
+                activeProjects: entries
+                    .Where(e => e.ProjectId is not null && e.Project is not null)
+                    .Select(e => e.ProjectId!.Value)
+                    .Distinct()
+                    .Count(),
+                overtimeHours,
+                weekendHours,
+                holidayHours),
+            Basis = MapBasis(data.MultiplierConfig),
+            GeneratedAtUtc = DateTime.UtcNow,
+            GeneratedByName = await ResolveGeneratedByAsync(cancellationToken),
+            FirstEntryDate = entries.Count == 0 ? null : entries.Min(ReportMetadataResolver.ResolveEntryDate),
+            FilterFromDate = data.Query.From,
+            FilterToDate = data.Query.To,
+            Allocations = allocations,
+            GrandTotalSeconds = grandTotal,
+            GrandTotalBillableSeconds = grandBillable,
+            Schedule =
+            [
+                new WorkloadScheduleDto
+                {
+                    Label = "Overtime",
+                    Hours = overtimeHours,
+                    PctOfTotalHours = SummaryReportAnalytics.PctOfTotal(
+                        (long)Math.Round(overtimeHours * 3600m, MidpointRounding.AwayFromZero),
+                        basics.TotalSeconds)
+                },
+                new WorkloadScheduleDto
+                {
+                    Label = "Weekend",
+                    Hours = weekendHours,
+                    PctOfTotalHours = SummaryReportAnalytics.PctOfTotal(
+                        (long)Math.Round(weekendHours * 3600m, MidpointRounding.AwayFromZero),
+                        basics.TotalSeconds)
+                },
+                new WorkloadScheduleDto
+                {
+                    Label = "Holiday",
+                    Hours = holidayHours,
+                    PctOfTotalHours = SummaryReportAnalytics.PctOfTotal(
+                        (long)Math.Round(holidayHours * 3600m, MidpointRounding.AwayFromZero),
+                        basics.TotalSeconds)
+                }
+            ]
         };
     }
 
-    private IReadOnlyList<ProjectSummaryDto> BuildProjectSummaries(
-        IReadOnlyList<TimeEntry> selectedEntries,
-        IReadOnlyList<TimeEntry> overtimeContext,
-        ILookup<Guid, UserHourlyRate> ratesByUser,
-        IReadOnlySet<DateOnly> holidays,
-        RateMultiplierConfig multiplierConfig)
+    public async Task<ProfitabilityReportDto> GetProfitabilityAsync(
+        ReportQuery query,
+        CancellationToken cancellationToken = default)
     {
-        var projectGroups = selectedEntries
-            .Where(e => e.ProjectId is not null && e.Project is not null)
+        var data = await _pipeline.LoadAsync(query, cancellationToken);
+        var entries = data.Entries;
+        var ratesByUser = data.UserRates.ToLookup(rate => rate.UserId);
+
+        var projects = ProjectSummaryBuilder.Build(
+            _calculator,
+            entries,
+            data.OvertimeContext,
+            ratesByUser,
+            data.Holidays,
+            data.MultiplierConfig);
+
+        var billableByProject = entries
+            .Where(e => e.ProjectId is not null)
             .GroupBy(e => e.ProjectId!.Value)
-            .ToList();
+            .ToDictionary(
+                g => g.Key,
+                g => g.Where(e => e.IsBillable).Sum(e => (long)e.DurationSeconds));
 
-        // Index once instead of rescanning the whole portfolio per project: the window
-        // slice below was O(projects × entries) and allocated a fresh list each pass.
-        // Order is irrelevant — ProjectCostCalculator sorts by instant itself.
-        var entriesByUser = overtimeContext
-            .GroupBy(e => e.UserId)
-            .ToDictionary(g => g.Key, g => g.ToList());
+        var (projectRows, byCurrency) = ProfitabilityRollupBuilder.Build(projects, billableByProject);
 
-        var results = new List<ProjectSummaryDto>(projectGroups.Count);
+        var costLines = _calculator.CalculateEntries(
+            entries,
+            data.OvertimeContext,
+            data.UserRates,
+            data.Holidays,
+            data.MultiplierConfig);
+        var costByEntryId = costLines.ToDictionary(line => line.EntryId);
 
-        foreach (var group in projectGroups)
-        {
-            var project = group.First().Project!;
-            var projectEntries = group.ToList();
-            var userIds = projectEntries.Select(e => e.UserId).Distinct().ToHashSet();
-
-            // Same cross-project week window as ProjectCostService, sliced from the
-            // already-loaded portfolio set (no per-project queries).
-            // A GroupBy group is never empty, so the window always resolves.
-            var window = WeekWindow.Covering(projectEntries.Select(ResolveEntryDate))!.Value;
-            var crossProjectUserEntries = userIds
-                .SelectMany(id => entriesByUser[id])
-                .Where(e => window.Contains(ResolveEntryInstant(e)))
-                .ToList();
-
-            var projectRates = userIds
-                .SelectMany(id => ratesByUser[id])
-                .ToList();
-
-            var cost = _calculator.Calculate(
-                project,
-                projectEntries,
-                crossProjectUserEntries,
-                projectRates,
-                holidays,
-                multiplierConfig);
-
-            results.Add(new ProjectSummaryDto
+        var members = entries
+            .GroupBy(e => (
+                e.UserId,
+                Currency: NormaliseCurrency(e.Project?.CurrencyCode)))
+            .Select(g =>
             {
-                ProjectId = project.Id,
-                Name = project.Name,
-                CurrencyCode = project.CurrencyCode,
-                ClientName = project.Client?.Name ?? string.Empty,
-                Status = project.Status.ToString(),
-                HourlyRate = project.HourlyRate,
-                FixedFeeAmount = project.FixedFeeAmount,
-                TimeEstimateHours = project.TimeEstimateHours,
-                TotalSeconds = projectEntries.Sum(e => (long)e.DurationSeconds),
-                CalculatedCost = cost.CalculatedCost,
-                NormalCost = cost.NormalCost,
-                WeekendCost = cost.WeekendCost,
-                HolidayCost = cost.HolidayCost,
-                OvertimeCost = cost.OvertimeCost,
-                OvertimeHours = cost.OvertimeHours,
-                WeekendHours = cost.WeekendHours,
-                HolidayHours = cost.HolidayHours
-            });
-        }
-
-        return results
-            .OrderByDescending(p => p.TotalSeconds)
-            .ThenBy(p => p.Name, StringComparer.OrdinalIgnoreCase)
+                var user = g.First().User;
+                var displayName = string.IsNullOrWhiteSpace(user?.DisplayName)
+                    ? user?.Email ?? g.Key.UserId.ToString()
+                    : user.DisplayName;
+                return new MemberLabourCostDto
+                {
+                    UserId = g.Key.UserId,
+                    DisplayName = displayName,
+                    CurrencyCode = g.Key.Currency,
+                    TotalSeconds = g.Sum(e => (long)e.DurationSeconds),
+                    LabourCost = ReportRounding.Cost(
+                        g.Sum(e => costByEntryId.GetValueOrDefault(e.Id)?.CalculatedCost ?? 0m))
+                };
+            })
+            .OrderByDescending(m => m.LabourCost)
+            .ThenBy(m => m.DisplayName, StringComparer.OrdinalIgnoreCase)
             .ToList();
+
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var trendEndDate = data.Query.To is { } to && to < today ? to : today;
+        var trendEndWeek = TimesheetWeek.ToWeekStart(trendEndDate);
+        var weeklyTrend = ProfitabilityTrendBuilder.Build(entries, projectRows, trendEndWeek);
+
+        var basics = ComputeBasicKpis(entries);
+
+        return new ProfitabilityReportDto
+        {
+            Kpis = BuildKpis(
+                basics,
+                entries.Count,
+                activeMembers: entries.Select(e => e.UserId).Distinct().Count(),
+                activeProjects: projectRows.Count,
+                overtimeHours: ReportRounding.Hours(costLines.Sum(line => line.OvertimeHours)),
+                weekendHours: ReportRounding.Hours(costLines.Sum(line => line.WeekendHours)),
+                holidayHours: ReportRounding.Hours(costLines.Sum(line => line.HolidayHours))),
+            Basis = MapBasis(data.MultiplierConfig),
+            GeneratedAtUtc = DateTime.UtcNow,
+            GeneratedByName = await ResolveGeneratedByAsync(cancellationToken),
+            FirstEntryDate = entries.Count == 0 ? null : entries.Min(ReportMetadataResolver.ResolveEntryDate),
+            FilterFromDate = data.Query.From,
+            FilterToDate = data.Query.To,
+            ByCurrency = byCurrency,
+            WeeklyTrend = weeklyTrend,
+            Projects = projectRows,
+            Members = members,
+            RevenueBasisLines = ReportFormat.ProfitabilityRevenueLines()
+        };
     }
 
     /// <summary>
-    /// Who ran the report, for export provenance. Never throws — an unresolvable user
-    /// degrades the footer line, it must not fail the report.
+    /// The six KPI fields every report shares (total/billable/non-billable seconds,
+    /// billable %, entry count, unassigned seconds) plus the per-report figures that
+    /// vary (active members/projects, overtime/weekend/holiday hours).
     /// </summary>
-    private async Task<string?> ResolveGeneratedByAsync(CancellationToken cancellationToken)
+    private static ReportKpisDto BuildKpis(
+        BasicKpis basics,
+        int entryCount,
+        int activeMembers,
+        int activeProjects,
+        decimal overtimeHours,
+        decimal weekendHours,
+        decimal holidayHours) =>
+        new()
+        {
+            TotalSeconds = basics.TotalSeconds,
+            BillableSeconds = basics.BillableSeconds,
+            NonBillableSeconds = basics.TotalSeconds - basics.BillableSeconds,
+            BillablePct = ReportAggregations.BillablePct(basics.BillableSeconds, basics.TotalSeconds),
+            EntryCount = entryCount,
+            ActiveMembers = activeMembers,
+            ActiveProjects = activeProjects,
+            OvertimeHours = overtimeHours,
+            WeekendHours = weekendHours,
+            HolidayHours = holidayHours,
+            UnassignedSeconds = basics.UnassignedSeconds
+        };
+
+    private static string NormaliseCurrency(string? currencyCode) =>
+        string.IsNullOrWhiteSpace(currencyCode)
+            ? SummaryReportAnalytics.NoCurrencyCode
+            : currencyCode.Trim().ToUpperInvariant();
+
+    private sealed record BasicKpis(long TotalSeconds, long BillableSeconds, long UnassignedSeconds);
+
+    private static BasicKpis ComputeBasicKpis(IReadOnlyList<TimeEntry> entries)
     {
-        if (!_currentUser.IsAuthenticated)
-            return null;
-
-        var userId = _currentUser.UserId;
-        var user = await _db.Users
-            .AsNoTracking()
-            .Where(u => u.Id == userId)
-            .Select(u => new { u.DisplayName, u.Email })
-            .FirstOrDefaultAsync(cancellationToken);
-
-        if (user is null)
-            return null;
-
-        return string.IsNullOrWhiteSpace(user.DisplayName) ? user.Email : user.DisplayName;
+        var totalSeconds = entries.Sum(e => (long)e.DurationSeconds);
+        var billableSeconds = entries.Where(e => e.IsBillable).Sum(e => (long)e.DurationSeconds);
+        var unassignedSeconds = entries
+            .Where(e => e.ProjectId is null || e.Project is null)
+            .Sum(e => (long)e.DurationSeconds);
+        return new BasicKpis(totalSeconds, billableSeconds, unassignedSeconds);
     }
 
-    private static DateTime ResolveEntryInstant(TimeEntry entry) =>
-        entry.StartedAtUtc ?? entry.CreatedAtUtc;
+    private static ReportBasisDto MapBasis(RateMultiplierConfig config) =>
+        new()
+        {
+            WeekendPremium = config.WeekendPremium,
+            HolidayPremium = config.HolidayPremium,
+            OvertimePremium = config.OvertimePremium,
+            WeeklyOvertimeThresholdHours = config.WeeklyOvertimeThresholdHours
+        };
 
-    private static DateOnly ResolveEntryDate(TimeEntry entry) =>
-        DateOnly.FromDateTime(ResolveEntryInstant(entry));
+    private Task<string?> ResolveGeneratedByAsync(CancellationToken cancellationToken) =>
+        ReportMetadataResolver.ResolveGeneratedByAsync(_db, _currentUser, cancellationToken);
 }

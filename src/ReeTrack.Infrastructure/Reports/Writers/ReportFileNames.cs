@@ -10,6 +10,12 @@ internal static class ReportFileNames
     public static string ForDetailed(ReportExportFormat format, DateTime generatedAtUtc) =>
         For("detailed", format, generatedAtUtc);
 
+    public static string ForWorkload(ReportExportFormat format, DateTime generatedAtUtc) =>
+        For("workload", format, generatedAtUtc);
+
+    public static string ForProfitability(ReportExportFormat format, DateTime generatedAtUtc) =>
+        For("profitability", format, generatedAtUtc);
+
     private static string For(string kind, ReportExportFormat format, DateTime generatedAtUtc)
     {
         var date = generatedAtUtc.ToString("yyyyMMdd");

@@ -39,6 +39,49 @@ public class ReportQueryRulesTests
     }
 
     [Fact]
+    public void NormalizeAndValidate_ExplicitRangeOver400Days_ThrowsBadRequest()
+    {
+        var query = new ReportQuery
+        {
+            From = new DateOnly(2024, 1, 1),
+            To = new DateOnly(2026, 1, 1) // ~731 days
+        };
+
+        var error = Assert.Throws<AppException>(
+            () => ReportQueryRules.NormalizeAndValidate(query));
+
+        Assert.Equal(400, error.StatusCode);
+    }
+
+    [Fact]
+    public void NormalizeAndValidate_ExplicitRangeExactlyAtLimit_Passes()
+    {
+        var query = new ReportQuery
+        {
+            From = new DateOnly(2025, 1, 1),
+            To = new DateOnly(2025, 1, 1).AddDays(400)
+        };
+
+        var normalized = ReportQueryRules.NormalizeAndValidate(query);
+
+        Assert.Equal(query.From, normalized.From);
+        Assert.Equal(query.To, normalized.To);
+    }
+
+    [Fact]
+    public void NormalizeAndValidate_FullyOpenRange_IsNotBoundByTheRangeGuard()
+    {
+        // "All time" (no From, no To) is an intentionally supported report — the
+        // max-range guard only fires on an explicit From+To span, not this case.
+        var query = new ReportQuery();
+
+        var normalized = ReportQueryRules.NormalizeAndValidate(query);
+
+        Assert.Null(normalized.From);
+        Assert.Null(normalized.To);
+    }
+
+    [Fact]
     public void NormalizeAndValidate_TooManyValues_ThrowsBadRequest()
     {
         var query = new ReportQuery

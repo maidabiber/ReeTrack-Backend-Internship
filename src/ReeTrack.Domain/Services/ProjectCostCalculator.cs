@@ -173,17 +173,22 @@ public sealed class ProjectCostCalculator : IProjectCostCalculator
                 ref holidayCost,
                 ref overtimeCost);
 
+            // Unrounded: this line feeds both Calculate() (which sums many lines and
+            // rounds once at the end) and CalculateEntries() consumers, who round at
+            // their own presentation boundary. Rounding here caused a regression where
+            // Calculate() summed already-rounded lines and rounded again (double
+            // rounding), drifting from master by up to N × 0.005 across N entries.
             lines.Add(new EntryCostLine(
                 entry.Id,
-                Math.Round(entryCost, 2, MidpointRounding.AwayFromZero),
-                Math.Round(normalCost, 2, MidpointRounding.AwayFromZero),
-                Math.Round(weekendCost, 2, MidpointRounding.AwayFromZero),
-                Math.Round(holidayCost, 2, MidpointRounding.AwayFromZero),
-                Math.Round(overtimeCost, 2, MidpointRounding.AwayFromZero),
-                Math.Round(entryHours, 4, MidpointRounding.AwayFromZero),
-                Math.Round(entryWeekendHours, 4, MidpointRounding.AwayFromZero),
-                Math.Round(entryHolidayHours, 4, MidpointRounding.AwayFromZero),
-                Math.Round(entryOvertimeHours, 4, MidpointRounding.AwayFromZero),
+                entryCost,
+                normalCost,
+                weekendCost,
+                holidayCost,
+                overtimeCost,
+                entryHours,
+                entryWeekendHours,
+                entryHolidayHours,
+                entryOvertimeHours,
                 isWeekend,
                 isHoliday));
         }

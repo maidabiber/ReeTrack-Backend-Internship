@@ -2,10 +2,11 @@ using ClosedXML.Excel;
 using ReeTrack.Application.Common.Interfaces;
 using ReeTrack.Application.Common.Models;
 using ReeTrack.Application.Reports;
+using static ReeTrack.Infrastructure.Reports.Writers.ExcelReportStyles;
 
 namespace ReeTrack.Infrastructure.Reports.Writers;
 
-public sealed class ExcelReportWriter : IReportWriter
+public sealed class ExcelReportWriter : IReportWriter<SummaryReportDto>
 {
     public ReportExportFormat Format => ReportExportFormat.Xlsx;
 
@@ -141,7 +142,7 @@ public sealed class ExcelReportWriter : IReportWriter
         StyleHeaderBand(ws.Range(row, 1, row, 6));
         row++;
 
-        foreach (var line in ReportFormat.BasisLines(model))
+        foreach (var line in ReportFormat.SummaryBasisLines(model))
         {
             ws.Cell(row, 1).Value = line;
             ws.Range(row, 1, row, 6).Merge();
@@ -426,44 +427,4 @@ public sealed class ExcelReportWriter : IReportWriter
         ws.SheetView.FreezeRows(1);
         ws.Columns().AdjustToContents();
     }
-
-    private static void AddDataBars(IXLRange range)
-    {
-        // ClosedXML data bars = the chart substitute. Brand fill, show cell values.
-        range.AddConditionalFormat()
-            .DataBar(XLColor.FromHtml(ReportColors.Brand), true)
-            .Minimum(XLCFContentType.Number, 0)
-            .Maximum(XLCFContentType.Maximum, 0);
-    }
-
-    private static string CurrencyFormat(string currencyCode)
-    {
-        var code = string.IsNullOrWhiteSpace(currencyCode)
-            ? ""
-            : currencyCode.Trim().ToUpperInvariant();
-        return string.IsNullOrEmpty(code)
-            ? "#,##0.00"
-            : $"#,##0.00 \"{code}\"";
-    }
-
-    private static void StyleTitle(IXLCell cell)
-    {
-        cell.Style.Font.Bold = true;
-        cell.Style.Font.FontSize = 16;
-        cell.Style.Font.FontColor = XLColor.FromHtml(ReportColors.Navy);
-    }
-
-    private static void StyleHeaderBand(IXLRange range)
-    {
-        range.Style.Font.Bold = true;
-        range.Style.Font.FontColor = XLColor.FromHtml(ReportColors.HeaderGray);
-        range.Style.Fill.BackgroundColor = XLColor.FromHtml(ReportColors.HeaderGrayBg);
-        range.Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
-    }
-
-    private static void StyleMuted(IXLCell cell) =>
-        cell.Style.Font.FontColor = XLColor.FromHtml(ReportColors.Gray);
-
-    private static void Zebra(IXLRange range) =>
-        range.Style.Fill.BackgroundColor = XLColor.FromHtml(ReportColors.SurfaceMuted);
 }

@@ -17,4 +17,14 @@ public interface IReportService
         int page = 1,
         int pageSize = 50,
         CancellationToken cancellationToken = default);
+
+    /// <summary>Member × dimension hours matrix (RT-52).</summary>
+    Task<WorkloadReportDto> GetWorkloadAsync(
+        ReportQuery query,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>Revenue, labour cost, and margin by currency (RT-53).</summary>
+    Task<ProfitabilityReportDto> GetProfitabilityAsync(
+        ReportQuery query,
+        CancellationToken cancellationToken = default);
 }

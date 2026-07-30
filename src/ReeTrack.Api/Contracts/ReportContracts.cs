@@ -154,6 +154,111 @@ public sealed class DetailedGroupResponse
     public required int EndIndexExclusive { get; init; }
 }
 
+public sealed class WorkloadReportResponse
+{
+    public required ReportKpisResponse Kpis { get; init; }
+    public required ReportBasisResponse Basis { get; init; }
+    public required DateTime GeneratedAtUtc { get; init; }
+    public string? GeneratedByName { get; init; }
+    public DateOnly? FirstEntryDate { get; init; }
+    public DateOnly? FilterFromDate { get; init; }
+    public DateOnly? FilterToDate { get; init; }
+    public required IReadOnlyList<WorkloadAllocationResponse> Allocations { get; init; }
+    public required long GrandTotalSeconds { get; init; }
+    public required long GrandTotalBillableSeconds { get; init; }
+    public required IReadOnlyList<WorkloadScheduleResponse> Schedule { get; init; }
+}
+
+public sealed class WorkloadAllocationResponse
+{
+    public required Guid UserId { get; init; }
+    public required string DisplayName { get; init; }
+    public Guid? ClientId { get; init; }
+    public required string ClientName { get; init; }
+    public Guid? ProjectId { get; init; }
+    public required string ProjectName { get; init; }
+    public required long TotalSeconds { get; init; }
+    public required long BillableSeconds { get; init; }
+    public required decimal PctOfMemberTotal { get; init; }
+}
+
+public sealed class WorkloadScheduleResponse
+{
+    public required string Label { get; init; }
+    public required decimal Hours { get; init; }
+    public required decimal PctOfTotalHours { get; init; }
+}
+
+public sealed class ProfitabilityReportResponse
+{
+    public required ReportKpisResponse Kpis { get; init; }
+    public required ReportBasisResponse Basis { get; init; }
+    public required DateTime GeneratedAtUtc { get; init; }
+    public string? GeneratedByName { get; init; }
+    public DateOnly? FirstEntryDate { get; init; }
+    public DateOnly? FilterFromDate { get; init; }
+    public DateOnly? FilterToDate { get; init; }
+    public required IReadOnlyList<CurrencyFinancialKpisResponse> ByCurrency { get; init; }
+    public required IReadOnlyList<WeeklyFinancialTrendResponse> WeeklyTrend { get; init; }
+    public required IReadOnlyList<ProjectProfitabilityResponse> Projects { get; init; }
+    public required IReadOnlyList<MemberLabourCostResponse> Members { get; init; }
+    public required IReadOnlyList<string> RevenueBasisLines { get; init; }
+}
+
+public sealed class CurrencyFinancialKpisResponse
+{
+    public required string CurrencyCode { get; init; }
+    public required decimal Revenue { get; init; }
+    public required decimal Cost { get; init; }
+    public required decimal Margin { get; init; }
+    public decimal? MarginPct { get; init; }
+    public required decimal BillableHours { get; init; }
+    public required long TotalSeconds { get; init; }
+    public required int ProjectCount { get; init; }
+}
+
+public sealed class WeeklyFinancialTrendResponse
+{
+    public required DateOnly WeekStartDate { get; init; }
+    public required string CurrencyCode { get; init; }
+    public required decimal Revenue { get; init; }
+    public required decimal Cost { get; init; }
+    public required decimal Margin { get; init; }
+}
+
+public sealed class ProjectProfitabilityResponse
+{
+    public required Guid ProjectId { get; init; }
+    public required string Name { get; init; }
+    public required string CurrencyCode { get; init; }
+    public required string ClientName { get; init; }
+    public required string Status { get; init; }
+    public required string BillingModel { get; init; }
+    public decimal? HourlyRate { get; init; }
+    public decimal? FixedFeeAmount { get; init; }
+    public decimal? TimeEstimateHours { get; init; }
+    public decimal? EstimateUsedPct { get; init; }
+    public required long TotalSeconds { get; init; }
+    public required long BillableSeconds { get; init; }
+    public required decimal Revenue { get; init; }
+    public required decimal CalculatedCost { get; init; }
+    public required decimal NormalCost { get; init; }
+    public required decimal WeekendCost { get; init; }
+    public required decimal HolidayCost { get; init; }
+    public required decimal OvertimeCost { get; init; }
+    public required decimal Margin { get; init; }
+    public decimal? MarginPct { get; init; }
+}
+
+public sealed class MemberLabourCostResponse
+{
+    public required Guid UserId { get; init; }
+    public required string DisplayName { get; init; }
+    public required string CurrencyCode { get; init; }
+    public required long TotalSeconds { get; init; }
+    public required decimal LabourCost { get; init; }
+}
+
 public sealed class ReportQueryRequest
 {
     public Guid[]? UserIds { get; init; } = [];

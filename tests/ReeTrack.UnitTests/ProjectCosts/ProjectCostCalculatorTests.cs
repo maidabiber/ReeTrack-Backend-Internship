@@ -359,6 +359,35 @@ public class ProjectCostCalculatorTests
     }
 
     [Fact]
+    public void Calculate_RoundsOnceAtTheEnd_NotPerEntry()
+    {
+        // Regression test for a rounding bug: Calculate() must sum raw per-entry costs
+        // and round only the total, matching the pre-refactor (master) behaviour.
+        // Rounding each entry line first and summing the rounded values double-rounds
+        // and drifts from the true total.
+        //
+        // A rate of 33.335 makes each 1-hour entry's cost land exactly on a rounding
+        // boundary: 33.335 rounds (AwayFromZero) to 33.34, a +0.005 drift per entry.
+        // Correct: sum 20 × 33.335 = 666.70 raw, then round once -> 666.70.
+        // Buggy:   round each line to 33.34, sum 20 of them -> 666.80.
+        var project = CreateProject(hourlyRate: 33.335m);
+
+        // 20 entries, one per week (distinct Mondays), so none crosses the weekly
+        // overtime threshold and none falls on a weekend or holiday.
+        var entries = Enumerable.Range(0, 20)
+            .Select(week => CreateEntry(
+                UserId,
+                durationSeconds: 3600,
+                startedAt: new DateTime(2026, 1, 12, 9, 0, 0, DateTimeKind.Utc).AddDays(7 * week)))
+            .ToList();
+
+        var result = CreateCalculator().Calculate(
+            project, entries, entries, [], new HashSet<DateOnly>(), RateMultiplierConfig.Defaults);
+
+        Assert.Equal(666.70m, result.CalculatedCost);
+    }
+
+    [Fact]
     public void CalculateEntries_ReconcilesToProjectCalculate()
     {
         var project = CreateProject(hourlyRate: 100m);

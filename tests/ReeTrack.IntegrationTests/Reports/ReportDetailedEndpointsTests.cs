@@ -16,6 +16,17 @@ public class ReportDetailedEndpointsTests
     private static DateOnly CurrentWeek => TimesheetWeek.ToWeekStart(DateTime.UtcNow);
 
     [Fact]
+    public async Task GetDetailed_Anonymous_ReturnsUnauthorized()
+    {
+        using var factory = new ReeTrackWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        var response = await client.GetAsync("/api/reports/detailed");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
     public async Task GetDetailed_AsMember_ReturnsForbidden()
     {
         using var factory = new ReeTrackWebApplicationFactory();

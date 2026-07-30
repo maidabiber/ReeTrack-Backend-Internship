@@ -112,6 +112,54 @@ public class ReportFormatTests
     }
 
     [Fact]
+    public void WorkloadBasisLines_OnlyHasTheConfirmedOnlyCaveat()
+    {
+        // Workload carries no cost, revenue or currency at all, so the premium/cost/
+        // currency lines that apply to the money-bearing reports would be noise here.
+        var lines = ReportFormat.WorkloadBasisLines(SampleBasis());
+
+        var line = Assert.Single(lines);
+        Assert.Contains("Confirmed time entries only", line);
+    }
+
+    [Fact]
+    public void SummaryBasisLines_DropsTheCrossCurrencyCaveat()
+    {
+        // Summary/Detailed show cost, so premiums and cost-vs-revenue still matter, but
+        // they never present one figure that mixes currencies, unlike Profitability.
+        var lines = ReportFormat.SummaryBasisLines(SampleBasis());
+
+        Assert.Equal(4, lines.Count);
+        Assert.Contains(lines, l => l.Contains("Confirmed time entries only"));
+        Assert.Contains(lines, l => l.Contains("Weekend +50%"));
+        Assert.Contains(lines, l => l.Contains("not client revenue"));
+        Assert.Contains(lines, l => l.Contains("determined in UTC"));
+        Assert.DoesNotContain(lines, l => l.Contains("never summed across currencies"));
+    }
+
+    [Fact]
+    public void ProfitabilityBasisLines_KeepsCrossCurrencyCaveat_AndAppendsRevenueRules()
+    {
+        var lines = ReportFormat.ProfitabilityBasisLines(SampleBasis());
+
+        Assert.Equal(8, lines.Count);
+        Assert.Contains(lines, l => l.Contains("never summed across currencies"));
+        Assert.Contains(lines, l => l.Contains("Fixed-fee projects recognize the full fee"));
+        Assert.Contains(lines, l => l.Contains("Margin = revenue"));
+        // The currency caveat must not appear twice — RevenueBasisLines used to repeat it.
+        Assert.Single(lines, l => l.Contains("never summed across currencies"));
+    }
+
+    private static ReportBasisDto SampleBasis() =>
+        new()
+        {
+            WeekendPremium = 0.5m,
+            HolidayPremium = 1.0m,
+            OvertimePremium = 0.5m,
+            WeeklyOvertimeThresholdHours = 40m
+        };
+
+    [Fact]
     public void PdfAndExcelWriters_EmitNonEmptyMagicBytes()
     {
         var model = Sample();

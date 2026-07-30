@@ -7,30 +7,6 @@ namespace ReeTrack.UnitTests.Reports;
 
 public class CsvReportWriterTests
 {
-    [Theory]
-    [InlineData("plain", "plain")]
-    [InlineData("has,comma", "\"has,comma\"")]
-    [InlineData("has\"quote", "\"has\"\"quote\"")]
-    [InlineData("line\nbreak", "\"line\nbreak\"")]
-    [InlineData("line\r\nbreak", "\"line\r\nbreak\"")]
-    public void Escape_FollowsRfc4180(string input, string expected)
-    {
-        Assert.Equal(expected, CsvReportWriter.Escape(input));
-    }
-
-    [Theory]
-    [InlineData("=1+1", "'=1+1")]
-    [InlineData("+1", "'+1")]
-    [InlineData("-1", "'-1")]
-    [InlineData("@SUM(A1)", "'@SUM(A1)")]
-    [InlineData("=cmd|'/c calc'!A1", "'=cmd|'/c calc'!A1")]
-    [InlineData("=HYPERLINK(\"http://x\",\"y\")", "\"'=HYPERLINK(\"\"http://x\"\",\"\"y\"\")\"")] // guarded, then RFC-quoted for the quotes
-    [InlineData("Normal name", "Normal name")]
-    public void Escape_NeutralisesFormulaTriggers(string input, string expected)
-    {
-        Assert.Equal(expected, CsvReportWriter.Escape(input));
-    }
-
     [Fact]
     public void Write_IncludesEscapedProjectName_AndUtf8Bom()
     {

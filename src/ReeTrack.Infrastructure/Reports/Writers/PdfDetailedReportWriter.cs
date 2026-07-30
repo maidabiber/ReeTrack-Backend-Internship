@@ -1,18 +1,12 @@
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
-using QuestPDF.Infrastructure;
 using ReeTrack.Application.Common.Interfaces;
 using ReeTrack.Application.Common.Models;
 
 namespace ReeTrack.Infrastructure.Reports.Writers;
 
-public sealed class PdfDetailedReportWriter : IDetailedReportWriter
+public sealed class PdfDetailedReportWriter : IReportWriter<DetailedReportDto>
 {
-    static PdfDetailedReportWriter()
-    {
-        QuestPDF.Settings.License = LicenseType.Community;
-    }
-
     public ReportExportFormat Format => ReportExportFormat.Pdf;
 
     public ReportFile Write(DetailedReportDto model)
@@ -92,11 +86,7 @@ public sealed class PdfDetailedReportWriter : IDetailedReportWriter
                         }
                     });
 
-                    col.Item().PaddingTop(10).Column(basis =>
-                    {
-                        foreach (var line in ReportFormat.BasisLines(model))
-                            basis.Item().Text(line).FontSize(7).FontColor(ReportColors.NavyMuted);
-                    });
+                    col.Item().PaddingTop(10).Element(c => PdfBasisBlock.Compose(c, ReportFormat.DetailedBasisLines(model)));
                 });
 
                 page.Footer().AlignRight().Text(text =>

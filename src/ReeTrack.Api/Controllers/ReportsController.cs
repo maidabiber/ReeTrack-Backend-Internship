@@ -37,17 +37,11 @@ public class ReportsController : ControllerBase
     }
 
     [HttpGet("summary/export")]
-    public async Task<IActionResult> ExportSummary(
+    public Task<IActionResult> ExportSummary(
         [FromQuery] string format,
         [FromQuery] ReportQueryRequest query,
-        CancellationToken cancellationToken)
-    {
-        if (!TryParseFormat(format, out var parsed))
-            throw new AppException("format must be csv, xlsx, or pdf.", 400);
-
-        var file = await _export.ExportSummaryAsync(parsed, MapQuery(query), cancellationToken);
-        return File(file.Bytes, file.ContentType, file.FileName);
-    }
+        CancellationToken cancellationToken) =>
+        ExportReport(format, query, (f, q, ct) => _export.ExportSummaryAsync(f, q, ct), cancellationToken);
 
     [HttpGet("detailed")]
     public async Task<ActionResult<DetailedReportResponse>> GetDetailed(
@@ -70,17 +64,43 @@ public class ReportsController : ControllerBase
     }
 
     [HttpGet("detailed/export")]
-    public async Task<IActionResult> ExportDetailed(
+    public Task<IActionResult> ExportDetailed(
         [FromQuery] string format,
+        [FromQuery] ReportQueryRequest query,
+        CancellationToken cancellationToken) =>
+        ExportReport(format, query, (f, q, ct) => _export.ExportDetailedAsync(f, q, ct), cancellationToken);
+
+    [HttpGet("workload")]
+    public async Task<ActionResult<WorkloadReportResponse>> GetWorkload(
         [FromQuery] ReportQueryRequest query,
         CancellationToken cancellationToken)
     {
-        if (!TryParseFormat(format, out var parsed))
-            throw new AppException("format must be csv, xlsx, or pdf.", 400);
-
-        var file = await _export.ExportDetailedAsync(parsed, MapQuery(query), cancellationToken);
-        return File(file.Bytes, file.ContentType, file.FileName);
+        var workload = await _reports.GetWorkloadAsync(MapQuery(query), cancellationToken);
+        return Ok(MapWorkload(workload));
     }
+
+    [HttpGet("workload/export")]
+    public Task<IActionResult> ExportWorkload(
+        [FromQuery] string format,
+        [FromQuery] ReportQueryRequest query,
+        CancellationToken cancellationToken) =>
+        ExportReport(format, query, (f, q, ct) => _export.ExportWorkloadAsync(f, q, ct), cancellationToken);
+
+    [HttpGet("profitability")]
+    public async Task<ActionResult<ProfitabilityReportResponse>> GetProfitability(
+        [FromQuery] ReportQueryRequest query,
+        CancellationToken cancellationToken)
+    {
+        var profitability = await _reports.GetProfitabilityAsync(MapQuery(query), cancellationToken);
+        return Ok(MapProfitability(profitability));
+    }
+
+    [HttpGet("profitability/export")]
+    public Task<IActionResult> ExportProfitability(
+        [FromQuery] string format,
+        [FromQuery] ReportQueryRequest query,
+        CancellationToken cancellationToken) =>
+        ExportReport(format, query, (f, q, ct) => _export.ExportProfitabilityAsync(f, q, ct), cancellationToken);
 
     [HttpGet("filter-sets")]
     public async Task<ActionResult<PagedResult<ReportFilterSetResponse>>> ListFilterSets(
@@ -135,6 +155,19 @@ public class ReportsController : ControllerBase
     {
         await _filterSets.DeleteAsync(id, cancellationToken);
         return NoContent();
+    }
+
+    private async Task<IActionResult> ExportReport(
+        string format,
+        ReportQueryRequest query,
+        Func<ReportExportFormat, ReportQuery, CancellationToken, Task<ReportFile>> exportFn,
+        CancellationToken cancellationToken)
+    {
+        if (!TryParseFormat(format, out var parsed))
+            throw new AppException("format must be csv, xlsx, or pdf.", 400);
+
+        var file = await exportFn(parsed, MapQuery(query), cancellationToken);
+        return File(file.Bytes, file.ContentType, file.FileName);
     }
 
     private static bool TryParseFormat(string? format, out ReportExportFormat parsed)
@@ -314,6 +347,138 @@ public class ReportsController : ControllerBase
             HolidayHours = entry.HolidayHours,
             IsWeekend = entry.IsWeekend,
             IsHoliday = entry.IsHoliday
+        };
+
+    private static WorkloadReportResponse MapWorkload(WorkloadReportDto dto) =>
+        new()
+        {
+            Kpis = MapKpis(dto.Kpis),
+            Basis = MapBasis(dto.Basis),
+            GeneratedAtUtc = dto.GeneratedAtUtc,
+            GeneratedByName = dto.GeneratedByName,
+            FirstEntryDate = dto.FirstEntryDate,
+            FilterFromDate = dto.FilterFromDate,
+            FilterToDate = dto.FilterToDate,
+            Allocations = dto.Allocations
+                .Select(a => new WorkloadAllocationResponse
+                {
+                    UserId = a.UserId,
+                    DisplayName = a.DisplayName,
+                    ClientId = a.ClientId,
+                    ClientName = a.ClientName,
+                    ProjectId = a.ProjectId,
+                    ProjectName = a.ProjectName,
+                    TotalSeconds = a.TotalSeconds,
+                    BillableSeconds = a.BillableSeconds,
+                    PctOfMemberTotal = a.PctOfMemberTotal
+                })
+                .ToList(),
+            GrandTotalSeconds = dto.GrandTotalSeconds,
+            GrandTotalBillableSeconds = dto.GrandTotalBillableSeconds,
+            Schedule = dto.Schedule
+                .Select(s => new WorkloadScheduleResponse
+                {
+                    Label = s.Label,
+                    Hours = s.Hours,
+                    PctOfTotalHours = s.PctOfTotalHours
+                })
+                .ToList()
+        };
+
+    private static ProfitabilityReportResponse MapProfitability(ProfitabilityReportDto dto) =>
+        new()
+        {
+            Kpis = MapKpis(dto.Kpis),
+            Basis = MapBasis(dto.Basis),
+            GeneratedAtUtc = dto.GeneratedAtUtc,
+            GeneratedByName = dto.GeneratedByName,
+            FirstEntryDate = dto.FirstEntryDate,
+            FilterFromDate = dto.FilterFromDate,
+            FilterToDate = dto.FilterToDate,
+            ByCurrency = dto.ByCurrency
+                .Select(c => new CurrencyFinancialKpisResponse
+                {
+                    CurrencyCode = c.CurrencyCode,
+                    Revenue = c.Revenue,
+                    Cost = c.Cost,
+                    Margin = c.Margin,
+                    MarginPct = c.MarginPct,
+                    BillableHours = c.BillableHours,
+                    TotalSeconds = c.TotalSeconds,
+                    ProjectCount = c.ProjectCount
+                })
+                .ToList(),
+            WeeklyTrend = dto.WeeklyTrend
+                .Select(t => new WeeklyFinancialTrendResponse
+                {
+                    WeekStartDate = t.WeekStartDate,
+                    CurrencyCode = t.CurrencyCode,
+                    Revenue = t.Revenue,
+                    Cost = t.Cost,
+                    Margin = t.Margin
+                })
+                .ToList(),
+            Projects = dto.Projects
+                .Select(p => new ProjectProfitabilityResponse
+                {
+                    ProjectId = p.ProjectId,
+                    Name = p.Name,
+                    CurrencyCode = p.CurrencyCode,
+                    ClientName = p.ClientName,
+                    Status = p.Status,
+                    BillingModel = p.BillingModel,
+                    HourlyRate = p.HourlyRate,
+                    FixedFeeAmount = p.FixedFeeAmount,
+                    TimeEstimateHours = p.TimeEstimateHours,
+                    EstimateUsedPct = p.EstimateUsedPct,
+                    TotalSeconds = p.TotalSeconds,
+                    BillableSeconds = p.BillableSeconds,
+                    Revenue = p.Revenue,
+                    CalculatedCost = p.CalculatedCost,
+                    NormalCost = p.NormalCost,
+                    WeekendCost = p.WeekendCost,
+                    HolidayCost = p.HolidayCost,
+                    OvertimeCost = p.OvertimeCost,
+                    Margin = p.Margin,
+                    MarginPct = p.MarginPct
+                })
+                .ToList(),
+            Members = dto.Members
+                .Select(m => new MemberLabourCostResponse
+                {
+                    UserId = m.UserId,
+                    DisplayName = m.DisplayName,
+                    CurrencyCode = m.CurrencyCode,
+                    TotalSeconds = m.TotalSeconds,
+                    LabourCost = m.LabourCost
+                })
+                .ToList(),
+            RevenueBasisLines = dto.RevenueBasisLines
+        };
+
+    private static ReportKpisResponse MapKpis(ReportKpisDto kpis) =>
+        new()
+        {
+            TotalSeconds = kpis.TotalSeconds,
+            BillableSeconds = kpis.BillableSeconds,
+            NonBillableSeconds = kpis.NonBillableSeconds,
+            BillablePct = kpis.BillablePct,
+            EntryCount = kpis.EntryCount,
+            ActiveMembers = kpis.ActiveMembers,
+            ActiveProjects = kpis.ActiveProjects,
+            OvertimeHours = kpis.OvertimeHours,
+            WeekendHours = kpis.WeekendHours,
+            HolidayHours = kpis.HolidayHours,
+            UnassignedSeconds = kpis.UnassignedSeconds
+        };
+
+    private static ReportBasisResponse MapBasis(ReportBasisDto basis) =>
+        new()
+        {
+            WeekendPremium = basis.WeekendPremium,
+            HolidayPremium = basis.HolidayPremium,
+            OvertimePremium = basis.OvertimePremium,
+            WeeklyOvertimeThresholdHours = basis.WeeklyOvertimeThresholdHours
         };
 
     private static ReportQuery MapQuery(ReportQueryRequest request) =>

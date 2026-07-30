@@ -31,10 +31,12 @@ internal static class DetailedReportExportRows
         foreach (var group in model.Groups)
         {
             var count = Math.Max(0, group.EndIndexExclusive - group.StartIndex);
-            var slice = model.Entries
-                .Skip(group.StartIndex)
-                .Take(count)
-                .ToList();
+            // Indexed slice, not Skip/Take: Skip re-walks from the front of the sequence
+            // on every call (it doesn't know model.Entries is a List), so this was O(n²)
+            // across all groups for a report with many small groups.
+            var slice = new List<DetailedEntryDto>(count);
+            for (var i = group.StartIndex; i < group.StartIndex + count; i++)
+                slice.Add(model.Entries[i]);
             yield return (group, slice);
         }
     }

@@ -1,8 +1,8 @@
-using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using ReeTrack.Application.Calendar;
 using ReeTrack.Application.Common.Interfaces;
+using ReeTrack.Application.Common.Models;
 using ReeTrack.Application.Common.Options;
 using ReeTrack.Application.Notifications;
 using ReeTrack.Infrastructure.Auditing;
@@ -74,9 +74,7 @@ public static class DependencyInjection
         services.AddScoped<IDomainEventPublisher, DomainEventPublisher>();
         services.AddScoped<INotificationDispatcher, NotificationDispatcher>();
         services.AddScoped<INotificationPreferenceService, NotificationPreferenceService>();
-        services.AddScoped<IInAppNotificationService, InAppNotificationService>();
         services.AddScoped<IChannelProvider, EmailChannelProvider>();
-        services.AddScoped<IChannelProvider, InAppChannelProvider>();
         services.AddDomainEventHandlers(typeof(IDomainEventHandler<>).Assembly);
 
         services.AddScoped<IInvitationService, InvitationService>();
@@ -99,12 +97,18 @@ public static class DependencyInjection
         services.AddScoped<ReportEntryPipeline>();
         services.AddScoped<IReportService, ReportService>();
         services.AddScoped<IReportFilterSetService, ReportFilterSetService>();
-        services.AddScoped<IReportWriter, CsvReportWriter>();
-        services.AddScoped<IReportWriter, ExcelReportWriter>();
-        services.AddScoped<IReportWriter, PdfReportWriter>();
-        services.AddScoped<IDetailedReportWriter, CsvDetailedReportWriter>();
-        services.AddScoped<IDetailedReportWriter, ExcelDetailedReportWriter>();
-        services.AddScoped<IDetailedReportWriter, PdfDetailedReportWriter>();
+        services.AddScoped<IReportWriter<SummaryReportDto>, CsvReportWriter>();
+        services.AddScoped<IReportWriter<SummaryReportDto>, ExcelReportWriter>();
+        services.AddScoped<IReportWriter<SummaryReportDto>, PdfReportWriter>();
+        services.AddScoped<IReportWriter<DetailedReportDto>, CsvDetailedReportWriter>();
+        services.AddScoped<IReportWriter<DetailedReportDto>, ExcelDetailedReportWriter>();
+        services.AddScoped<IReportWriter<DetailedReportDto>, PdfDetailedReportWriter>();
+        services.AddScoped<IReportWriter<WorkloadReportDto>, CsvWorkloadReportWriter>();
+        services.AddScoped<IReportWriter<WorkloadReportDto>, ExcelWorkloadReportWriter>();
+        services.AddScoped<IReportWriter<WorkloadReportDto>, PdfWorkloadReportWriter>();
+        services.AddScoped<IReportWriter<ProfitabilityReportDto>, CsvProfitabilityReportWriter>();
+        services.AddScoped<IReportWriter<ProfitabilityReportDto>, ExcelProfitabilityReportWriter>();
+        services.AddScoped<IReportWriter<ProfitabilityReportDto>, PdfProfitabilityReportWriter>();
         services.AddScoped<IReportExportService, ReportExportService>();
         services.AddScoped<IRateMultiplierSettingsService, RateMultiplierSettingsService>();
         services.AddScoped<IRateMultiplierConfigProvider, RateMultiplierConfigProvider>();
