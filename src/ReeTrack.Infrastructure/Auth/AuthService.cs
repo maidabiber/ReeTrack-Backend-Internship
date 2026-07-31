@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using ReeTrack.Application.Common.Constants;
+using ReeTrack.Application.Common.Exceptions;
 using ReeTrack.Application.Common.Interfaces;
 using ReeTrack.Application.Common.Models;
 using ReeTrack.Application.Common.Options;
@@ -46,10 +47,11 @@ public class AuthService : IAuthService
         if (user is null)
             throw new AuthException(
                 "Access denied. An administrator must invite you before you can sign in.",
-                403);
+                403,
+                ErrorCode.Forbidden);
 
         if (user.Status == UserStatus.Disabled)
-            throw new AuthException("This account has been disabled.", 403);
+            throw new AuthException("This account has been disabled.", 403, ErrorCode.Forbidden);
 
         if (user.Status == UserStatus.Invited)
             await AcceptPendingInvitationAsync(user, cancellationToken);
@@ -90,7 +92,8 @@ public class AuthService : IAuthService
                 pendingInvitations.Count > 0
                     ? "Your invitation has expired. Ask an administrator to send a new one."
                     : "Your invitation is no longer valid. Ask an administrator to send a new one.",
-                403);
+                403,
+                ErrorCode.Forbidden);
 
         foreach (var invitation in pendingInvitations)
         {
@@ -119,10 +122,10 @@ public class AuthService : IAuthService
             .FirstOrDefaultAsync(u => u.Id == userId, cancellationToken);
 
         if (user is null)
-            throw new AuthException("User not found.", 401);
+            throw new AuthException("User not found.", 401, ErrorCode.Unauthorized);
 
         if (user.Status == UserStatus.Disabled)
-            throw new AuthException("This account has been disabled.", 403);
+            throw new AuthException("This account has been disabled.", 403, ErrorCode.Forbidden);
 
         return MapToAuthenticatedUser(user);
     }
@@ -136,7 +139,8 @@ public class AuthService : IAuthService
         {
             throw new AuthException(
                 "Only the configured administrator email may complete initial setup.",
-                403);
+                403,
+                ErrorCode.Forbidden);
         }
 
         var now = DateTime.UtcNow;

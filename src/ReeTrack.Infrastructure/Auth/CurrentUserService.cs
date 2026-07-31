@@ -23,7 +23,7 @@ public class CurrentUserService : ICurrentUserService
                 ?? _httpContextAccessor.HttpContext?.User.FindFirst("sub")?.Value;
 
             if (!Guid.TryParse(subject, out var userId))
-                throw new AppException("Authentication is required.", 401);
+                throw AppErrors.Unauthorized("Authentication is required.");
 
             return userId;
         }

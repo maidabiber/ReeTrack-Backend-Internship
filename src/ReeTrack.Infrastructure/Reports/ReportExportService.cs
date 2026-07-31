@@ -66,7 +66,7 @@ public sealed class ReportExportService : IReportExportService
         Func<Task<TModel>> loadModel)
     {
         if (!writers.TryGetValue(format, out var writer))
-            throw new AppException($"Unsupported export format '{format}'.", 400);
+            throw new AppException($"Unsupported export format '{format}'.", 400, ErrorCode.ExportFormatInvalid);
 
         var model = await loadModel();
         return writer.Write(model);

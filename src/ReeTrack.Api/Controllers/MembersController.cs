@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ReeTrack.Api.Contracts;
+using ReeTrack.Application.Common.Exceptions;
 using ReeTrack.Application.Common.Interfaces;
 using ReeTrack.Application.Common.Models;
 using ReeTrack.Domain.Enums;
@@ -52,7 +53,7 @@ public class MembersController : ControllerBase
         if (request.Status is not null)
         {
             if (!Enum.TryParse<UserStatus>(request.Status, ignoreCase: true, out var parsed))
-                return BadRequest(new { message = "Status must be Active or Disabled." });
+                throw new AppException("Status must be Active or Disabled.", 400, ErrorCode.StatusInvalid);
             status = parsed;
         }
 

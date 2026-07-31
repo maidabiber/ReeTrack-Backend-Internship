@@ -71,16 +71,16 @@ public sealed class JiraIntegrationService : IJiraIntegrationService
         CancellationToken cancellationToken = default)
     {
         if (input.ClientId == Guid.Empty)
-            throw new AppException("Assign a client before integrating this project.");
+            throw AppErrors.Validation("Assign a client before integrating this project.");
 
         var client = await _db.Clients
             .AsNoTracking()
             .FirstOrDefaultAsync(c => c.Id == input.ClientId && c.IsActive, cancellationToken)
-            ?? throw new AppException("Client not found or inactive.", 404);
+            ?? throw AppErrors.NotFound("Client");
 
         var jiraProjectId = input.JiraProjectId?.Trim() ?? string.Empty;
         if (string.IsNullOrWhiteSpace(jiraProjectId))
-            throw new AppException("Jira project id is required.");
+            throw AppErrors.Validation("Jira project id is required.");
 
         var already = await _db.Projects
             .AsNoTracking()
@@ -88,12 +88,12 @@ public sealed class JiraIntegrationService : IJiraIntegrationService
                 p => p.ExternalProvider == ExternalProvider.Jira && p.ExternalId == jiraProjectId,
                 cancellationToken);
         if (already)
-            throw new AppException("This Jira project is already integrated.", 409);
+            throw AppErrors.Conflict("This Jira project is already integrated.");
 
         var (siteUrl, email, apiToken) = GetCredentials();
         var remoteProjects = await _jiraApi.ListProjectsAsync(siteUrl, email, apiToken, cancellationToken);
         var remote = remoteProjects.FirstOrDefault(p => p.Id == jiraProjectId)
-            ?? throw new AppException("Jira project not found.", 404);
+            ?? throw AppErrors.NotFound("Jira project");
 
         var projectName = await ResolveUniqueProjectNameAsync(remote.Name, remote.Key, cancellationToken);
         var now = DateTime.UtcNow;
@@ -131,13 +131,13 @@ public sealed class JiraIntegrationService : IJiraIntegrationService
     {
         var project = await _db.Projects
             .FirstOrDefaultAsync(p => p.Id == reeTrackProjectId, cancellationToken)
-            ?? throw new AppException("Project not found.", 404);
+            ?? throw AppErrors.NotFound("Project");
 
         if (project.ExternalProvider != ExternalProvider.Jira
             || string.IsNullOrWhiteSpace(project.ExternalId)
             || string.IsNullOrWhiteSpace(project.ExternalKey))
         {
-            throw new AppException("This project is not linked to Jira.");
+            throw AppErrors.Validation("This project is not linked to Jira.");
         }
 
         var (siteUrl, email, apiToken) = GetCredentials();
@@ -163,7 +163,7 @@ public sealed class JiraIntegrationService : IJiraIntegrationService
         }
         catch (Exception ex) when (ex is not AppException)
         {
-            throw new AppException($"Jira sync failed: {ex.Message}", 502);
+            throw new AppException($"Jira sync failed: {ex.Message}", 502, ErrorCode.ServiceUnavailable);
         }
     }
 
@@ -257,7 +257,8 @@ public sealed class JiraIntegrationService : IJiraIntegrationService
         if (!_options.IsConfigured)
             throw new AppException(
                 "Jira is not configured. Set Jira__SiteUrl, Jira__Email, and Jira__ApiToken in the environment.",
-                503);
+                503,
+                ErrorCode.ServiceUnavailable);
 
         return (
             JiraApiClient.NormalizeSiteUrl(_options.SiteUrl),
@@ -291,7 +292,7 @@ public sealed class JiraIntegrationService : IJiraIntegrationService
                 return candidate;
         }
 
-        throw new AppException("Could not create a unique project name for this Jira project.");
+        throw AppErrors.Validation("Could not create a unique project name for this Jira project.");
     }
 
     private static string BuildTaskName(string key, string summary)

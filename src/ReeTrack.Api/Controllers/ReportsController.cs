@@ -51,9 +51,9 @@ public class ReportsController : ControllerBase
         CancellationToken cancellationToken = default)
     {
         if (page < 1)
-            throw new AppException("page must be >= 1.", 400);
+            throw AppErrors.Validation("page must be >= 1.");
         if (pageSize < 1 || pageSize > 200)
-            throw new AppException("pageSize must be between 1 and 200.", 400);
+            throw AppErrors.Validation("pageSize must be between 1 and 200.");
 
         var detailed = await _reports.GetDetailedAsync(
             MapQuery(query),
@@ -124,7 +124,7 @@ public class ReportsController : ControllerBase
         CancellationToken cancellationToken)
     {
         if (request?.Query is null)
-            throw new AppException("Report filter query is required.", 400);
+            throw AppErrors.Validation("Report filter query is required.");
 
         var created = await _filterSets.CreateAsync(
             request.Name,
@@ -140,7 +140,7 @@ public class ReportsController : ControllerBase
         CancellationToken cancellationToken)
     {
         if (request?.Query is null)
-            throw new AppException("Report filter query is required.", 400);
+            throw AppErrors.Validation("Report filter query is required.");
 
         var updated = await _filterSets.UpdateAsync(
             id,
@@ -164,7 +164,7 @@ public class ReportsController : ControllerBase
         CancellationToken cancellationToken)
     {
         if (!TryParseFormat(format, out var parsed))
-            throw new AppException("format must be csv, xlsx, or pdf.", 400);
+            throw new AppException("format must be csv, xlsx, or pdf.", 400, ErrorCode.ExportFormatInvalid);
 
         var file = await exportFn(parsed, MapQuery(query), cancellationToken);
         return File(file.Bytes, file.ContentType, file.FileName);
@@ -506,9 +506,8 @@ public class ReportsController : ControllerBase
             "billable" => ReportGroupBy.Billable,
             "day" => ReportGroupBy.Day,
             "week" => ReportGroupBy.Week,
-            _ => throw new AppException(
-                "GroupBy must contain only: user, project, client, task, tag, billable, day, or week.",
-                400)
+            _ => throw AppErrors.Validation(
+                "GroupBy must contain only: user, project, client, task, tag, billable, day, or week.")
         };
 
     private static ReportFilterSetResponse MapFilterSet(ReportFilterSetDto filterSet) =>

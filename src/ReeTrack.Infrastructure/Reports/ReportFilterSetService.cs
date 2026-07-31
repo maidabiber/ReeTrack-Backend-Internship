@@ -103,7 +103,7 @@ public sealed class ReportFilterSetService : IReportFilterSetService
                 .FirstOrDefaultAsync(
                     existing => existing.Id == id && existing.UserId == userId,
                     cancellationToken)
-            ?? throw new AppException("Report filter set was not found.", 404);
+            ?? throw AppErrors.NotFound("Report filter set");
 
         await EnsureNameIsAvailableAsync(userId, normalizedName, id, cancellationToken);
 
@@ -123,7 +123,7 @@ public sealed class ReportFilterSetService : IReportFilterSetService
                 .FirstOrDefaultAsync(
                     existing => existing.Id == id && existing.UserId == userId,
                     cancellationToken)
-            ?? throw new AppException("Report filter set was not found.", 404);
+            ?? throw AppErrors.NotFound("Report filter set");
 
         _db.ReportFilterSets.Remove(filterSet);
         await _db.SaveChangesAsync(cancellationToken);
@@ -144,7 +144,7 @@ public sealed class ReportFilterSetService : IReportFilterSetService
                 cancellationToken);
 
         if (exists)
-            throw new AppException("A report filter set with this name already exists.", 409);
+            throw AppErrors.Conflict("A report filter set with this name already exists.");
     }
 
     private async Task SaveGuardingNameConflictAsync(CancellationToken cancellationToken)
@@ -156,7 +156,7 @@ public sealed class ReportFilterSetService : IReportFilterSetService
         catch (DbUpdateException ex) when (
             ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
         {
-            throw new AppException("A report filter set with this name already exists.", 409);
+            throw AppErrors.Conflict("A report filter set with this name already exists.");
         }
     }
 
@@ -164,10 +164,10 @@ public sealed class ReportFilterSetService : IReportFilterSetService
     {
         var trimmed = name?.Trim();
         if (string.IsNullOrWhiteSpace(trimmed))
-            throw new AppException("Report filter set name is required.", 400);
+            throw AppErrors.Validation("Report filter set name is required.");
 
         if (trimmed.Length > MaxNameLength)
-            throw new AppException($"Report filter set name cannot exceed {MaxNameLength} characters.", 400);
+            throw AppErrors.Validation($"Report filter set name cannot exceed {MaxNameLength} characters.");
 
         return trimmed;
     }
@@ -178,7 +178,7 @@ public sealed class ReportFilterSetService : IReportFilterSetService
     {
         var json = JsonSerializer.Serialize(query, JsonOptions);
         if (json.Length > MaxQueryJsonLength)
-            throw new AppException("The report filter set is too large to save.", 400);
+            throw AppErrors.Validation("The report filter set is too large to save.");
 
         return json;
     }

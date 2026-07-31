@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using ReeTrack.Application.Common.Exceptions;
 using ReeTrack.Application.Common.Interfaces;
 using ReeTrack.Application.Common.Options;
 using ReeTrack.Application.Integrations.Calendar;
@@ -122,7 +123,7 @@ public class CalendarIntegrationService : ICalendarIntegrationService
             .FirstOrDefaultAsync(c => c.Id == connectionId && c.UserId == userId, cancellationToken);
 
         if (connection is null)
-            throw new CalendarIntegrationException("Calendar connection not found.", 404);
+            throw new CalendarIntegrationException("Calendar connection not found.", 404, ErrorCode.NotFound);
 
         _db.UserCalendarConnections.Remove(connection);
         await _db.SaveChangesAsync(cancellationToken);

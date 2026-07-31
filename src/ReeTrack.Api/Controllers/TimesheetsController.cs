@@ -149,7 +149,7 @@ public class TimesheetsController : ControllerBase
         if (Enum.TryParse<TimesheetStatus>(status, ignoreCase: true, out var parsed))
             return parsed;
 
-        throw new AppException("Unknown timesheet status filter.", 400);
+        throw new AppException("Unknown timesheet status filter.", 400, ErrorCode.StatusInvalid);
     }
 
     private static AdminTimesheetListItemResponse MapListItem(AdminTimesheetListItemDto item) =>

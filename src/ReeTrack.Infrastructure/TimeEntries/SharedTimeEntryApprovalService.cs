@@ -66,7 +66,7 @@ public class SharedTimeEntryApprovalService : ISharedTimeEntryApprovalService
             .FirstOrDefaultAsync(
                 e => e.Id == entryId && e.UserId == userId && e.Status == TimeEntryStatus.Pending,
                 cancellationToken)
-            ?? throw new AppException("Pending time entry not found.", 404);
+            ?? throw AppErrors.NotFound("Pending time entry");
 
         await ApplyTimedEntryUpdateAsync(
             entry,
@@ -94,7 +94,7 @@ public class SharedTimeEntryApprovalService : ISharedTimeEntryApprovalService
             .FirstOrDefaultAsync(
                 e => e.Id == entryId && e.UserId == userId && e.Status == TimeEntryStatus.Pending,
                 cancellationToken)
-            ?? throw new AppException("Pending time entry not found.", 404);
+            ?? throw AppErrors.NotFound("Pending time entry");
 
         if (entry.StartedAtUtc is not null)
             await _entryGuard.EnsureEditableAsync(entry.UserId, entry.StartedAtUtc.Value, cancellationToken);
@@ -196,9 +196,9 @@ public class SharedTimeEntryApprovalService : ISharedTimeEntryApprovalService
             .ToList();
 
         if (labels.Count > 0)
-            throw new AppException($"This entry overlaps with: {string.Join(", ", labels)}.", 409);
+            throw new AppException($"This entry overlaps with: {string.Join(", ", labels)}.", 409, ErrorCode.EntryOverlap);
 
-        throw new AppException("This entry overlaps with an existing time entry.", 409);
+        throw new AppException("This entry overlaps with an existing time entry.", 409, ErrorCode.EntryOverlap);
     }
 
 }

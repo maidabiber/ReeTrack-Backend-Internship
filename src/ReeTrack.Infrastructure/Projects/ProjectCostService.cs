@@ -34,7 +34,7 @@ public sealed class ProjectCostService : IProjectCostService
             .AnyAsync(p => p.Id == projectId, cancellationToken);
 
         if (!projectExists)
-            throw new AppException("Project not found.", 404);
+            throw AppErrors.NotFound("Project");
 
         var snapshot = await _db.ProjectCostSnapshots
             .AsNoTracking()
@@ -56,7 +56,7 @@ public sealed class ProjectCostService : IProjectCostService
         var project = await _db.Projects
             .AsNoTracking()
             .FirstOrDefaultAsync(p => p.Id == projectId, cancellationToken)
-            ?? throw new AppException("Project not found.", 404);
+            ?? throw AppErrors.NotFound("Project");
 
         var entries = await _db.TimeEntries
             .AsNoTracking()

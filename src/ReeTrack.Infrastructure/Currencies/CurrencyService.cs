@@ -39,14 +39,14 @@ public sealed class CurrencyService : ICurrencyService
         var code = string.IsNullOrEmpty(trimmed) ? DefaultCode : trimmed.ToUpperInvariant();
 
         if (code.Length != 3)
-            throw new AppException("Invalid currency code length.");
+            throw AppErrors.Validation("Invalid currency code length.");
 
         var isActive = await _db.Currencies
             .AsNoTracking()
             .AnyAsync(c => c.Code == code && c.IsActive, cancellationToken);
 
         if (!isActive)
-            throw new AppException($"Currency '{code}' is not supported or inactive in the system.");
+            throw AppErrors.Validation($"Currency '{code}' is not supported or inactive in the system.");
 
         return code;
     }

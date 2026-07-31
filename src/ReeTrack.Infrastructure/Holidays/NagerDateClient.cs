@@ -25,7 +25,7 @@ public sealed class NagerDateClient : INagerDateClient
                 cancellationToken);
 
             if (countries is null)
-                throw new AppException("Could not load available holiday calendars.", 502);
+                throw new AppException("Could not load available holiday calendars.", 502, ErrorCode.ServiceUnavailable);
 
             return countries
                 .Where(c => !string.IsNullOrWhiteSpace(c.CountryCode) && !string.IsNullOrWhiteSpace(c.Name))
@@ -43,7 +43,7 @@ public sealed class NagerDateClient : INagerDateClient
         }
         catch (Exception)
         {
-            throw new AppException("Could not reach the holiday calendar service.", 502);
+            throw new AppException("Could not reach the holiday calendar service.", 502, ErrorCode.ServiceUnavailable);
         }
     }
 
@@ -59,7 +59,7 @@ public sealed class NagerDateClient : INagerDateClient
                 cancellationToken);
 
             if (holidays is null)
-                throw new AppException("Could not load public holidays for the selected calendar.", 502);
+                throw new AppException("Could not load public holidays for the selected calendar.", 502, ErrorCode.ServiceUnavailable);
 
             return holidays
                 .Where(h => h.Types is null || h.Types.Count == 0 || h.Types.Contains("Public", StringComparer.OrdinalIgnoreCase))
@@ -78,11 +78,11 @@ public sealed class NagerDateClient : INagerDateClient
         }
         catch (HttpRequestException)
         {
-            throw new AppException("Could not reach the holiday calendar service.", 502);
+            throw new AppException("Could not reach the holiday calendar service.", 502, ErrorCode.ServiceUnavailable);
         }
         catch (Exception)
         {
-            throw new AppException("Could not load public holidays for the selected calendar.", 502);
+            throw new AppException("Could not load public holidays for the selected calendar.", 502, ErrorCode.ServiceUnavailable);
         }
     }
 

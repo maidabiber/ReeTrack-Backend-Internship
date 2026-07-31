@@ -83,7 +83,7 @@ public class TagService : ITagService
         CancellationToken cancellationToken = default)
     {
         var tag = await _db.Tags.FirstOrDefaultAsync(t => t.Id == id, cancellationToken)
-            ?? throw new AppException("Tag was not found.", 404);
+            ?? throw AppErrors.NotFound("Tag");
 
         if (name is not null)
         {
@@ -108,7 +108,7 @@ public class TagService : ITagService
     public async Task DeleteAsync(Guid id, CancellationToken cancellationToken = default)
     {
         var tag = await _db.Tags.FirstOrDefaultAsync(t => t.Id == id, cancellationToken)
-            ?? throw new AppException("Tag was not found.", 404);
+            ?? throw AppErrors.NotFound("Tag");
 
         // Tags may be deleted even while in use: the soft-delete keeps historical
         // time-entry associations intact and the filtered name index lets the name
@@ -122,9 +122,9 @@ public class TagService : ITagService
     {
         var trimmed = name?.Trim();
         if (string.IsNullOrEmpty(trimmed))
-            throw new AppException("Tag name is required.");
+            throw AppErrors.Validation("Tag name is required.");
         if (trimmed.Length > NameMaxLength)
-            throw new AppException($"Tag name must be at most {NameMaxLength} characters.");
+            throw AppErrors.Validation($"Tag name must be at most {NameMaxLength} characters.");
 
         return trimmed;
     }
@@ -135,7 +135,7 @@ public class TagService : ITagService
         if (string.IsNullOrEmpty(trimmed))
             return null;
         if (!ColorPattern.IsMatch(trimmed))
-            throw new AppException("Color must be a hex value like #4366E2.");
+            throw AppErrors.Validation("Color must be a hex value like #4366E2.");
 
         return trimmed.ToUpperInvariant();
     }
@@ -151,7 +151,7 @@ public class TagService : ITagService
             cancellationToken);
 
         if (taken)
-            throw new AppException("A tag with this name already exists.", 409);
+            throw AppErrors.Conflict("A tag with this name already exists.");
     }
 
     // Backstop for the pre-check race: ix_tags_name is unique over non-deleted rows.
@@ -163,7 +163,7 @@ public class TagService : ITagService
         }
         catch (DbUpdateException)
         {
-            throw new AppException("A tag with this name already exists.", 409);
+            throw AppErrors.Conflict("A tag with this name already exists.");
         }
     }
 

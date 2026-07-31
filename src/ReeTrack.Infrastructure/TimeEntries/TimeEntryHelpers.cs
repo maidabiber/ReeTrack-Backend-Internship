@@ -9,20 +9,20 @@ internal static class TimeEntryHelpers
     public static void ValidateManualRange(DateTime startedAtUtc, DateTime endedAtUtc)
     {
         if (endedAtUtc <= startedAtUtc)
-            throw new AppException("End time must be after start time.");
+            throw AppErrors.Validation("End time must be after start time.");
 
         var durationSeconds = (endedAtUtc - startedAtUtc).TotalSeconds;
         if (durationSeconds > MaxDurationSeconds)
-            throw new AppException("Duration cannot exceed 24 hours.");
+            throw new AppException("Duration cannot exceed 24 hours.", 400, ErrorCode.DurationLimitExceeded);
     }
 
     public static void ValidateDurationOnly(int durationSeconds)
     {
         if (durationSeconds <= 0)
-            throw new AppException("Duration must be greater than zero.", 400);
+            throw AppErrors.Validation("Duration must be greater than zero.");
 
         if (durationSeconds > MaxDurationSeconds)
-            throw new AppException("Duration cannot exceed 24 hours.", 400);
+            throw new AppException("Duration cannot exceed 24 hours.", 400, ErrorCode.DurationLimitExceeded);
     }
 
     public static DateTime NormalizeEntryDateUtc(DateTime entryDateUtc)

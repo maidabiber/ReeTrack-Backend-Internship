@@ -5,6 +5,7 @@ using Google.Apis.Calendar.v3;
 using Google.Apis.Calendar.v3.Data;
 using Google.Apis.Services;
 using Microsoft.Extensions.Options;
+using ReeTrack.Application.Common.Exceptions;
 using ReeTrack.Application.Common.Options;
 using ReeTrack.Application.Integrations.Calendar;
 using ReeTrack.Application.Integrations.Calendar.Models;
@@ -132,18 +133,18 @@ public class GoogleCalendarProvider : ICalendarProvider
         }
         catch (HttpRequestException ex)
         {
-            throw new CalendarIntegrationException($"Failed to contact Google token endpoint: {ex.Message}", 502);
+            throw new CalendarIntegrationException($"Failed to contact Google token endpoint: {ex.Message}", 502, ErrorCode.ServiceUnavailable);
         }
 
         if (!response.IsSuccessStatusCode)
         {
             var error = await response.Content.ReadAsStringAsync(cancellationToken);
-            throw new CalendarIntegrationException($"Google token request failed: {error}", 502);
+            throw new CalendarIntegrationException($"Google token request failed: {error}", 502, ErrorCode.ServiceUnavailable);
         }
 
         var tokenResponse = await response.Content.ReadFromJsonAsync<GoogleOAuthTokenResponse>(cancellationToken: cancellationToken);
         if (tokenResponse is null || string.IsNullOrWhiteSpace(tokenResponse.AccessToken))
-            throw new CalendarIntegrationException("Google returned an invalid token response.", 502);
+            throw new CalendarIntegrationException("Google returned an invalid token response.", 502, ErrorCode.ServiceUnavailable);
 
         return tokenResponse;
     }
@@ -158,7 +159,7 @@ public class GoogleCalendarProvider : ICalendarProvider
             : existingRefreshToken;
 
         if (string.IsNullOrWhiteSpace(refreshToken))
-            throw new CalendarIntegrationException("Google did not return a refresh token. Reconnect with consent.", 400);
+            throw new CalendarIntegrationException("Google did not return a refresh token. Reconnect with consent.", 400, ErrorCode.Validation);
 
         var expiresAtUtc = DateTime.UtcNow.AddSeconds(tokenResponse.ExpiresIn > 0 ? tokenResponse.ExpiresIn : 3600);
         var accountId = await TryGetUserEmailAsync(tokenResponse.AccessToken!, cancellationToken);

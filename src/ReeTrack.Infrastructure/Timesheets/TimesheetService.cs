@@ -112,7 +112,7 @@ public class TimesheetService : ITimesheetService
 
         var blocker = EvaluateSubmitBlockers(timesheet, entries, weekStart).FirstOrDefault();
         if (blocker is not null)
-            throw new AppException(blocker.Message, blocker.StatusCode);
+            throw new AppException(blocker.Message, blocker.StatusCode, blocker.Code);
 
         var now = DateTime.UtcNow;
         if (timesheet is null)
@@ -144,7 +144,7 @@ public class TimesheetService : ITimesheetService
             ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
         {
             // Unique (user_id, week_start_date) index lost a double-submit race.
-            throw new AppException("This week's timesheet has already been submitted.", 409);
+            throw AppErrors.Conflict("This week's timesheet has already been submitted.");
         }
 
         return TimesheetMapping.MapTimesheet(timesheet);
@@ -159,10 +159,10 @@ public class TimesheetService : ITimesheetService
             .FirstOrDefaultAsync(
                 t => t.Id == timesheetId && t.UserId == userId,
                 cancellationToken)
-            ?? throw new AppException("Timesheet not found.", 404);
+            ?? throw AppErrors.NotFound("Timesheet");
 
         if (timesheet.Status != TimesheetStatus.Submitted)
-            throw new AppException("Only a submitted timesheet can be withdrawn.", 409);
+            throw AppErrors.Conflict("Only a submitted timesheet can be withdrawn.");
 
         // Hard delete (not soft): frees the unique week index for resubmission;
         // the deletion is still recorded in the audit trail.
@@ -170,7 +170,7 @@ public class TimesheetService : ITimesheetService
         await _db.SaveChangesAsync(cancellationToken);
     }
 
-    private sealed record SubmitBlocker(string Message, int StatusCode);
+    private sealed record SubmitBlocker(string Message, int StatusCode, ErrorCode Code);
 
     /// <summary>
     /// Single source of truth for why a week cannot be submitted: GetMyWeekAsync
@@ -184,19 +184,19 @@ public class TimesheetService : ITimesheetService
         var blockers = new List<SubmitBlocker>();
 
         if (timesheet is not null && timesheet.Status != TimesheetStatus.Rejected)
-            blockers.Add(new("This week's timesheet has already been submitted.", 409));
+            blockers.Add(new("This week's timesheet has already been submitted.", 409, ErrorCode.Conflict));
 
         if (weekStart > TimesheetWeek.ToWeekStart(DateTime.UtcNow))
-            blockers.Add(new("A future week cannot be submitted.", 400));
+            blockers.Add(new("A future week cannot be submitted.", 400, ErrorCode.Validation));
 
         if (entries.Any(TimesheetMapping.IsRunning))
-            blockers.Add(new("Stop your running timer before submitting this week.", 409));
+            blockers.Add(new("Stop your running timer before submitting this week.", 409, ErrorCode.Conflict));
 
         if (entries.Any(e => e.Status == TimeEntryStatus.Pending))
-            blockers.Add(new("Review your pending shared entries before submitting this week.", 409));
+            blockers.Add(new("Review your pending shared entries before submitting this week.", 409, ErrorCode.Conflict));
 
         if (entries.Sum(e => (long)e.DurationSeconds) == 0)
-            blockers.Add(new("There is no time logged in this week.", 400));
+            blockers.Add(new("There is no time logged in this week.", 400, ErrorCode.Validation));
 
         return blockers;
     }
@@ -204,6 +204,6 @@ public class TimesheetService : ITimesheetService
     private static void EnsureMonday(DateOnly weekStart)
     {
         if (weekStart.DayOfWeek != DayOfWeek.Monday)
-            throw new AppException("Week start must be a Monday.", 400);
+            throw AppErrors.Validation("Week start must be a Monday.");
     }
 }

@@ -27,7 +27,7 @@ public class ProjectTaskService : IProjectTaskService
         CancellationToken cancellationToken = default)
     {
         if (!query.ProjectId.HasValue)
-            throw new AppException("Project is required.");
+            throw AppErrors.Validation("Project is required.");
 
         var projectId = query.ProjectId.Value;
         await EnsureProjectExistsAsync(projectId, cancellationToken);
@@ -48,7 +48,7 @@ public class ProjectTaskService : IProjectTaskService
                 filtered = filtered.Where(t => t.Status == ProjectTaskStatus.Done);
                 break;
             default:
-                throw new AppException("Status must be one of: open, done, all.");
+                throw new AppException("Status must be one of: open, done, all.", 400, ErrorCode.StatusInvalid);
         }
 
         var q = query.Q?.Trim().ToLowerInvariant();
@@ -108,7 +108,7 @@ public class ProjectTaskService : IProjectTaskService
             case "all":
                 break;
             default:
-                throw new AppException("Status must be one of: open, done, all.");
+                throw new AppException("Status must be one of: open, done, all.", 400, ErrorCode.StatusInvalid);
         }
 
         if (query.ProjectIds is { Count: > 0 })
@@ -191,7 +191,7 @@ public class ProjectTaskService : IProjectTaskService
     {
         var task = await _db.ProjectTasks
             .FirstOrDefaultAsync(t => t.Id == taskId && t.ProjectId == projectId, cancellationToken)
-            ?? throw new AppException("Task was not found.", 404);
+            ?? throw AppErrors.NotFound("Task");
 
         if (input.Status is not null)
             task.Status = ParseStatus(input.Status);
@@ -224,11 +224,11 @@ public class ProjectTaskService : IProjectTaskService
     {
         var task = await _db.ProjectTasks
             .FirstOrDefaultAsync(t => t.Id == taskId && t.ProjectId == projectId, cancellationToken)
-            ?? throw new AppException("Task was not found.", 404);
+            ?? throw AppErrors.NotFound("Task");
 
         var hasTrackedTime = await _db.TimeEntries.AnyAsync(e => e.ProjectTaskId == taskId, cancellationToken);
         if (hasTrackedTime)
-            throw new AppException("This task has tracked time. Mark it done instead.", 409);
+            throw AppErrors.Conflict("This task has tracked time. Mark it done instead.");
 
         task.DeletedAtUtc = DateTime.UtcNow;
         task.DeletedByUserId = _currentUser.UserId;
@@ -239,7 +239,7 @@ public class ProjectTaskService : IProjectTaskService
     {
         var exists = await _db.Projects.AnyAsync(p => p.Id == projectId, cancellationToken);
         if (!exists)
-            throw new AppException("Project was not found.", 404);
+            throw AppErrors.NotFound("Project");
     }
 
     private async Task<string?> ResolveAssigneeAsync(Guid? userId, CancellationToken cancellationToken)
@@ -253,7 +253,7 @@ public class ProjectTaskService : IProjectTaskService
             .FirstOrDefaultAsync(cancellationToken);
 
         if (name is null)
-            throw new AppException("Assigned user was not found.");
+            throw AppErrors.Validation("Assigned user was not found.");
 
         return name;
     }
@@ -262,9 +262,9 @@ public class ProjectTaskService : IProjectTaskService
     {
         var trimmed = name?.Trim();
         if (string.IsNullOrEmpty(trimmed))
-            throw new AppException("Task name is required.");
+            throw AppErrors.Validation("Task name is required.");
         if (trimmed.Length > NameMaxLength)
-            throw new AppException($"Task name must be at most {NameMaxLength} characters.");
+            throw AppErrors.Validation($"Task name must be at most {NameMaxLength} characters.");
 
         return trimmed;
     }
@@ -274,9 +274,9 @@ public class ProjectTaskService : IProjectTaskService
         if (hours is null)
             return null;
         if (hours < 0)
-            throw new AppException("Time estimate cannot be negative.");
+            throw AppErrors.Validation("Time estimate cannot be negative.");
         if (hours >= EstimateMax)
-            throw new AppException("Time estimate is too large.");
+            throw AppErrors.Validation("Time estimate is too large.");
 
         return hours;
     }
@@ -286,7 +286,7 @@ public class ProjectTaskService : IProjectTaskService
         {
             "open" => ProjectTaskStatus.Open,
             "done" => ProjectTaskStatus.Done,
-            _ => throw new AppException("Status must be one of: open, done.")
+            _ => throw new AppException("Status must be one of: open, done.", 400, ErrorCode.StatusInvalid)
         };
 
     private static string FormatStatus(ProjectTaskStatus status) =>
@@ -306,7 +306,7 @@ public class ProjectTaskService : IProjectTaskService
             cancellationToken);
 
         if (taken)
-            throw new AppException("A task with this name already exists in this project.", 409);
+            throw AppErrors.Conflict("A task with this name already exists in this project.");
     }
 
     // Backstop for the pre-check race: ix_project_tasks_project_id_name is unique over non-deleted rows.
@@ -320,7 +320,7 @@ public class ProjectTaskService : IProjectTaskService
         }
         catch (DbUpdateException ex) when (IsUniqueViolation(ex))
         {
-            throw new AppException("A task with this name already exists in this project.", 409);
+            throw AppErrors.Conflict("A task with this name already exists in this project.");
         }
     }
 
@@ -342,7 +342,7 @@ public class ProjectTaskService : IProjectTaskService
                 ClientName = p.Client.Name
             })
             .FirstOrDefaultAsync(cancellationToken)
-            ?? throw new AppException("Project was not found.", 404);
+            ?? throw AppErrors.NotFound("Project");
 
         return (info.ClientId, info.ProjectName, info.ProjectColor, info.ClientName);
     }

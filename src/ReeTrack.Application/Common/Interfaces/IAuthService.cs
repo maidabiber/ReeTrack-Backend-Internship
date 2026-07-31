@@ -1,3 +1,4 @@
+using ReeTrack.Application.Common.Exceptions;
 using ReeTrack.Application.Common.Models;
 
 namespace ReeTrack.Application.Common.Interfaces;
@@ -20,9 +21,12 @@ public sealed class AuthException : Exception
 {
     public int StatusCode { get; }
 
-    public AuthException(string message, int statusCode = 401)
+    public ErrorCode Code { get; }
+
+    public AuthException(string message, int statusCode = 401, ErrorCode code = ErrorCode.Unspecified)
         : base(message)
     {
         StatusCode = statusCode;
+        Code = code;
     }
 }

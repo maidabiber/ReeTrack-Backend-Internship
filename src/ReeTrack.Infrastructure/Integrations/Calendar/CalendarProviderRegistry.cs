@@ -1,3 +1,4 @@
+using ReeTrack.Application.Common.Exceptions;
 using ReeTrack.Application.Integrations.Calendar;
 using ReeTrack.Domain.Enums;
 
@@ -17,6 +18,6 @@ public class CalendarProviderRegistry : ICalendarProviderRegistry
         if (_providers.TryGetValue(providerType, out var provider))
             return provider;
 
-        throw new CalendarIntegrationException($"Calendar provider '{providerType}' is not supported.", 400);
+        throw new CalendarIntegrationException($"Calendar provider '{providerType}' is not supported.", 400, ErrorCode.Validation);
     }
 }

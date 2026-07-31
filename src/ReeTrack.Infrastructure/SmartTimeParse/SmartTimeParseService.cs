@@ -114,14 +114,14 @@ public sealed class SmartTimeParseService : ISmartTimeParseService
 
         var trimmed = userInput?.Trim() ?? string.Empty;
         if (string.IsNullOrWhiteSpace(trimmed))
-            throw new AppException("Time entry text is required.", 400);
+            throw AppErrors.Validation("Time entry text is required.");
 
         if (string.IsNullOrWhiteSpace(_options.ApiKey)
             && string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("GROQ_API_KEY")))
-            throw new AppException("Smart time parsing is not configured (missing Llm:ApiKey / GROQ_API_KEY).", 503);
+            throw new AppException("Smart time parsing is not configured (missing Llm:ApiKey / GROQ_API_KEY).", 503, ErrorCode.ServiceUnavailable);
 
         if (string.IsNullOrWhiteSpace(_options.BaseUrl))
-            throw new AppException("Smart time parsing is not configured (missing Llm:BaseUrl).", 503);
+            throw new AppException("Smart time parsing is not configured (missing Llm:BaseUrl).", 503, ErrorCode.ServiceUnavailable);
 
         var client = CreateChatClient();
         var messages = BuildMessages(trimmed, catalog);
@@ -141,17 +141,17 @@ public sealed class SmartTimeParseService : ISmartTimeParseService
         catch (ClientResultException ex) when (ex.Status is 401 or 403)
         {
             _logger.LogError(ex, "LLM authentication failed while parsing time entry.");
-            throw new AppException("Smart time parsing is misconfigured.", 503);
+            throw new AppException("Smart time parsing is misconfigured.", 503, ErrorCode.ServiceUnavailable);
         }
         catch (ClientResultException ex) when (ex.Status == 429)
         {
             _logger.LogWarning(ex, "LLM rate limit hit while parsing time entry.");
-            throw new AppException("Smart time parsing is temporarily unavailable. Please try again.", 503);
+            throw new AppException("Smart time parsing is temporarily unavailable. Please try again.", 503, ErrorCode.ServiceUnavailable);
         }
         catch (HttpRequestException ex)
         {
             _logger.LogError(ex, "Could not reach LLM endpoint {BaseUrl}.", _options.BaseUrl);
-            throw new AppException("Could not reach Groq. Check network connectivity and Llm:BaseUrl.", 503);
+            throw new AppException("Could not reach Groq. Check network connectivity and Llm:BaseUrl.", 503, ErrorCode.ServiceUnavailable);
         }
         catch (ClientResultException ex)
         {
@@ -162,7 +162,8 @@ public sealed class SmartTimeParseService : ISmartTimeParseService
                 string.IsNullOrWhiteSpace(detail)
                     ? "Smart time parsing failed. Please try again."
                     : $"Smart time parsing failed: {detail}",
-                502);
+                502,
+                ErrorCode.ServiceUnavailable);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -171,16 +172,16 @@ public sealed class SmartTimeParseService : ISmartTimeParseService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Unexpected error calling LLM for time entry parse.");
-            throw new AppException("Smart time parsing failed. Please try again.", 502);
+            throw new AppException("Smart time parsing failed. Please try again.", 502, ErrorCode.ServiceUnavailable);
         }
 
         if (completion.FinishReason == ChatFinishReason.ContentFilter)
-            throw new AppException("The time entry text could not be processed.", 400);
+            throw AppErrors.Validation("The time entry text could not be processed.");
 
         if (completion.Content.Count == 0 || string.IsNullOrWhiteSpace(completion.Content[0].Text))
         {
             _logger.LogWarning("LLM returned an empty structured response.");
-            throw new AppException("Smart time parsing returned an empty result.", 502);
+            throw new AppException("Smart time parsing returned an empty result.", 502, ErrorCode.ServiceUnavailable);
         }
 
         LlmParsedTimeEntry raw;
@@ -193,7 +194,7 @@ public sealed class SmartTimeParseService : ISmartTimeParseService
         {
             _logger.LogError(ex, "Failed to deserialize LLM structured output: {Payload}",
                 completion.Content[0].Text);
-            throw new AppException("Smart time parsing returned an invalid result.", 502);
+            throw new AppException("Smart time parsing returned an invalid result.", 502, ErrorCode.ServiceUnavailable);
         }
 
         return Normalize(raw, catalog);
@@ -218,7 +219,7 @@ public sealed class SmartTimeParseService : ISmartTimeParseService
         if (!string.IsNullOrWhiteSpace(groqKey))
             return groqKey;
 
-        throw new AppException("Smart time parsing is not configured (missing Llm:ApiKey / GROQ_API_KEY).", 503);
+        throw new AppException("Smart time parsing is not configured (missing Llm:ApiKey / GROQ_API_KEY).", 503, ErrorCode.ServiceUnavailable);
     }
 
     private static List<ChatMessage> BuildMessages(string userInput, SmartTimeParseCatalog catalog)

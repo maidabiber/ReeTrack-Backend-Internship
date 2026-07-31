@@ -40,10 +40,10 @@ public class SharedTimeEntryService : ISharedTimeEntryService
         CancellationToken cancellationToken = default)
     {
         var running = await _timeEntries.GetActiveTimerAsync(cancellationToken)
-            ?? throw new AppException("No timer is currently running.", 404);
+            ?? throw new AppException("No timer is currently running.", 404, ErrorCode.NotFound);
 
         if (running.StartedAtUtc is null)
-            throw new AppException("No timer is currently running.", 404);
+            throw new AppException("No timer is currently running.", 404, ErrorCode.NotFound);
 
         var assignees = await ResolveAssigneesAsync(input.AssigneeUserIds, cancellationToken);
         var startedAtUtc = running.StartedAtUtc.Value;
@@ -55,7 +55,7 @@ public class SharedTimeEntryService : ISharedTimeEntryService
             endedAtUtc,
             cancellationToken);
         if (assigneeOverlap is not null)
-            throw new AppException(assigneeOverlap, 409);
+            throw new AppException(assigneeOverlap, 409, ErrorCode.EntryOverlap);
 
         var stopped = await _timeEntries.StopTimerAsync(
             new StopTimerInput
@@ -86,7 +86,7 @@ public class SharedTimeEntryService : ISharedTimeEntryService
             input.EndedAtUtc,
             cancellationToken);
         if (assigneeOverlap is not null)
-            throw new AppException(assigneeOverlap, 409);
+            throw new AppException(assigneeOverlap, 409, ErrorCode.EntryOverlap);
 
         var mine = await _timeEntries.CreateManualEntryAsync(
             new CreateManualEntryInput
@@ -141,13 +141,13 @@ public class SharedTimeEntryService : ISharedTimeEntryService
         var source = await _db.TimeEntries
             .Include(e => e.TimeEntryTags)
             .FirstOrDefaultAsync(e => e.Id == entryId, cancellationToken)
-            ?? throw new AppException("Time entry not found.", 404);
+            ?? throw AppErrors.NotFound("Time entry");
 
         if (source.Mode == TimeEntryMode.Timer && source.EndedAtUtc is null)
-            throw new AppException("Cannot share a running timer entry.", 409);
+            throw AppErrors.Conflict("Cannot share a running timer entry.");
 
         if (source.StartedAtUtc is null)
-            throw new AppException("This entry cannot be shared.", 400);
+            throw AppErrors.Validation("This entry cannot be shared.");
 
         var isAuthorOwnedConfirmed = source.UserId == userId &&
             source.SubmittedByUserId is null &&
@@ -157,7 +157,7 @@ public class SharedTimeEntryService : ISharedTimeEntryService
         var isSubmitterShare = source.SubmittedByUserId == userId;
 
         if (!isParticipantConfirmed && !isSubmitterShare)
-            throw new AppException("You cannot share this time entry.", 403);
+            throw AppErrors.Forbidden("You cannot share this time entry.");
 
         List<TimeEntry> existingShareRows = [];
         if (source.ShareGroupId is Guid existingGroupId)
@@ -174,7 +174,7 @@ public class SharedTimeEntryService : ISharedTimeEntryService
             .ToList();
 
         if (newAssigneeIds.Count == 0)
-            throw new AppException("All selected teammates are already on this entry.", 400);
+            throw AppErrors.Validation("All selected teammates are already on this entry.");
 
         var assignees = await ResolveAssigneesAsync(newAssigneeIds, cancellationToken);
         var timingSource = source;
@@ -193,7 +193,7 @@ public class SharedTimeEntryService : ISharedTimeEntryService
         }
 
         if (timingSource.Mode != TimeEntryMode.DurationOnly && timingSource.EndedAtUtc is null)
-            throw new AppException("This entry cannot be shared.", 400);
+            throw AppErrors.Validation("This entry cannot be shared.");
 
         string? overlapMessage = null;
         if (timingSource.Mode != TimeEntryMode.DurationOnly && timingSource.EndedAtUtc is not null)
@@ -204,7 +204,7 @@ public class SharedTimeEntryService : ISharedTimeEntryService
                 timingSource.EndedAtUtc.Value,
                 cancellationToken);
             if (overlapMessage is not null)
-                throw new AppException(overlapMessage, 409);
+                throw new AppException(overlapMessage, 409, ErrorCode.EntryOverlap);
         }
 
         var shareGroupId = source.ShareGroupId
@@ -254,7 +254,7 @@ public class SharedTimeEntryService : ISharedTimeEntryService
         ownedEntry.UpdatedAtUtc = DateTime.UtcNow;
 
         if (ownedEntry.StartedAtUtc is null)
-            throw new AppException("This entry cannot be shared.", 400);
+            throw AppErrors.Validation("This entry cannot be shared.");
 
         return await AddPendingClonesAndNotifyAsync(
             ownedEntry,
@@ -383,11 +383,11 @@ public class SharedTimeEntryService : ISharedTimeEntryService
     {
         var distinctAssigneeIds = assigneeUserIds.Distinct().ToList();
         if (distinctAssigneeIds.Count == 0)
-            throw new AppException("At least one teammate is required.", 400);
+            throw new AppException("At least one teammate is required.", 400, ErrorCode.TeammatesRequired);
 
         var submitterId = _currentUser.UserId;
         if (distinctAssigneeIds.Contains(submitterId))
-            throw new AppException("You cannot share a time entry with yourself.", 400);
+            throw AppErrors.Validation("You cannot share a time entry with yourself.");
 
         var assignees = await _db.Users
             .AsNoTracking()
@@ -395,7 +395,7 @@ public class SharedTimeEntryService : ISharedTimeEntryService
             .ToListAsync(cancellationToken);
 
         if (assignees.Count != distinctAssigneeIds.Count)
-            throw new AppException("One or more teammates were not found.", 404);
+            throw new AppException("One or more teammates were not found.", 404, ErrorCode.NotFound);
 
         return assignees;
     }

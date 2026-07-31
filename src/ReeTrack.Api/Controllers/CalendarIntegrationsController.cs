@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.WebUtilities;
 using ReeTrack.Api.Auth;
+using ReeTrack.Application.Common.Exceptions;
 using ReeTrack.Application.Integrations.Calendar;
 using ReeTrack.Domain.Enums;
 
@@ -16,15 +17,18 @@ public class CalendarIntegrationsController : ControllerBase
     private readonly ICalendarIntegrationService _calendarIntegrationService;
     private readonly ICalendarSyncService _calendarSyncService;
     private readonly IWebHostEnvironment _environment;
+    private readonly ILogger<CalendarIntegrationsController> _logger;
 
     public CalendarIntegrationsController(
         ICalendarIntegrationService calendarIntegrationService,
         ICalendarSyncService calendarSyncService,
-        IWebHostEnvironment environment)
+        IWebHostEnvironment environment,
+        ILogger<CalendarIntegrationsController> logger)
     {
         _calendarIntegrationService = calendarIntegrationService;
         _calendarSyncService = calendarSyncService;
         _environment = environment;
+        _logger = logger;
     }
 
     [Authorize]
@@ -57,7 +61,8 @@ public class CalendarIntegrationsController : ControllerBase
         }
         catch (InvalidOperationException ex)
         {
-            return StatusCode(StatusCodes.Status500InternalServerError, new { message = ex.Message });
+            _logger.LogError(ex, "Failed to start Google Calendar connect");
+            throw new AppException("Could not start Google Calendar connection. Please try again.", 500);
         }
     }
 
@@ -105,7 +110,8 @@ public class CalendarIntegrationsController : ControllerBase
         }
         catch (InvalidOperationException ex)
         {
-            return StatusCode(StatusCodes.Status500InternalServerError, new { message = ex.Message });
+            _logger.LogError(ex, "Failed to complete Google Calendar connect callback");
+            return RedirectWithIntegrationError(returnUrl, "Google Calendar connection is temporarily unavailable. Please try again.");
         }
     }
 
@@ -123,7 +129,7 @@ public class CalendarIntegrationsController : ControllerBase
         }
         catch (CalendarIntegrationException ex)
         {
-            return StatusCode(ex.StatusCode, new { message = ex.Message });
+            throw new AppException(ex.Message, ex.StatusCode, ex.Code);
         }
     }
 
@@ -136,7 +142,7 @@ public class CalendarIntegrationsController : ControllerBase
 
         var connections = await _calendarIntegrationService.ListConnectionsAsync(userId, cancellationToken);
         if (connections.All(c => c.Id != id))
-            return NotFound(new { message = "Calendar connection not found." });
+            throw AppErrors.NotFound("Calendar connection");
 
         try
         {
@@ -145,7 +151,7 @@ public class CalendarIntegrationsController : ControllerBase
         }
         catch (CalendarIntegrationException ex)
         {
-            return StatusCode(ex.StatusCode, new { message = ex.Message });
+            throw new AppException(ex.Message, ex.StatusCode, ex.Code);
         }
     }
 

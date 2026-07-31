@@ -63,7 +63,7 @@ public sealed class UserHourTargetService : IUserHourTargetService
         }
         catch (DomainException ex)
         {
-            throw new AppException(ex.Message, 400);
+            throw new AppException(ex.Message, 400, ErrorCode.Validation);
         }
 
         await _db.SaveChangesAsync(cancellationToken);
@@ -140,7 +140,7 @@ public sealed class UserHourTargetService : IUserHourTargetService
     {
         var exists = await _db.Users.AsNoTracking().AnyAsync(u => u.Id == userId, cancellationToken);
         if (!exists)
-            throw new AppException("User was not found.", 404);
+            throw AppErrors.NotFound("User");
     }
 
     private static UserHourTargetDto ToDto(UserHourTarget target) =>

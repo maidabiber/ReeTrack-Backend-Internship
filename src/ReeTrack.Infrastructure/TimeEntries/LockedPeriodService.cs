@@ -21,7 +21,7 @@ public class LockedPeriodService : ILockedPeriodService
         var lockedBefore = _options.LockedBeforeUtc;
         if (lockedBefore is not null && startedAtUtc < lockedBefore)
         {
-            throw new AppException("This time period is locked and cannot be edited.", 403);
+            throw AppErrors.Forbidden("This time period is locked and cannot be edited.");
         }
 
         return Task.CompletedTask;

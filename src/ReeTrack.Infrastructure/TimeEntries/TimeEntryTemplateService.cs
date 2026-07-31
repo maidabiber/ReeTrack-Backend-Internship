@@ -59,12 +59,12 @@ public class TimeEntryTemplateService : ITimeEntryTemplateService
         var entry = await _db.TimeEntries.AsNoTracking()
                 .Include(e => e.TimeEntryTags)
                 .FirstOrDefaultAsync(e => e.Id == timeEntryId && e.UserId == userId, cancellationToken)
-            ?? throw new AppException("Time entry was not found.", 404);
+            ?? throw AppErrors.NotFound("Time entry");
 
         var alreadyExists = await _db.TimeEntryTemplates.AsNoTracking()
             .AnyAsync(t => t.TimeEntryId == timeEntryId, cancellationToken);
         if (alreadyExists)
-            throw new AppException("A favourite template for this time entry already exists.", 409);
+            throw AppErrors.Conflict("A favourite template for this time entry already exists.");
 
         TimeEntryTemplate template;
         try
@@ -73,7 +73,7 @@ public class TimeEntryTemplateService : ITimeEntryTemplateService
         }
         catch (InvalidOperationException ex)
         {
-            throw new AppException(ex.Message, 400);
+            throw new AppException(ex.Message, 400, ErrorCode.Validation);
         }
 
         foreach (var tag in entry.TimeEntryTags)
@@ -96,7 +96,7 @@ public class TimeEntryTemplateService : ITimeEntryTemplateService
         }
         catch (DbUpdateException)
         {
-            throw new AppException("A favourite template for this time entry already exists.", 409);
+            throw AppErrors.Conflict("A favourite template for this time entry already exists.");
         }
 
         var created = await _db.TimeEntryTemplates.AsNoTracking()
@@ -115,7 +115,7 @@ public class TimeEntryTemplateService : ITimeEntryTemplateService
 
         var template = await _db.TimeEntryTemplates
                 .FirstOrDefaultAsync(t => t.Id == id && t.UserId == userId, cancellationToken)
-            ?? throw new AppException("Time entry template was not found.", 404);
+            ?? throw AppErrors.NotFound("Time entry template");
 
         _db.TimeEntryTemplates.Remove(template);
         await _db.SaveChangesAsync(cancellationToken);

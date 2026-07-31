@@ -65,7 +65,7 @@ public class ProjectEndpointsTests
     }
 
     [Fact]
-    public async Task Create_UnknownClient_Returns400()
+    public async Task Create_UnknownClient_Returns404()
     {
         using var factory = new ReeTrackWebApplicationFactory();
         var (_, token) = await factory.SeedAdminAsync();
@@ -77,7 +77,7 @@ public class ProjectEndpointsTests
             clientId = Guid.NewGuid()
         });
 
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
     [Fact]

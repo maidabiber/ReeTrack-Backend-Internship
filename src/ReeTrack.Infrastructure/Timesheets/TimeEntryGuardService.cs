@@ -31,6 +31,6 @@ public class TimeEntryGuardService : ITimeEntryGuardService
             cancellationToken);
 
         if (weekLocked)
-            throw new AppException("This week's timesheet has been submitted and can no longer be edited.", 409);
+            throw AppErrors.Conflict("This week's timesheet has been submitted and can no longer be edited.");
     }
 }

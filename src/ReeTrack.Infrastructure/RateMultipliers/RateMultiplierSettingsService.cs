@@ -70,13 +70,13 @@ public sealed class RateMultiplierSettingsService : IRateMultiplierSettingsServi
     private static void Validate(RateMultiplierSettingsDto request)
     {
         if (request.WeekendPremium < 0m)
-            throw new AppException("Weekend premium must be zero or greater.", 400);
+            throw AppErrors.Validation("Weekend premium must be zero or greater.");
         if (request.HolidayPremium < 0m)
-            throw new AppException("Holiday premium must be zero or greater.", 400);
+            throw AppErrors.Validation("Holiday premium must be zero or greater.");
         if (request.OvertimePremium < 0m)
-            throw new AppException("Overtime premium must be zero or greater.", 400);
+            throw AppErrors.Validation("Overtime premium must be zero or greater.");
         if (request.WeeklyOvertimeThresholdHours <= 0m)
-            throw new AppException("Weekly overtime threshold must be greater than zero.", 400);
+            throw AppErrors.Validation("Weekly overtime threshold must be greater than zero.");
     }
 
     private static RateMultiplierSettingsDto ToDto(RateMultiplierSettings settings) =>

@@ -71,7 +71,7 @@ public sealed class InAppNotificationService : IInAppNotificationService
             .FirstOrDefaultAsync(n => n.Id == notificationId && n.UserId == userId, ct);
 
         if (notification is null)
-            throw new AppException("Notification was not found.", 404);
+            throw AppErrors.NotFound("Notification");
 
         if (notification.IsRead)
             return;

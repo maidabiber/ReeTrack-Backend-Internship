@@ -70,7 +70,7 @@ public class MemberService : IMemberService
         CancellationToken cancellationToken = default)
     {
         if (roleId is null && status is null)
-            throw new AppException("Nothing to update.");
+            throw AppErrors.Validation("Nothing to update.");
 
         var actorId = _currentUser.UserId;
 
@@ -78,20 +78,20 @@ public class MemberService : IMemberService
             .Include(u => u.UserRoles)
             .ThenInclude(ur => ur.Role)
             .FirstOrDefaultAsync(u => u.Id == userId, cancellationToken)
-            ?? throw new AppException("Member was not found.", 404);
+            ?? throw AppErrors.NotFound("Member");
 
         var now = DateTime.UtcNow;
 
         if (status is not null && status != user.Status)
         {
             if (status is not (UserStatus.Active or UserStatus.Disabled))
-                throw new AppException("Status can only be changed to Active or Disabled.");
+                throw new AppException("Status can only be changed to Active or Disabled.", 400, ErrorCode.StatusInvalid);
 
             if (user.Status == UserStatus.Invited)
-                throw new AppException("This member has not joined yet. Revoke their invitation instead.");
+                throw AppErrors.Validation("This member has not joined yet. Revoke their invitation instead.");
 
             if (user.Id == actorId)
-                throw new AppException("You cannot change the status of your own account.", 409);
+                throw AppErrors.Conflict("You cannot change the status of your own account.");
 
             if (status == UserStatus.Disabled)
                 await EnsureAnotherActiveAdminRemainsAsync(user, cancellationToken);
@@ -103,7 +103,7 @@ public class MemberService : IMemberService
         if (roleId is not null)
         {
             if (roleId is not (RoleIds.Admin or RoleIds.Member))
-                throw new AppException("Role must be Admin or Member.");
+                throw new AppException("Role must be Admin or Member.", 400, ErrorCode.RoleInvalid);
 
             var currentRole = user.UserRoles.FirstOrDefault()
                 ?? throw new AppException($"User {user.Id} has no assigned role.", 500);
@@ -179,7 +179,7 @@ public class MemberService : IMemberService
             cancellationToken);
 
         if (!anotherActiveAdminExists)
-            throw new AppException("At least one active admin is required.", 409);
+            throw AppErrors.Conflict("At least one active admin is required.");
     }
 
     internal static MemberDto MapMember(User user, IReadOnlyDictionary<string, Guid>? pendingInvitations = null)

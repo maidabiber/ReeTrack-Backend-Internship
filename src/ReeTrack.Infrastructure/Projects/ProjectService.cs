@@ -50,7 +50,7 @@ public class ProjectService : IProjectService
             case "all":
                 break;
             default:
-                throw new AppException("Status must be one of: active, archived, all.");
+                throw new AppException("Status must be one of: active, archived, all.", 400, ErrorCode.StatusInvalid);
         }
 
         var clientFilterIds = new List<Guid>();
@@ -126,7 +126,7 @@ public class ProjectService : IProjectService
                 p.Tasks.Count,
                 p.CreatedAtUtc))
             .FirstOrDefaultAsync(cancellationToken)
-            ?? throw new AppException("Project was not found.", 404);
+            ?? throw AppErrors.NotFound("Project");
 
         var actualHours = await GetActualHoursAsync(id, cancellationToken);
         return MapRow(row, actualHours);
@@ -166,7 +166,7 @@ public class ProjectService : IProjectService
     public async Task<ProjectDto> UpdateAsync(Guid id, UpdateProjectInput input, CancellationToken cancellationToken = default)
     {
         var project = await _db.Projects.FirstOrDefaultAsync(p => p.Id == id, cancellationToken)
-            ?? throw new AppException("Project was not found.", 404);
+            ?? throw AppErrors.NotFound("Project");
 
         if (input.Name is not null)
         {
@@ -217,11 +217,11 @@ public class ProjectService : IProjectService
     public async Task DeleteAsync(Guid id, CancellationToken cancellationToken = default)
     {
         var project = await _db.Projects.FirstOrDefaultAsync(p => p.Id == id, cancellationToken)
-            ?? throw new AppException("Project was not found.", 404);
+            ?? throw AppErrors.NotFound("Project");
 
         var isAdmin = _currentUser.Roles.Contains("Admin");
         if (!isAdmin && project.CreatedByUserId != _currentUser.UserId)
-            throw new AppException("Only the person who created this project or an admin can delete it.", 403);
+            throw AppErrors.Forbidden("Only the person who created this project or an admin can delete it.");
 
         var taskIds = await _db.ProjectTasks
             .Where(t => t.ProjectId == id)
@@ -232,7 +232,7 @@ public class ProjectService : IProjectService
             e => e.ProjectId == id || (e.ProjectTaskId != null && taskIds.Contains(e.ProjectTaskId.Value)),
             cancellationToken);
         if (hasTrackedTime)
-            throw new AppException("This project has tracked time. Archive it instead.", 409);
+            throw AppErrors.Conflict("This project has tracked time. Archive it instead.");
 
         var now = DateTime.UtcNow;
         var deletedBy = _currentUser.UserId;
@@ -270,7 +270,7 @@ public class ProjectService : IProjectService
     private async Task<string> EnsureClientExistsAsync(Guid? clientId, CancellationToken cancellationToken)
     {
         if (!clientId.HasValue)
-            throw new AppException("Client is required.");
+            throw AppErrors.Validation("Client is required.");
 
         var name = await _db.Clients.AsNoTracking()
             .Where(c => c.Id == clientId.Value)
@@ -278,7 +278,7 @@ public class ProjectService : IProjectService
             .FirstOrDefaultAsync(cancellationToken);
 
         if (name is null)
-            throw new AppException("Client was not found.");
+            throw AppErrors.NotFound("Client");
 
         return name;
     }
@@ -287,9 +287,9 @@ public class ProjectService : IProjectService
     {
         var trimmed = name?.Trim();
         if (string.IsNullOrEmpty(trimmed))
-            throw new AppException("Project name is required.");
+            throw AppErrors.Validation("Project name is required.");
         if (trimmed.Length > NameMaxLength)
-            throw new AppException($"Project name must be at most {NameMaxLength} characters.");
+            throw AppErrors.Validation($"Project name must be at most {NameMaxLength} characters.");
 
         return trimmed;
     }
@@ -300,7 +300,7 @@ public class ProjectService : IProjectService
         if (string.IsNullOrEmpty(trimmed))
             return null;
         if (!ColorPattern.IsMatch(trimmed))
-            throw new AppException("Color must be a hex value like #4366E2.");
+            throw AppErrors.Validation("Color must be a hex value like #4366E2.");
 
         return trimmed.ToUpperInvariant();
     }
@@ -310,7 +310,7 @@ public class ProjectService : IProjectService
         if (amount is null)
             return null;
         if (amount < 0)
-            throw new AppException($"{label} cannot be negative.");
+            throw AppErrors.Validation($"{label} cannot be negative.");
 
         return amount;
     }
@@ -320,9 +320,9 @@ public class ProjectService : IProjectService
         if (hours is null)
             return null;
         if (hours < 0)
-            throw new AppException("Time estimate cannot be negative.");
+            throw AppErrors.Validation("Time estimate cannot be negative.");
         if (hours >= EstimateMax)
-            throw new AppException("Time estimate is too large.");
+            throw AppErrors.Validation("Time estimate is too large.");
 
         return hours;
     }
@@ -332,7 +332,7 @@ public class ProjectService : IProjectService
         {
             "active" => ProjectStatus.Active,
             "archived" => ProjectStatus.Archived,
-            _ => throw new AppException("Status must be one of: active, archived.")
+            _ => throw new AppException("Status must be one of: active, archived.", 400, ErrorCode.StatusInvalid)
         };
 
     private static string FormatStatus(ProjectStatus status) =>
@@ -346,7 +346,7 @@ public class ProjectService : IProjectService
             cancellationToken);
 
         if (taken)
-            throw new AppException("A project with this name already exists.", 409);
+            throw AppErrors.Conflict("A project with this name already exists.");
     }
 
     // Backstop for the pre-check race: ix_projects_name is unique over non-deleted rows.
@@ -360,7 +360,7 @@ public class ProjectService : IProjectService
         }
         catch (DbUpdateException ex) when (IsUniqueViolation(ex))
         {
-            throw new AppException("A project with this name already exists.", 409);
+            throw AppErrors.Conflict("A project with this name already exists.");
         }
     }
 

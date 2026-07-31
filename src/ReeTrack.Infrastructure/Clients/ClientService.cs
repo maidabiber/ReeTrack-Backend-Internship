@@ -39,7 +39,7 @@ public class ClientService : IClientService
             case "all":
                 break;
             default:
-                throw new AppException("Status must be one of: active, archived, all.");
+                throw new AppException("Status must be one of: active, archived, all.", 400, ErrorCode.StatusInvalid);
         }
 
         var q = query.Q?.Trim().ToLowerInvariant();
@@ -90,7 +90,7 @@ public class ClientService : IClientService
         CancellationToken cancellationToken = default)
     {
         var client = await _db.Clients.FirstOrDefaultAsync(c => c.Id == id, cancellationToken)
-            ?? throw new AppException("Client was not found.", 404);
+            ?? throw AppErrors.NotFound("Client");
 
         if (name is not null)
         {
@@ -114,11 +114,11 @@ public class ClientService : IClientService
     public async Task DeleteAsync(Guid id, CancellationToken cancellationToken = default)
     {
         var client = await _db.Clients.FirstOrDefaultAsync(c => c.Id == id, cancellationToken)
-            ?? throw new AppException("Client was not found.", 404);
+            ?? throw AppErrors.NotFound("Client");
 
         var hasProjects = await _db.Projects.AnyAsync(p => p.ClientId == id, cancellationToken);
         if (hasProjects)
-            throw new AppException("This client has projects. Archive it instead.", 409);
+            throw AppErrors.Conflict("This client has projects. Archive it instead.");
 
         client.DeletedAtUtc = DateTime.UtcNow;
         client.DeletedByUserId = _currentUser.UserId;
@@ -129,9 +129,9 @@ public class ClientService : IClientService
     {
         var trimmed = name?.Trim();
         if (string.IsNullOrEmpty(trimmed))
-            throw new AppException("Client name is required.");
+            throw AppErrors.Validation("Client name is required.");
         if (trimmed.Length > NameMaxLength)
-            throw new AppException($"Client name must be at most {NameMaxLength} characters.");
+            throw AppErrors.Validation($"Client name must be at most {NameMaxLength} characters.");
 
         return trimmed;
     }
@@ -147,7 +147,7 @@ public class ClientService : IClientService
             cancellationToken);
 
         if (taken)
-            throw new AppException("A client with this name already exists.", 409);
+            throw AppErrors.Conflict("A client with this name already exists.");
     }
 
     // Backstop for the pre-check race: ix_clients_name is unique over non-deleted rows.
@@ -159,7 +159,7 @@ public class ClientService : IClientService
         }
         catch (DbUpdateException)
         {
-            throw new AppException("A client with this name already exists.", 409);
+            throw AppErrors.Conflict("A client with this name already exists.");
         }
     }
 

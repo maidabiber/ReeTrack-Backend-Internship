@@ -234,7 +234,7 @@ public class TimeEntriesController : ControllerBase
             assigneeUserIds = [singleId];
 
         if (assigneeUserIds.Count == 0)
-            throw new AppException("At least one teammate is required.", 400);
+            throw new AppException("At least one teammate is required.", 400, ErrorCode.TeammatesRequired);
 
         var input = new CreateSharedDurationOnlyEntryInput
         {
@@ -268,7 +268,7 @@ public class TimeEntriesController : ControllerBase
             .ToList() ?? [];
 
         if (assigneeUserIds.Count == 0)
-            throw new AppException("At least one teammate is required.", 400);
+            throw new AppException("At least one teammate is required.", 400, ErrorCode.TeammatesRequired);
 
         var input = new ShareExistingEntryInput
         {
@@ -293,7 +293,7 @@ public class TimeEntriesController : ControllerBase
         if (request.AssigneeUserId is Guid assigneeUserId)
             return [assigneeUserId];
 
-        throw new AppException("At least one teammate is required.", 400);
+        throw new AppException("At least one teammate is required.", 400, ErrorCode.TeammatesRequired);
     }
 
     [HttpGet("pending")]

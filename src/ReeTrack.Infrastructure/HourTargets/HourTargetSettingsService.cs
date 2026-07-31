@@ -36,7 +36,7 @@ public sealed class HourTargetSettingsService : IHourTargetSettingsService
         }
         catch (DomainException ex)
         {
-            throw new AppException(ex.Message, 400);
+            throw new AppException(ex.Message, 400, ErrorCode.Validation);
         }
 
         await _db.SaveChangesAsync(cancellationToken);

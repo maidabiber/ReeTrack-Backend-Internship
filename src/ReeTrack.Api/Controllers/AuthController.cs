@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.WebUtilities;
 using ReeTrack.Api.Auth;
+using ReeTrack.Application.Common.Exceptions;
 using ReeTrack.Application.Common.Interfaces;
 using ReeTrack.Application.Common.Models;
 
@@ -16,15 +17,18 @@ public class AuthController : ControllerBase
     private readonly IAuthService _authService;
     private readonly IGoogleOAuthService _googleOAuthService;
     private readonly IWebHostEnvironment _environment;
+    private readonly ILogger<AuthController> _logger;
 
     public AuthController(
         IAuthService authService,
         IGoogleOAuthService googleOAuthService,
-        IWebHostEnvironment environment)
+        IWebHostEnvironment environment,
+        ILogger<AuthController> logger)
     {
         _authService = authService;
         _googleOAuthService = googleOAuthService;
         _environment = environment;
+        _logger = logger;
     }
 
     [AllowAnonymous]
@@ -43,7 +47,8 @@ public class AuthController : ControllerBase
         }
         catch (InvalidOperationException ex)
         {
-            return StatusCode(StatusCodes.Status500InternalServerError, new { message = ex.Message });
+            _logger.LogError(ex, "Failed to start Google sign-in");
+            throw new AppException("Could not start Google sign-in. Please try again.", 500);
         }
     }
 
@@ -84,7 +89,8 @@ public class AuthController : ControllerBase
         }
         catch (InvalidOperationException ex)
         {
-            return StatusCode(StatusCodes.Status500InternalServerError, new { message = ex.Message });
+            _logger.LogError(ex, "Failed to complete Google sign-in callback");
+            return RedirectWithAuthError(returnUrl, "Google sign-in is temporarily unavailable. Please try again.");
         }
     }
 
@@ -102,7 +108,7 @@ public class AuthController : ControllerBase
         }
         catch (AuthException ex)
         {
-            return StatusCode(ex.StatusCode, new { message = ex.Message });
+            throw new AppException(ex.Message, ex.StatusCode, ex.Code);
         }
     }
 

@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ReeTrack.Api.Contracts;
+using ReeTrack.Application.Common.Exceptions;
 using ReeTrack.Application.Common.Interfaces;
 using ReeTrack.Application.Common.Models;
 
@@ -40,7 +41,7 @@ public class TimeEntryTemplatesController : ControllerBase
         CancellationToken cancellationToken)
     {
         if (request is null || request.TimeEntryId == Guid.Empty)
-            return BadRequest(new { message = "TimeEntryId is required." });
+            throw AppErrors.Validation("TimeEntryId is required.");
 
         var template = await _templateService.CreateFromTimeEntryAsync(
             request.TimeEntryId,

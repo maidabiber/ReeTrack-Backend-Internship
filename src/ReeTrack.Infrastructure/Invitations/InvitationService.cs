@@ -49,20 +49,20 @@ public class InvitationService : IInvitationService
         var normalizedEmail = InvitationTokenHelper.NormalizeEmail(email);
 
         if (string.IsNullOrWhiteSpace(normalizedEmail) || !normalizedEmail.Contains('@'))
-            throw new AppException("A valid email address is required.");
+            throw AppErrors.Validation("A valid email address is required.");
 
         if (!InvitationTokenHelper.IsEmailDomainAllowed(normalizedEmail, _invitationOptions.AllowedDomains))
-            throw new AppException(
+            throw AppErrors.Validation(
                 $"{normalizedEmail} cannot be invited. Only addresses from these domains can sign in: " +
                 $"{string.Join(", ", _invitationOptions.AllowedDomains)}.");
 
         if (roleId is not (RoleIds.Admin or RoleIds.Member))
-            throw new AppException("Role must be Admin or Member.");
+            throw new AppException("Role must be Admin or Member.", 400, ErrorCode.RoleInvalid);
 
         var role = await _db.Roles
             .AsNoTracking()
             .FirstOrDefaultAsync(r => r.Id == roleId, cancellationToken)
-            ?? throw new AppException("Role must be Admin or Member.");
+            ?? throw new AppException("Role must be Admin or Member.", 400, ErrorCode.RoleInvalid);
 
         var existingUser = await _db.Users
             .Include(u => u.UserRoles)
@@ -70,12 +70,12 @@ public class InvitationService : IInvitationService
             .FirstOrDefaultAsync(u => u.Email == normalizedEmail, cancellationToken);
 
         if (existingUser?.Status == UserStatus.Active)
-            throw new AppException("A user with this email already has access.", 409);
+            throw AppErrors.Conflict("A user with this email already has access.");
 
         var inviter = await _db.Users
             .AsNoTracking()
             .FirstOrDefaultAsync(u => u.Id == adminId, cancellationToken)
-            ?? throw new AppException("Current user was not found.", 401);
+            ?? throw AppErrors.Unauthorized("Current user was not found.");
 
         var inviterName = inviter.DisplayName ?? inviter.Email;
         var rawToken = InvitationTokenHelper.GenerateToken();
@@ -198,13 +198,13 @@ public class InvitationService : IInvitationService
         const int maxBatchSize = 50;
 
         if (emails.Count == 0)
-            throw new AppException("At least one email address is required.");
+            throw AppErrors.Validation("At least one email address is required.");
 
         if (emails.Count > maxBatchSize)
-            throw new AppException($"You can invite at most {maxBatchSize} emails at once.");
+            throw AppErrors.Validation($"You can invite at most {maxBatchSize} emails at once.");
 
         if (roleId is not (RoleIds.Admin or RoleIds.Member))
-            throw new AppException("Role must be Admin or Member.");
+            throw new AppException("Role must be Admin or Member.", 400, ErrorCode.RoleInvalid);
 
         var results = new List<BatchInvitationRowResult>(emails.Count);
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -266,7 +266,7 @@ public class InvitationService : IInvitationService
         }
 
         if (results.Count == 0)
-            throw new AppException("At least one email address is required.");
+            throw AppErrors.Validation("At least one email address is required.");
 
         return results;
     }
@@ -303,15 +303,14 @@ public class InvitationService : IInvitationService
         var invitation = await _db.Invitations
             .Include(i => i.Role)
             .FirstOrDefaultAsync(i => i.Id == invitationId, cancellationToken)
-            ?? throw new AppException("Invitation was not found.", 404);
+            ?? throw AppErrors.NotFound("Invitation");
 
         if (invitation.Status != InvitationStatus.Pending)
         {
-            throw new AppException(
+            throw AppErrors.Conflict(
                 invitation.Status == InvitationStatus.Accepted
                     ? "This invitation was already accepted. Deactivate the member instead."
-                    : "This invitation was already revoked.",
-                409);
+                    : "This invitation was already revoked.");
         }
 
         var now = DateTime.UtcNow;
@@ -355,22 +354,22 @@ public class InvitationService : IInvitationService
         var existingInvitation = await _db.Invitations
             .Include(i => i.Role)
             .FirstOrDefaultAsync(i => i.Id == invitationId, cancellationToken)
-            ?? throw new AppException("Invitation was not found.", 404);
+            ?? throw AppErrors.NotFound("Invitation");
 
         if (existingInvitation.Status != InvitationStatus.Pending)
-            throw new AppException("Only pending invitations can be resent.");
+            throw AppErrors.Validation("Only pending invitations can be resent.");
 
         var user = await _db.Users
             .FirstOrDefaultAsync(u => u.Email == existingInvitation.Email, cancellationToken)
-            ?? throw new AppException("Invited user was not found.", 404);
+            ?? throw AppErrors.NotFound("Invited user");
 
         if (user.Status != UserStatus.Invited)
-            throw new AppException("This user is no longer in an invited state.");
+            throw AppErrors.Validation("This user is no longer in an invited state.");
 
         var inviter = await _db.Users
             .AsNoTracking()
             .FirstOrDefaultAsync(u => u.Id == adminId, cancellationToken)
-            ?? throw new AppException("Current user was not found.", 401);
+            ?? throw AppErrors.Unauthorized("Current user was not found.");
 
         var inviterName = inviter.DisplayName ?? inviter.Email;
         var rawToken = InvitationTokenHelper.GenerateToken();
@@ -436,7 +435,7 @@ public class InvitationService : IInvitationService
             invitation.Status != InvitationStatus.Pending ||
             invitation.ExpiresAtUtc <= DateTime.UtcNow)
         {
-            throw new AppException("Invitation was not found.", 404);
+            throw AppErrors.NotFound("Invitation");
         }
 
         var inviterName = invitation.InvitedByUser.DisplayName ?? invitation.InvitedByUser.Email;
@@ -499,7 +498,8 @@ public class InvitationService : IInvitationService
         {
             throw new AppException(
                 "The invitation was saved, but the invite email could not be sent. Use resend to try again.",
-                502);
+                502,
+                ErrorCode.ServiceUnavailable);
         }
     }
 

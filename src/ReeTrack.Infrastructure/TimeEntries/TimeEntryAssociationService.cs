@@ -77,10 +77,10 @@ public class TimeEntryAssociationService : ITimeEntryAssociationService
             task = await _db.ProjectTasks
                 .Include(t => t.Project)
                 .FirstOrDefaultAsync(t => t.Id == taskId, cancellationToken)
-                ?? throw new AppException("Task was not found.", 404);
+                ?? throw AppErrors.NotFound("Task");
 
             if (resolvedProjectId is Guid explicitProjectId && task.ProjectId != explicitProjectId)
-                throw new AppException("Task does not belong to the selected project.", 400);
+                throw AppErrors.Validation("Task does not belong to the selected project.");
 
             resolvedProjectId = task.ProjectId;
             project = task.Project;
@@ -89,7 +89,7 @@ public class TimeEntryAssociationService : ITimeEntryAssociationService
         {
             project = await _db.Projects
                 .FirstOrDefaultAsync(p => p.Id == projectOnlyId, cancellationToken)
-                ?? throw new AppException("Project was not found.", 404);
+                ?? throw AppErrors.NotFound("Project");
         }
 
         entry.ProjectId = resolvedProjectId;
@@ -117,7 +117,7 @@ public class TimeEntryAssociationService : ITimeEntryAssociationService
             .ToListAsync(cancellationToken);
 
         if (tags.Count != ids.Count)
-            throw new AppException("One or more tags were not found.", 404);
+            throw new AppException("One or more tags were not found.", 404, ErrorCode.NotFound);
 
         var byId = tags.ToDictionary(t => t.Id);
         entry.TimeEntryTags.Clear();

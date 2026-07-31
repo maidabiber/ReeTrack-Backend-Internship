@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using ReeTrack.Application.Common.Exceptions;
 using ReeTrack.Application.Common.Interfaces;
 using ReeTrack.Application.Common.Options;
 using ReeTrack.Application.Integrations.Calendar;
@@ -40,7 +41,7 @@ public class CalendarSyncService : ICalendarSyncService
             .FirstOrDefaultAsync(c => c.Id == connectionId, cancellationToken);
 
         if (connection is null)
-            throw new CalendarIntegrationException("Calendar connection not found.", 404);
+            throw new CalendarIntegrationException("Calendar connection not found.", 404, ErrorCode.NotFound);
 
         if (connection.SyncStatus == CalendarSyncStatus.Syncing)
             return;

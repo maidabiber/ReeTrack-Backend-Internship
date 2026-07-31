@@ -40,7 +40,7 @@ public class TimeEntryService : ITimeEntryService
         var userId = _currentUser.UserId;
         var existing = await FindRunningTimerAsync(userId, cancellationToken);
         if (existing is not null)
-            throw new AppException("A timer is already running.", 409);
+            throw new AppException("A timer is already running.", 409, ErrorCode.AlreadyRunning);
 
         var now = DateTime.UtcNow;
         await _entryGuard.EnsureEditableAsync(userId, now, cancellationToken);
@@ -69,7 +69,7 @@ public class TimeEntryService : ITimeEntryService
         }
         catch (DbUpdateException)
         {
-            throw new AppException("A timer is already running.", 409);
+            throw new AppException("A timer is already running.", 409, ErrorCode.AlreadyRunning);
         }
 
         return MapEntity(entry);
@@ -81,7 +81,7 @@ public class TimeEntryService : ITimeEntryService
     {
         var userId = _currentUser.UserId;
         var entry = await FindRunningTimerAsync(userId, cancellationToken, tracked: true)
-            ?? throw new AppException("No timer is currently running.", 404);
+            ?? throw new AppException("No timer is currently running.", 404, ErrorCode.NotFound);
 
         var now = DateTime.UtcNow;
         entry.EndedAtUtc = now;
@@ -192,16 +192,16 @@ public class TimeEntryService : ITimeEntryService
             .Include(e => e.TimeEntryTags)
                 .ThenInclude(t => t.Tag)
             .FirstOrDefaultAsync(e => e.Id == entryId && e.UserId == userId, cancellationToken)
-            ?? throw new AppException("Time entry not found.", 404);
+            ?? throw AppErrors.NotFound("Time entry");
 
         if (entry.Mode == TimeEntryMode.DurationOnly)
-            throw new AppException("Duration-only entries must be updated without start/end times.", 409);
+            throw AppErrors.Conflict("Duration-only entries must be updated without start/end times.");
 
         if (entry.Mode == TimeEntryMode.Timer && entry.EndedAtUtc is null)
-            throw new AppException("Cannot edit a running timer entry.", 409);
+            throw AppErrors.Conflict("Cannot edit a running timer entry.");
 
         if (entry.Status == TimeEntryStatus.Pending)
-            throw new AppException("Pending entries must be reviewed on the Approvals page.", 409);
+            throw AppErrors.Conflict("Pending entries must be reviewed on the Approvals page.");
 
         await ApplyTimedEntryUpdateAsync(
             entry,
@@ -227,13 +227,13 @@ public class TimeEntryService : ITimeEntryService
             .Include(e => e.TimeEntryTags)
                 .ThenInclude(t => t.Tag)
             .FirstOrDefaultAsync(e => e.Id == entryId && e.UserId == userId, cancellationToken)
-            ?? throw new AppException("Time entry not found.", 404);
+            ?? throw AppErrors.NotFound("Time entry");
 
         if (entry.Mode != TimeEntryMode.DurationOnly)
-            throw new AppException("Only duration-only entries can be updated without start/end times.", 409);
+            throw AppErrors.Conflict("Only duration-only entries can be updated without start/end times.");
 
         if (entry.Status == TimeEntryStatus.Pending)
-            throw new AppException("Pending entries must be reviewed on the Approvals page.", 409);
+            throw AppErrors.Conflict("Pending entries must be reviewed on the Approvals page.");
 
         ValidateDurationOnly(input.DurationSeconds);
         var normalizedEntryDateUtc = NormalizeEntryDateUtc(input.EntryDateUtc);
@@ -363,9 +363,9 @@ public class TimeEntryService : ITimeEntryService
             .ToList();
 
         if (labels.Count > 0)
-            throw new AppException($"This entry overlaps with: {string.Join(", ", labels)}.", 409);
+            throw new AppException($"This entry overlaps with: {string.Join(", ", labels)}.", 409, ErrorCode.EntryOverlap);
 
-        throw new AppException("This entry overlaps with an existing time entry.", 409);
+        throw new AppException("This entry overlaps with an existing time entry.", 409, ErrorCode.EntryOverlap);
     }
 
     private async Task<IReadOnlyDictionary<Guid, List<TimeEntry>>> LoadShareGroupsAsync(

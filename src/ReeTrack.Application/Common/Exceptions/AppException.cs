@@ -4,9 +4,12 @@ public sealed class AppException : Exception
 {
     public int StatusCode { get; }
 
-    public AppException(string message, int statusCode = 400)
+    public ErrorCode Code { get; }
+
+    public AppException(string message, int statusCode = 400, ErrorCode code = ErrorCode.Unspecified)
         : base(message)
     {
         StatusCode = statusCode;
+        Code = code;
     }
 }

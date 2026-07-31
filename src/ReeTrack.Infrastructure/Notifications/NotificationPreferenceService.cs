@@ -74,7 +74,7 @@ public sealed class NotificationPreferenceService : INotificationPreferenceServi
     {
         var exists = await _db.Users.AsNoTracking().AnyAsync(u => u.Id == userId, cancellationToken);
         if (!exists)
-            throw new AppException("User was not found.", 404);
+            throw AppErrors.NotFound("User");
     }
 
     private static NotificationPreferenceDto Map(NotificationPreference preference) =>

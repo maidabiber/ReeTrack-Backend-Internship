@@ -2,6 +2,7 @@ using System.Net.Http.Json;
 using System.Text.Json.Serialization;
 using Google.Apis.Auth;
 using Microsoft.Extensions.Options;
+using ReeTrack.Application.Common.Exceptions;
 using ReeTrack.Application.Common.Interfaces;
 using ReeTrack.Application.Common.Options;
 
@@ -31,7 +32,7 @@ public class GoogleCodeExchanger : IGoogleCodeExchanger
         var tokenResponse = await ExchangeCodeForTokensAsync(code, cancellationToken);
 
         if (string.IsNullOrWhiteSpace(tokenResponse.IdToken))
-            throw new AuthException("Google did not return an ID token.");
+            throw new AuthException("Google did not return an ID token.", 401, ErrorCode.Unauthorized);
 
         return await ValidateIdTokenAsync(tokenResponse.IdToken);
     }
@@ -54,18 +55,18 @@ public class GoogleCodeExchanger : IGoogleCodeExchanger
         }
         catch (HttpRequestException ex)
         {
-            throw new AuthException($"Failed to contact Google token endpoint: {ex.Message}");
+            throw new AuthException($"Failed to contact Google token endpoint: {ex.Message}", 401, ErrorCode.Unauthorized);
         }
 
         if (!response.IsSuccessStatusCode)
         {
             var error = await response.Content.ReadAsStringAsync(cancellationToken);
-            throw new AuthException($"Google token exchange failed: {error}");
+            throw new AuthException($"Google token exchange failed: {error}", 401, ErrorCode.Unauthorized);
         }
 
         var tokenResponse = await response.Content.ReadFromJsonAsync<GoogleTokenResponse>(cancellationToken: cancellationToken);
         if (tokenResponse is null)
-            throw new AuthException("Google returned an empty token response.");
+            throw new AuthException("Google returned an empty token response.", 401, ErrorCode.Unauthorized);
 
         return tokenResponse;
     }
@@ -82,13 +83,13 @@ public class GoogleCodeExchanger : IGoogleCodeExchanger
                 });
 
             if (string.IsNullOrWhiteSpace(payload.Subject))
-                throw new AuthException("Google token is missing a subject claim.");
+                throw new AuthException("Google token is missing a subject claim.", 401, ErrorCode.Unauthorized);
 
             if (string.IsNullOrWhiteSpace(payload.Email))
-                throw new AuthException("Google token is missing an email claim.");
+                throw new AuthException("Google token is missing an email claim.", 401, ErrorCode.Unauthorized);
 
             if (!payload.EmailVerified)
-                throw new AuthException("Google account email is not verified.");
+                throw new AuthException("Google account email is not verified.", 401, ErrorCode.Unauthorized);
 
             return new GoogleTokenPayload
             {
@@ -101,7 +102,7 @@ public class GoogleCodeExchanger : IGoogleCodeExchanger
         }
         catch (InvalidJwtException)
         {
-            throw new AuthException("Invalid or expired Google ID token.");
+            throw new AuthException("Invalid or expired Google ID token.", 401, ErrorCode.Unauthorized);
         }
     }
 

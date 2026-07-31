@@ -48,7 +48,7 @@ public sealed class UserHourlyRateService : IUserHourlyRateService
         }
         catch (DomainException ex)
         {
-            throw new AppException(ex.Message, 404);
+            throw new AppException(ex.Message, 404, ErrorCode.NotFound);
         }
     }
 
@@ -69,7 +69,7 @@ public sealed class UserHourlyRateService : IUserHourlyRateService
         }
         catch (DomainException ex)
         {
-            throw new AppException(ex.Message, 400);
+            throw new AppException(ex.Message, 400, ErrorCode.Validation);
         }
     }
 
@@ -91,8 +91,10 @@ public sealed class UserHourlyRateService : IUserHourlyRateService
         }
         catch (DomainException ex)
         {
-            var status = ex.Message.Contains("was not found", StringComparison.OrdinalIgnoreCase) ? 404 : 400;
-            throw new AppException(ex.Message, status);
+            var isNotFound = ex.Message.Contains("was not found", StringComparison.OrdinalIgnoreCase);
+            var status = isNotFound ? 404 : 400;
+            var code = isNotFound ? ErrorCode.NotFound : ErrorCode.Validation;
+            throw new AppException(ex.Message, status, code);
         }
     }
 
@@ -100,7 +102,7 @@ public sealed class UserHourlyRateService : IUserHourlyRateService
     {
         var exists = await _db.Users.AsNoTracking().AnyAsync(u => u.Id == userId, cancellationToken);
         if (!exists)
-            throw new AppException("User was not found.", 404);
+            throw AppErrors.NotFound("User");
     }
 
     private async Task<User> LoadUserWithRatesAsync(Guid userId, CancellationToken cancellationToken)
@@ -110,7 +112,7 @@ public sealed class UserHourlyRateService : IUserHourlyRateService
             .FirstOrDefaultAsync(u => u.Id == userId, cancellationToken);
 
         if (user is null)
-            throw new AppException("User was not found.", 404);
+            throw AppErrors.NotFound("User");
 
         return user;
     }

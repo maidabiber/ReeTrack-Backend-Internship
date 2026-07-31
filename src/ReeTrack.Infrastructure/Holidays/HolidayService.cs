@@ -54,7 +54,7 @@ public sealed class HolidayService : IHolidayService
         // Validate country exists before mutating
         var calendars = await _nagerDateClient.GetAvailableCountriesAsync(cancellationToken);
         if (!calendars.Any(c => string.Equals(c.CountryCode, normalized, StringComparison.OrdinalIgnoreCase)))
-            throw new AppException("Unknown holiday calendar country code.", 400);
+            throw AppErrors.Validation("Unknown holiday calendar country code.");
 
         var countryChanged = !string.Equals(previousCountry, normalized, StringComparison.OrdinalIgnoreCase);
 
@@ -80,7 +80,7 @@ public sealed class HolidayService : IHolidayService
     {
         var settings = await EnsureSettingsAsync(cancellationToken);
         if (string.IsNullOrWhiteSpace(settings.CountryCode))
-            throw new AppException("Select a holiday calendar before refreshing.", 400);
+            throw AppErrors.Validation("Select a holiday calendar before refreshing.");
 
         var countryCode = settings.CountryCode;
         var fetched = await FetchSyncedYearsAsync(countryCode, cancellationToken);
@@ -106,13 +106,13 @@ public sealed class HolidayService : IHolidayService
     {
         var name = (request.Name ?? string.Empty).Trim();
         if (string.IsNullOrWhiteSpace(name))
-            throw new AppException("Holiday name is required.", 400);
+            throw AppErrors.Validation("Holiday name is required.");
         if (name.Length > 200)
-            throw new AppException("Holiday name must be 200 characters or fewer.", 400);
+            throw AppErrors.Validation("Holiday name must be 200 characters or fewer.");
 
         var exists = await _db.Holidays.AnyAsync(h => h.Date == request.Date, cancellationToken);
         if (exists)
-            throw new AppException("A holiday already exists on that date.", 409);
+            throw AppErrors.Conflict("A holiday already exists on that date.");
 
         var now = DateTime.UtcNow;
         var holiday = new Holiday
@@ -138,7 +138,7 @@ public sealed class HolidayService : IHolidayService
         CancellationToken cancellationToken = default)
     {
         var holiday = await _db.Holidays.FirstOrDefaultAsync(h => h.Id == id, cancellationToken)
-            ?? throw new AppException("Holiday was not found.", 404);
+            ?? throw AppErrors.NotFound("Holiday");
 
         holiday.IsActive = isActive;
         holiday.UpdatedAtUtc = DateTime.UtcNow;
@@ -149,10 +149,10 @@ public sealed class HolidayService : IHolidayService
     public async Task DeleteCustomAsync(Guid id, CancellationToken cancellationToken = default)
     {
         var holiday = await _db.Holidays.FirstOrDefaultAsync(h => h.Id == id, cancellationToken)
-            ?? throw new AppException("Holiday was not found.", 404);
+            ?? throw AppErrors.NotFound("Holiday");
 
         if (holiday.Source != HolidaySource.Custom)
-            throw new AppException("Calendar holidays cannot be deleted. Deactivate them instead.", 400);
+            throw AppErrors.Validation("Calendar holidays cannot be deleted. Deactivate them instead.");
 
         _db.Holidays.Remove(holiday);
         await _db.SaveChangesAsync(cancellationToken);
@@ -271,7 +271,7 @@ public sealed class HolidayService : IHolidayService
 
         var normalized = countryCode.Trim().ToUpperInvariant();
         if (normalized.Length != 2)
-            throw new AppException("Country code must be a 2-letter ISO code.", 400);
+            throw AppErrors.Validation("Country code must be a 2-letter ISO code.");
 
         return normalized;
     }

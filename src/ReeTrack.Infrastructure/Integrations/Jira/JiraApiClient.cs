@@ -194,15 +194,17 @@ public sealed class JiraApiClient : IJiraApiClient
             return;
 
         var body = await response.Content.ReadAsStringAsync(cancellationToken);
+        var isUnauthorized = response.StatusCode == System.Net.HttpStatusCode.Unauthorized;
         throw new AppException(
             $"Jira API error ({(int)response.StatusCode}): {Truncate(body)}",
-            response.StatusCode == System.Net.HttpStatusCode.Unauthorized ? 401 : 502);
+            isUnauthorized ? 401 : 502,
+            isUnauthorized ? ErrorCode.Unauthorized : ErrorCode.ServiceUnavailable);
     }
 
     internal static string NormalizeSiteUrl(string siteUrl)
     {
         if (string.IsNullOrWhiteSpace(siteUrl))
-            throw new AppException("Jira site URL is required.");
+            throw AppErrors.Validation("Jira site URL is required.");
 
         var trimmed = siteUrl.Trim().TrimEnd('/');
         if (!trimmed.StartsWith("https://", StringComparison.OrdinalIgnoreCase)
@@ -214,7 +216,7 @@ public sealed class JiraApiClient : IJiraApiClient
         if (!Uri.TryCreate(trimmed, UriKind.Absolute, out var uri)
             || (uri.Scheme != Uri.UriSchemeHttps && uri.Scheme != Uri.UriSchemeHttp))
         {
-            throw new AppException("Jira site URL is invalid.");
+            throw AppErrors.Validation("Jira site URL is invalid.");
         }
 
         return $"{uri.Scheme}://{uri.Authority}";

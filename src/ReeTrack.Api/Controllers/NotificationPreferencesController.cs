@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ReeTrack.Api.Contracts;
+using ReeTrack.Application.Common.Exceptions;
 using ReeTrack.Application.Common.Interfaces;
 using ReeTrack.Application.Notifications;
 using ReeTrack.Domain.Enums;
@@ -45,16 +46,16 @@ public class NotificationPreferencesController : ControllerBase
             return Forbid();
 
         if (request.Preferences is null)
-            return BadRequest(new { message = "Preferences are required." });
+            throw AppErrors.Validation("Preferences are required.");
 
         var upserts = new List<UpsertNotificationPreferenceDto>();
         foreach (var item in request.Preferences)
         {
             if (!Enum.TryParse<NotificationType>(item.NotificationType, ignoreCase: true, out var notificationType))
-                return BadRequest(new { message = $"Unknown notification type: {item.NotificationType}." });
+                throw AppErrors.Validation($"Unknown notification type: {item.NotificationType}.");
 
             if (!Enum.TryParse<DeliveryChannel>(item.DeliveryChannel, ignoreCase: true, out var deliveryChannel))
-                return BadRequest(new { message = $"Unknown delivery channel: {item.DeliveryChannel}." });
+                throw AppErrors.Validation($"Unknown delivery channel: {item.DeliveryChannel}.");
 
             upserts.Add(new UpsertNotificationPreferenceDto
             {

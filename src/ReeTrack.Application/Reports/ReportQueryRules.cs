@@ -23,18 +23,17 @@ public static class ReportQueryRules
         ArgumentNullException.ThrowIfNull(query);
 
         if (query.From is { } from && query.To is { } to && from > to)
-            throw new AppException("The report start date must be on or before the end date.", 400);
+            throw AppErrors.Validation("The report start date must be on or before the end date.");
 
         if (query.From is { } rangeFrom && query.To is { } rangeTo
             && rangeTo.DayNumber - rangeFrom.DayNumber > MaxExplicitRangeDays)
         {
-            throw new AppException(
-                $"A report can cover at most {MaxExplicitRangeDays} days — narrow the date range.",
-                400);
+            throw AppErrors.Validation(
+                $"A report can cover at most {MaxExplicitRangeDays} days — narrow the date range.");
         }
 
         if (query.GroupBy.Any(group => !Enum.IsDefined(group)))
-            throw new AppException("The report contains an unsupported grouping.", 400);
+            throw AppErrors.Validation("The report contains an unsupported grouping.");
 
         return new ReportQuery
         {
@@ -59,9 +58,8 @@ public static class ReportQueryRules
 
         if (normalized.Count > MaxValuesPerDimension)
         {
-            throw new AppException(
-                $"A report can filter by at most {MaxValuesPerDimension} {dimension}.",
-                400);
+            throw AppErrors.Validation(
+                $"A report can filter by at most {MaxValuesPerDimension} {dimension}.");
         }
 
         return normalized;

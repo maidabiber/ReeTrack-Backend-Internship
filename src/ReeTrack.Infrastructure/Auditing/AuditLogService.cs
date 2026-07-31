@@ -38,7 +38,7 @@ public class AuditLogService : IAuditLogService
         if (!string.IsNullOrWhiteSpace(query.Action))
         {
             if (!Enum.TryParse<AuditAction>(query.Action, ignoreCase: true, out var action))
-                throw new AppException("Action must be Created, Updated, Deleted or Restored.");
+                throw AppErrors.Validation("Action must be Created, Updated, Deleted or Restored.");
             logs = logs.Where(l => l.Action == action);
         }
 

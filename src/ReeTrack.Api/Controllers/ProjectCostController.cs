@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ReeTrack.Api.Contracts;
+using ReeTrack.Application.Common.Exceptions;
 using ReeTrack.Application.Common.Interfaces;
 using ReeTrack.Application.Common.Models;
 
@@ -25,7 +26,7 @@ public class ProjectCostController : ControllerBase
     {
         var cost = await _projectCostService.GetLatestAsync(id, cancellationToken);
         if (cost is null)
-            return NotFound();
+            throw AppErrors.NotFound("Project cost");
 
         return Ok(Map(cost));
     }

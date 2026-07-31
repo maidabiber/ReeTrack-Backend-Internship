@@ -89,7 +89,7 @@ public class TimesheetReviewService : ITimesheetReviewService
             .Include(t => t.User)
             .Include(t => t.ReviewedByUser)
             .FirstOrDefaultAsync(t => t.Id == timesheetId, cancellationToken)
-            ?? throw new AppException("Timesheet not found.", 404);
+            ?? throw AppErrors.NotFound("Timesheet");
 
         var entries = await TimesheetQueries.WeekEntriesAsync(
             _db, timesheet.UserId, timesheet.WeekStartDate, cancellationToken);
@@ -127,7 +127,7 @@ public class TimesheetReviewService : ITimesheetReviewService
         var timesheet = await _db.Timesheets
             .Include(t => t.User)
             .FirstOrDefaultAsync(t => t.Id == timesheetId, cancellationToken)
-            ?? throw new AppException("Timesheet not found.", 404);
+            ?? throw AppErrors.NotFound("Timesheet");
 
         // Approve is only valid on a fresh submission; a send-back (reject) is also
         // allowed on an already-approved sheet so an admin can reopen it for fixes.
@@ -136,11 +136,10 @@ public class TimesheetReviewService : ITimesheetReviewService
             : timesheet.Status is TimesheetStatus.Submitted or TimesheetStatus.Approved;
 
         if (!allowed)
-            throw new AppException(
+            throw AppErrors.Conflict(
                 decision == TimesheetStatus.Approved
                     ? "Only a submitted timesheet can be approved."
-                    : "This timesheet can no longer be sent back.",
-                409);
+                    : "This timesheet can no longer be sent back.");
 
         // Load the reviewer tracked (not AsNoTracking): when an admin reviews
         // their own timesheet the owner is already tracked via Include(t => t.User),
