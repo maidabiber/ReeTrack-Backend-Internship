@@ -14,4 +14,6 @@ public sealed class MemberDto
     public required bool EmailVerified { get; init; }
     public DateTime? LastLoginAtUtc { get; init; }
     public Guid? PendingInvitationId { get; init; }
+    public HourTargetMode? HourTargetMode { get; init; }
+    public decimal? HourTargetHours { get; init; }
 }

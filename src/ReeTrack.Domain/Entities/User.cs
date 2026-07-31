@@ -24,6 +24,7 @@ public class User : BaseEntity, IAuditable
     public ICollection<TimeEntryTemplate> TimeEntryTemplates { get; set; } = [];
     public ICollection<ProjectTask> AssignedTasks { get; set; } = [];
     public ICollection<UserHourlyRate> HourlyRates { get; set; } = [];
+    public ICollection<UserHourTarget> HourTargets { get; set; } = [];
     public ICollection<NotificationPreference> NotificationPreferences { get; set; } = [];
     public ICollection<InAppNotification> InAppNotifications { get; set; } = [];
 

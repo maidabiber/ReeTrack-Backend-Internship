@@ -135,7 +135,7 @@ public sealed class ProjectCostCalculator : IProjectCostCalculator
             var entryHours = entry.DurationSeconds / 3600m;
             var hoursBeforeEntry = cumulativeWeeklyHours.GetValueOrDefault(entry.Id);
             var isHoliday = holidays.Contains(entryDate);
-            var isWeekend = entryDate.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday;
+            var isWeekend = WorkingDayCalendar.IsWeekend(entryDate);
             var entryWeekendHours = isWeekend ? entryHours : 0m;
             var entryHolidayHours = isHoliday ? entryHours : 0m;
             var entryOvertimeHours = CalculateOvertimeHours(

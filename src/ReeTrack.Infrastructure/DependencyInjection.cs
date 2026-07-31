@@ -15,6 +15,7 @@ using ReeTrack.Infrastructure.Members;
 using ReeTrack.Infrastructure.Notifications;
 using ReeTrack.Infrastructure.Projects;
 using ReeTrack.Infrastructure.RateMultipliers;
+using ReeTrack.Infrastructure.HourTargets;
 using ReeTrack.Infrastructure.Reports;
 using ReeTrack.Infrastructure.Reports.Writers;
 using ReeTrack.Infrastructure.Holidays;
@@ -112,6 +113,8 @@ public static class DependencyInjection
         services.AddScoped<IReportExportService, ReportExportService>();
         services.AddScoped<IRateMultiplierSettingsService, RateMultiplierSettingsService>();
         services.AddScoped<IRateMultiplierConfigProvider, RateMultiplierConfigProvider>();
+        services.AddScoped<IHourTargetSettingsService, HourTargetSettingsService>();
+        services.AddScoped<IUserHourTargetService, UserHourTargetService>();
         services.AddScoped<IHolidayService, HolidayService>();
         services.AddScoped<IRateMultiplier, BaseRateMultiplier>();
         services.AddScoped<IRateMultiplier, WeekendRateMultiplier>();

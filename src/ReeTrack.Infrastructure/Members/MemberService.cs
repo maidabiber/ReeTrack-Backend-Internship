@@ -41,6 +41,7 @@ public class MemberService : IMemberService
         var users = await filtered
             .Include(u => u.UserRoles)
             .ThenInclude(ur => ur.Role)
+            .Include(u => u.HourTargets)
             .OrderBy(u => u.DisplayName)
             .ThenBy(u => u.Email)
             .Skip((page - 1) * pageSize)
@@ -148,6 +149,7 @@ public class MemberService : IMemberService
             .AsNoTracking()
             .Include(u => u.UserRoles)
             .ThenInclude(ur => ur.Role)
+            .Include(u => u.HourTargets)
             .FirstAsync(u => u.Id == userId, cancellationToken);
 
         var pendingInvitationsByEmail = await _db.Invitations
@@ -185,6 +187,8 @@ public class MemberService : IMemberService
         var role = user.UserRoles.FirstOrDefault()?.Role
             ?? throw new InvalidOperationException($"User {user.Id} has no assigned role.");
 
+        var hourTarget = user.HourTargets.FirstOrDefault();
+
         return new MemberDto
         {
             Id = user.Id,
@@ -199,7 +203,9 @@ public class MemberService : IMemberService
             PendingInvitationId = pendingInvitations is not null &&
                                   pendingInvitations.TryGetValue(user.Email, out var invitationId)
                 ? invitationId
-                : null
+                : null,
+            HourTargetMode = hourTarget?.Mode,
+            HourTargetHours = hourTarget?.TargetHours
         };
     }
 }

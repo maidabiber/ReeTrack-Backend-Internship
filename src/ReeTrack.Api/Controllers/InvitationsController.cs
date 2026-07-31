@@ -134,7 +134,9 @@ public class InvitationsController : ControllerBase
             Status = member.Status.ToString(),
             EmailVerified = member.EmailVerified,
             LastLoginAtUtc = member.LastLoginAtUtc,
-            PendingInvitationId = member.PendingInvitationId
+            PendingInvitationId = member.PendingInvitationId,
+            HourTargetMode = member.HourTargetMode?.ToString(),
+            HourTargetHours = member.HourTargetHours
         };
 
     private static InvitationResponse MapInvitation(Application.Common.Models.InvitationDto invitation) =>

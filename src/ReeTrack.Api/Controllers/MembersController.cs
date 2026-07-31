@@ -72,6 +72,8 @@ public class MembersController : ControllerBase
             Status = member.Status.ToString(),
             EmailVerified = member.EmailVerified,
             LastLoginAtUtc = member.LastLoginAtUtc,
-            PendingInvitationId = member.PendingInvitationId
+            PendingInvitationId = member.PendingInvitationId,
+            HourTargetMode = member.HourTargetMode?.ToString(),
+            HourTargetHours = member.HourTargetHours
         };
 }

@@ -19,4 +19,8 @@ public sealed class MemberResponse
     public required bool EmailVerified { get; init; }
     public DateTime? LastLoginAtUtc { get; init; }
     public Guid? PendingInvitationId { get; init; }
+    /// <summary>Override mode when set; null means app default.</summary>
+    public string? HourTargetMode { get; init; }
+    /// <summary>Override hours when set; null means app default.</summary>
+    public decimal? HourTargetHours { get; init; }
 }

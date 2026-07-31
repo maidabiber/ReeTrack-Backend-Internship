@@ -26,6 +26,8 @@ public interface IApplicationDbContext
     DbSet<Holiday> Holidays { get; }
     DbSet<HolidayCalendarSettings> HolidayCalendarSettings { get; }
     DbSet<RateMultiplierSettings> RateMultiplierSettings { get; }
+    DbSet<HourTargetSettings> HourTargetSettings { get; }
+    DbSet<UserHourTarget> UserHourTargets { get; }
     DbSet<NotificationPreference> NotificationPreferences { get; }
     DbSet<ReportFilterSet> ReportFilterSets { get; }
     DbSet<InAppNotification> InAppNotifications { get; }

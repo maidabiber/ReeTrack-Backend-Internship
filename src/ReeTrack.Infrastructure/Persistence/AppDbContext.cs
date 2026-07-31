@@ -32,6 +32,8 @@ public class AppDbContext : DbContext, IApplicationDbContext
     public DbSet<Holiday> Holidays => Set<Holiday>();
     public DbSet<HolidayCalendarSettings> HolidayCalendarSettings => Set<HolidayCalendarSettings>();
     public DbSet<RateMultiplierSettings> RateMultiplierSettings => Set<RateMultiplierSettings>();
+    public DbSet<HourTargetSettings> HourTargetSettings => Set<HourTargetSettings>();
+    public DbSet<UserHourTarget> UserHourTargets => Set<UserHourTarget>();
     public DbSet<NotificationPreference> NotificationPreferences => Set<NotificationPreference>();
     public DbSet<ReportFilterSet> ReportFilterSets => Set<ReportFilterSet>();
     public DbSet<InAppNotification> InAppNotifications => Set<InAppNotification>();
