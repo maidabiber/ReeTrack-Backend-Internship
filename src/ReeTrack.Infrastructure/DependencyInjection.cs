@@ -35,7 +35,9 @@ using ReeTrack.Infrastructure.Calendar;
 using ReeTrack.Infrastructure.Integrations.Calendar;
 using ReeTrack.Infrastructure.Integrations.Calendar.Google;
 using ReeTrack.Infrastructure.Integrations.Jira;
+using ReeTrack.Infrastructure.Integrations.Slack;
 using ReeTrack.Application.Integrations.Jira;
+using ReeTrack.Application.Integrations.Slack;
 using ReeTrack.Domain.Services;
 
 namespace ReeTrack.Infrastructure;
@@ -52,6 +54,7 @@ public static class DependencyInjection
         services.Configure<TimeEntryOptions>(configuration.GetSection(TimeEntryOptions.SectionName));
         services.Configure<LlmOptions>(configuration.GetSection(LlmOptions.SectionName));
         services.Configure<JiraOptions>(configuration.GetSection(JiraOptions.SectionName));
+        services.Configure<SlackOptions>(configuration.GetSection(SlackOptions.SectionName));
 
         // Register IChatClient using Microsoft.Extensions.AI + OpenAI adapter.
         // Always register so DI validation passes; the actual call will fail with a clear
@@ -77,6 +80,7 @@ public static class DependencyInjection
 
         services.AddHttpContextAccessor();
         services.Configure<CalendarSyncOptions>(configuration.GetSection(CalendarSyncOptions.SectionName));
+        services.Configure<WeeklyTargetCheckInOptions>(configuration.GetSection(WeeklyTargetCheckInOptions.SectionName));
 
         services.AddHttpClient<IGoogleCodeExchanger, GoogleCodeExchanger>();
         services.AddHttpClient<GoogleCalendarProvider>();
@@ -87,6 +91,17 @@ public static class DependencyInjection
         services.AddHttpClient<INagerDateClient, NagerDateClient>(client =>
         {
             client.BaseAddress = new Uri("https://date.nager.at/");
+            client.Timeout = TimeSpan.FromSeconds(30);
+        });
+        services.AddHttpClient<ISlackApiClient, SlackApiClient>((sp, client) =>
+        {
+            var slack = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<SlackOptions>>().Value;
+            var baseUrl = string.IsNullOrWhiteSpace(slack.BaseUrl)
+                ? "https://slack.com/api/"
+                : slack.BaseUrl;
+            if (!baseUrl.EndsWith('/'))
+                baseUrl += "/";
+            client.BaseAddress = new Uri(baseUrl);
             client.Timeout = TimeSpan.FromSeconds(30);
         });
 
@@ -105,6 +120,8 @@ public static class DependencyInjection
         services.AddScoped<IInAppNotificationService, InAppNotificationService>();
         services.AddScoped<IChannelProvider, EmailChannelProvider>();
         services.AddScoped<IChannelProvider, InAppChannelProvider>();
+        services.AddScoped<IChannelProvider, SlackChannelProvider>();
+        services.AddScoped<ISlackIntegrationService, SlackIntegrationService>();
         services.AddDomainEventHandlers(typeof(IDomainEventHandler<>).Assembly);
 
         services.AddScoped<IInvitationService, InvitationService>();
@@ -146,6 +163,7 @@ public static class DependencyInjection
         services.AddScoped<IRateMultiplierConfigProvider, RateMultiplierConfigProvider>();
         services.AddScoped<IHourTargetSettingsService, HourTargetSettingsService>();
         services.AddScoped<IUserHourTargetService, UserHourTargetService>();
+        services.AddScoped<IWeeklyTargetCheckInJob, WeeklyTargetCheckInJob>();
         services.AddScoped<IHolidayService, HolidayService>();
         services.AddScoped<IRateMultiplier, BaseRateMultiplier>();
         services.AddScoped<IRateMultiplier, WeekendRateMultiplier>();
@@ -164,6 +182,7 @@ public static class DependencyInjection
         services.AddScoped<ICalendarSyncService, CalendarSyncService>();
         services.AddScoped<ICalendarViewService, CalendarViewService>();
         services.AddHostedService<CalendarSyncBackgroundService>();
+        services.AddHostedService<WeeklyTargetCheckInBackgroundService>();
         services.AddScoped<IJiraIntegrationService, JiraIntegrationService>();
 
         return services;

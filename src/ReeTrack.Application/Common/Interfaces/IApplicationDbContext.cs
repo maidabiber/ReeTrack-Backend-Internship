@@ -28,6 +28,7 @@ public interface IApplicationDbContext
     DbSet<RateMultiplierSettings> RateMultiplierSettings { get; }
     DbSet<HourTargetSettings> HourTargetSettings { get; }
     DbSet<UserHourTarget> UserHourTargets { get; }
+    DbSet<WeeklyTargetCheckInRun> WeeklyTargetCheckInRuns { get; }
     DbSet<NotificationPreference> NotificationPreferences { get; }
     DbSet<ReportFilterSet> ReportFilterSets { get; }
     DbSet<InAppNotification> InAppNotifications { get; }

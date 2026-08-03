@@ -6,5 +6,6 @@ namespace ReeTrack.Domain.Enums;
 public enum DeliveryChannel : short
 {
     Email = 0,
-    InApp = 1
+    InApp = 1,
+    Slack = 2
 }
