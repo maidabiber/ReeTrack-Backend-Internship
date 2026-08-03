@@ -7,12 +7,12 @@ public interface ITimeEntryAssociationService
 {
     Task ApplyForCreateAsync(
         TimeEntry entry,
-        TimeEntryFieldsInput input,
+        TimeEntryInput input,
         CancellationToken cancellationToken = default);
 
     Task ApplyForUpdateAsync(
         TimeEntry entry,
-        TimeEntryFieldsInput input,
+        TimeEntryInput input,
         CancellationToken cancellationToken = default);
 
     void CopyAssociations(TimeEntry source, TimeEntry target);

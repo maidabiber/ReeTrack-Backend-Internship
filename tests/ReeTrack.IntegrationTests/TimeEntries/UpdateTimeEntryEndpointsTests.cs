@@ -17,14 +17,14 @@ public class UpdateTimeEntryEndpointsTests
         var startedAtUtc = DateTime.UtcNow.AddHours(-3);
         var endedAtUtc = DateTime.UtcNow.AddHours(-2);
 
-        var created = await client.PostAsJsonAsync("/api/time-entries/manual", new
+        var created = await client.PostAsJsonAsync("/api/time-entries", new
         {
             description = "Original",
             startedAtUtc,
             endedAtUtc
         });
-        var createdBody = await created.Content.ReadFromJsonAsync<CreateManualEntryResponse>();
-        var entryId = createdBody!.Entry.Id;
+        var createdBody = await created.Content.ReadFromJsonAsync<TimeEntryResponse>();
+        var entryId = createdBody!.Id;
 
         var newStart = DateTime.UtcNow.AddHours(-5);
         var newEnd = DateTime.UtcNow.AddHours(-3);
@@ -38,10 +38,10 @@ public class UpdateTimeEntryEndpointsTests
         });
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var body = await response.Content.ReadFromJsonAsync<UpdateTimeEntryResponse>();
-        Assert.Equal("Updated", body!.Entry.Description);
-        Assert.False(body.Entry.IsBillable);
-        Assert.Equal(7200, body.Entry.DurationSeconds);
+        var body = await response.Content.ReadFromJsonAsync<TimeEntryResponse>();
+        Assert.Equal("Updated", body!.Description);
+        Assert.False(body.IsBillable);
+        Assert.Equal(7200, body.DurationSeconds);
     }
 
     [Fact]
@@ -70,22 +70,22 @@ public class UpdateTimeEntryEndpointsTests
         var startedAtUtc = DateTime.UtcNow.AddHours(-4);
         var endedAtUtc = DateTime.UtcNow.AddHours(-3);
 
-        await client.PostAsJsonAsync("/api/time-entries/manual", new
+        await client.PostAsJsonAsync("/api/time-entries", new
         {
             description = "Existing",
             startedAtUtc,
             endedAtUtc
         });
 
-        var second = await client.PostAsJsonAsync("/api/time-entries/manual", new
+        var second = await client.PostAsJsonAsync("/api/time-entries", new
         {
             description = "Movable",
             startedAtUtc = DateTime.UtcNow.AddHours(-6),
             endedAtUtc = DateTime.UtcNow.AddHours(-5)
         });
-        var secondBody = await second.Content.ReadFromJsonAsync<CreateManualEntryResponse>();
+        var secondBody = await second.Content.ReadFromJsonAsync<TimeEntryResponse>();
 
-        var conflict = await client.PutAsJsonAsync($"/api/time-entries/{secondBody!.Entry.Id}", new
+        var conflict = await client.PutAsJsonAsync($"/api/time-entries/{secondBody!.Id}", new
         {
             description = "Movable",
             startedAtUtc = startedAtUtc.AddMinutes(30),
@@ -93,7 +93,7 @@ public class UpdateTimeEntryEndpointsTests
         });
         Assert.Equal(HttpStatusCode.Conflict, conflict.StatusCode);
 
-        var confirmedStillRejected = await client.PutAsJsonAsync($"/api/time-entries/{secondBody.Entry.Id}", new
+        var confirmedStillRejected = await client.PutAsJsonAsync($"/api/time-entries/{secondBody.Id}", new
         {
             description = "Movable",
             startedAtUtc = startedAtUtc.AddMinutes(30),
@@ -101,16 +101,6 @@ public class UpdateTimeEntryEndpointsTests
             confirmOverlap = true
         });
         Assert.Equal(HttpStatusCode.Conflict, confirmedStillRejected.StatusCode);
-    }
-
-    private sealed class CreateManualEntryResponse
-    {
-        public TimeEntryResponse Entry { get; set; } = null!;
-    }
-
-    private sealed class UpdateTimeEntryResponse
-    {
-        public TimeEntryResponse Entry { get; set; } = null!;
     }
 
     private sealed class TimeEntryResponse

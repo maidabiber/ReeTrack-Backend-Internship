@@ -1,80 +1,23 @@
 namespace ReeTrack.Api.Contracts;
 
-public abstract class TimeEntryFieldsRequest
+public sealed class TimeEntryRequest
 {
     public string? Description { get; set; }
     public bool? IsBillable { get; set; }
+    public DateTime? StartedAtUtc { get; set; }
+    public DateTime? EndedAtUtc { get; set; }
+    public DateTime? EntryDateUtc { get; set; }
+    public int? DurationSeconds { get; set; }
     public Guid? ProjectId { get; set; }
     public Guid? ProjectTaskId { get; set; }
     public List<Guid>? TagIds { get; set; }
-}
-
-public abstract class TimeEntryRangeRequest : TimeEntryFieldsRequest
-{
-    public required DateTime StartedAtUtc { get; set; }
-    public required DateTime EndedAtUtc { get; set; }
-}
-
-public abstract class TimeEntryDurationRequest : TimeEntryFieldsRequest
-{
-    public required DateTime EntryDateUtc { get; set; }
-    public required int DurationSeconds { get; set; }
-}
-
-public abstract class SharedAssigneeTimeEntryRangeRequest : TimeEntryRangeRequest
-{
     public Guid? AssigneeUserId { get; set; }
-    public List<Guid>? AssigneeUserIds { get; set; }
-}
-
-public abstract class SharedAssigneeTimeEntryDurationRequest : TimeEntryDurationRequest
-{
-    public Guid? AssigneeUserId { get; set; }
-    public List<Guid>? AssigneeUserIds { get; set; }
-}
-
-public sealed class StartTimerRequest : TimeEntryFieldsRequest;
-
-public sealed class StopTimerRequest
-{
-    public string? Description { get; set; }
-    public List<Guid>? AssigneeUserIds { get; set; }
-    public bool? IsBillable { get; set; }
-    public Guid? ProjectId { get; set; }
-    public Guid? ProjectTaskId { get; set; }
-    public List<Guid>? TagIds { get; set; }
-}
-
-public sealed class CreateManualEntryRequest : TimeEntryRangeRequest;
-
-public sealed class CreateDurationOnlyEntryRequest : TimeEntryDurationRequest;
-
-public sealed class CreateSharedManualEntryRequest : SharedAssigneeTimeEntryRangeRequest;
-
-public sealed class CreateSharedDurationOnlyEntryRequest : SharedAssigneeTimeEntryDurationRequest;
-
-public sealed class ShareExistingEntryRequest
-{
     public List<Guid>? AssigneeUserIds { get; set; }
 }
 
 public sealed class CreateSharedManualEntryResponse
 {
     public required IReadOnlyList<TimeEntryResponse> Entries { get; init; }
-}
-
-public sealed class CreateManualEntryResponse
-{
-    public required TimeEntryResponse Entry { get; init; }
-}
-
-public sealed class UpdateTimeEntryRequest : TimeEntryRangeRequest;
-
-public sealed class UpdateDurationOnlyEntryRequest : TimeEntryDurationRequest;
-
-public sealed class UpdateTimeEntryResponse
-{
-    public required TimeEntryResponse Entry { get; init; }
 }
 
 public sealed class TimeEntryTagResponse

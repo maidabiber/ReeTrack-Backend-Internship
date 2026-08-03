@@ -6,36 +6,39 @@ public interface ITimeEntryService
 {
     Task<TimeEntryDto?> GetActiveTimerAsync(CancellationToken cancellationToken = default);
 
-    Task<TimeEntryDto> StartTimerAsync(
-        StartTimerInput input,
+    Task<TimeEntryDto> StopTimerAsync(
+        TimeEntryInput? input = null,
         CancellationToken cancellationToken = default);
 
-    Task<TimeEntryDto> StopTimerAsync(
-        StopTimerInput? input = null,
+    Task<TimeEntryDto> CreateAsync(
+        TimeEntryInput input,
+        CancellationToken cancellationToken = default);
+
+    Task<TimeEntryDto> UpdateAsync(
+        Guid entryId,
+        TimeEntryInput input,
+        CancellationToken cancellationToken = default);
+
+    Task<TimeEntryDto> ShareEntryAsync(
+        Guid entryId,
+        IReadOnlyList<Guid> assigneeUserIds,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<TimeEntryDto>> CreateAndShareAsync(
+        TimeEntryInput input,
+        IReadOnlyList<Guid> assigneeUserIds,
+        CancellationToken cancellationToken = default);
+
+    Task<TimeEntryDto> ApprovePendingEntryAsync(
+        Guid entryId,
         CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<TimeEntryDto>> ListAsync(CancellationToken cancellationToken = default);
-
-    Task<CreateManualEntryResult> CreateManualEntryAsync(
-        CreateManualEntryInput input,
-        CancellationToken cancellationToken = default);
-
-    Task<CreateManualEntryResult> CreateDurationOnlyEntryAsync(
-        CreateDurationOnlyEntryInput input,
-        CancellationToken cancellationToken = default);
-
-    Task<UpdateTimeEntryResult> UpdateTimeEntryAsync(
-        Guid entryId,
-        UpdateTimeEntryInput input,
-        CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<TimeEntryDto>> ListByDateRangeAsync(
         DateTime fromUtc,
         DateTime toUtc,
         CancellationToken cancellationToken = default);
 
-    Task<UpdateTimeEntryResult> UpdateDurationOnlyEntryAsync(
-        Guid entryId,
-        UpdateDurationOnlyEntryInput input,
-        CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<TimeEntryDto>> ListPendingEntriesAsync(CancellationToken cancellationToken = default);
 }

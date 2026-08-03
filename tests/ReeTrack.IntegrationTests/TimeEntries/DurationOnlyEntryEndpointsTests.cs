@@ -16,7 +16,7 @@ public class DurationOnlyEntryEndpointsTests
 
         var entryDateUtc = DateTime.UtcNow.Date.AddHours(12);
 
-        var response = await client.PostAsJsonAsync("/api/time-entries/duration", new
+        var response = await client.PostAsJsonAsync("/api/time-entries", new
         {
             description = "Research without timestamps",
             entryDateUtc,
@@ -24,18 +24,18 @@ public class DurationOnlyEntryEndpointsTests
         });
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var body = await response.Content.ReadFromJsonAsync<CreateDurationOnlyEntryResponse>();
+        var body = await response.Content.ReadFromJsonAsync<TimeEntryResponse>();
         Assert.NotNull(body);
-        Assert.Equal("DurationOnly", body!.Entry.Mode);
-        Assert.Equal("Research without timestamps", body.Entry.Description);
-        Assert.Equal(5400, body.Entry.DurationSeconds);
-        Assert.NotNull(body.Entry.StartedAtUtc);
-        Assert.Null(body.Entry.EndedAtUtc);
+        Assert.Equal("DurationOnly", body!.Mode);
+        Assert.Equal("Research without timestamps", body.Description);
+        Assert.Equal(5400, body.DurationSeconds);
+        Assert.NotNull(body.StartedAtUtc);
+        Assert.Null(body.EndedAtUtc);
 
         var list = await client.GetAsync("/api/time-entries");
         var entries = await list.Content.ReadFromJsonAsync<List<TimeEntryResponse>>();
         Assert.Single(entries!);
-        Assert.Equal(body.Entry.Id, entries![0].Id);
+        Assert.Equal(body.Id, entries![0].Id);
     }
 
     [Fact]
@@ -47,14 +47,14 @@ public class DurationOnlyEntryEndpointsTests
 
         var entryDateUtc = DateTime.UtcNow.Date.AddHours(12);
 
-        var zeroDuration = await client.PostAsJsonAsync("/api/time-entries/duration", new
+        var zeroDuration = await client.PostAsJsonAsync("/api/time-entries", new
         {
             entryDateUtc,
             durationSeconds = 0
         });
         Assert.Equal(HttpStatusCode.BadRequest, zeroDuration.StatusCode);
 
-        var overLimit = await client.PostAsJsonAsync("/api/time-entries/duration", new
+        var overLimit = await client.PostAsJsonAsync("/api/time-entries", new
         {
             entryDateUtc,
             durationSeconds = 24 * 60 * 60 + 1
@@ -71,7 +71,7 @@ public class DurationOnlyEntryEndpointsTests
 
         var entryDateUtc = DateTime.UtcNow.Date.AddDays(-1).AddHours(12);
 
-        var create = await client.PostAsJsonAsync("/api/time-entries/duration", new
+        var create = await client.PostAsJsonAsync("/api/time-entries", new
         {
             description = "Initial duration entry",
             entryDateUtc,
@@ -79,11 +79,11 @@ public class DurationOnlyEntryEndpointsTests
             isBillable = true
         });
         Assert.Equal(HttpStatusCode.OK, create.StatusCode);
-        var created = await create.Content.ReadFromJsonAsync<CreateDurationOnlyEntryResponse>();
+        var created = await create.Content.ReadFromJsonAsync<TimeEntryResponse>();
         Assert.NotNull(created);
 
         var updatedDateUtc = DateTime.UtcNow.Date.AddHours(12);
-        var update = await client.PutAsJsonAsync($"/api/time-entries/{created!.Entry.Id}/duration", new
+        var update = await client.PutAsJsonAsync($"/api/time-entries/{created!.Id}", new
         {
             description = "Updated duration entry",
             entryDateUtc = updatedDateUtc,
@@ -91,13 +91,13 @@ public class DurationOnlyEntryEndpointsTests
             isBillable = false
         });
         Assert.Equal(HttpStatusCode.OK, update.StatusCode);
-        var updated = await update.Content.ReadFromJsonAsync<UpdateDurationOnlyEntryResponse>();
+        var updated = await update.Content.ReadFromJsonAsync<TimeEntryResponse>();
         Assert.NotNull(updated);
-        Assert.Equal("Updated duration entry", updated!.Entry.Description);
-        Assert.Equal(3600, updated.Entry.DurationSeconds);
-        Assert.False(updated.Entry.IsBillable);
-        Assert.NotNull(updated.Entry.StartedAtUtc);
-        Assert.Null(updated.Entry.EndedAtUtc);
+        Assert.Equal("Updated duration entry", updated!.Description);
+        Assert.Equal(3600, updated.DurationSeconds);
+        Assert.False(updated.IsBillable);
+        Assert.NotNull(updated.StartedAtUtc);
+        Assert.Null(updated.EndedAtUtc);
     }
 
     [Fact]
@@ -110,32 +110,22 @@ public class DurationOnlyEntryEndpointsTests
         var startedAtUtc = DateTime.UtcNow.AddHours(-2);
         var endedAtUtc = DateTime.UtcNow.AddHours(-1);
 
-        var manual = await client.PostAsJsonAsync("/api/time-entries/manual", new
+        var manual = await client.PostAsJsonAsync("/api/time-entries", new
         {
             description = "Manual entry",
             startedAtUtc,
             endedAtUtc
         });
         Assert.Equal(HttpStatusCode.OK, manual.StatusCode);
-        var manualBody = await manual.Content.ReadFromJsonAsync<CreateDurationOnlyEntryResponse>();
+        var manualBody = await manual.Content.ReadFromJsonAsync<TimeEntryResponse>();
         Assert.NotNull(manualBody);
 
-        var update = await client.PutAsJsonAsync($"/api/time-entries/{manualBody!.Entry.Id}/duration", new
+        var update = await client.PutAsJsonAsync($"/api/time-entries/{manualBody!.Id}", new
         {
             entryDateUtc = DateTime.UtcNow.Date.AddHours(12),
             durationSeconds = 1200
         });
         Assert.Equal(HttpStatusCode.Conflict, update.StatusCode);
-    }
-
-    private sealed class CreateDurationOnlyEntryResponse
-    {
-        public TimeEntryResponse Entry { get; set; } = null!;
-    }
-
-    private sealed class UpdateDurationOnlyEntryResponse
-    {
-        public TimeEntryResponse Entry { get; set; } = null!;
     }
 
     private sealed class TimeEntryResponse

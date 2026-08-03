@@ -17,7 +17,7 @@ public class TimeEntryAssociationService : ITimeEntryAssociationService
 
     public Task ApplyForCreateAsync(
         TimeEntry entry,
-        TimeEntryFieldsInput input,
+        TimeEntryInput input,
         CancellationToken cancellationToken = default) =>
         ApplyAsync(
             entry,
@@ -29,7 +29,7 @@ public class TimeEntryAssociationService : ITimeEntryAssociationService
 
     public Task ApplyForUpdateAsync(
         TimeEntry entry,
-        TimeEntryFieldsInput input,
+        TimeEntryInput input,
         CancellationToken cancellationToken = default)
     {
         if (input.ProjectId is null && input.ProjectTaskId is null && input.TagIds is null)

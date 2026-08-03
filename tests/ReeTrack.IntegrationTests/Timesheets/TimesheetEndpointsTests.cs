@@ -96,7 +96,7 @@ public class TimesheetEndpointsTests
         var memberClient = factory.CreateAuthenticatedClient(memberToken);
 
         var monday = CurrentWeek.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
-        var share = await adminClient.PostAsJsonAsync("/api/time-entries/shared/manual", new
+        var share = await adminClient.PostAsJsonAsync("/api/time-entries/shared", new
         {
             assigneeUserIds = new[] { member.Id },
             description = "Shared work",
@@ -296,7 +296,7 @@ public class TimesheetEndpointsTests
         bool isBillable = true)
     {
         var monday = week.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
-        var response = await client.PostAsJsonAsync("/api/time-entries/manual", new
+        var response = await client.PostAsJsonAsync("/api/time-entries", new
         {
             description,
             startedAtUtc = monday.AddHours(startHour),

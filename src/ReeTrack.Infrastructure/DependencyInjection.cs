@@ -88,8 +88,8 @@ public static class DependencyInjection
         services.AddScoped<ITimesheetReviewService, TimesheetReviewService>();
         services.AddScoped<ITimeEntryAssociationService, TimeEntryAssociationService>();
         services.AddScoped<ITimeEntryService, TimeEntryService>();
-        services.AddScoped<ISharedTimeEntryService, SharedTimeEntryService>();
-        services.AddScoped<ISharedTimeEntryApprovalService, SharedTimeEntryApprovalService>();
+        services.AddScoped<IDailyTimeBudget, DailyTimeBudget>();
+        services.AddScoped<ITimeEntryOverlapChecker, TimeEntryOverlapChecker>();
         services.AddScoped<ITimeEntryTemplateService, TimeEntryTemplateService>();
         services.AddScoped<ISmartTimeParseService, SmartTimeParseService>();
         services.AddScoped<ITimeEntrySuggestionService, TimeEntrySuggestionService>();

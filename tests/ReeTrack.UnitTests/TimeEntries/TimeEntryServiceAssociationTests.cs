@@ -52,7 +52,7 @@ public class TimeEntryServiceAssociationTests : IDisposable
         var startedAtUtc = DateTime.UtcNow.AddHours(-2);
         var endedAtUtc = DateTime.UtcNow.AddHours(-1);
 
-        var result = await _service.CreateManualEntryAsync(new CreateManualEntryInput
+        var result = await _service.CreateAsync(new TimeEntryInput
         {
             Description = "Billable project work",
             StartedAtUtc = startedAtUtc,
@@ -62,13 +62,13 @@ public class TimeEntryServiceAssociationTests : IDisposable
             TagIds = [_tagId]
         });
 
-        Assert.Equal(_projectId, result.Entry.ProjectId);
-        Assert.Equal("Redesign", result.Entry.ProjectName);
-        Assert.Equal("#4366E2", result.Entry.ProjectColor);
-        Assert.Equal(_taskId, result.Entry.ProjectTaskId);
-        Assert.Equal("Wireframes", result.Entry.ProjectTaskName);
-        Assert.Single(result.Entry.Tags);
-        Assert.Equal(_tagId, result.Entry.Tags[0].Id);
+        Assert.Equal(_projectId, result.ProjectId);
+        Assert.Equal("Redesign", result.ProjectName);
+        Assert.Equal("#4366E2", result.ProjectColor);
+        Assert.Equal(_taskId, result.ProjectTaskId);
+        Assert.Equal("Wireframes", result.ProjectTaskName);
+        Assert.Single(result.Tags);
+        Assert.Equal(_tagId, result.Tags[0].Id);
 
         var stored = await _db.TimeEntries
             .Include(e => e.TimeEntryTags)
@@ -85,15 +85,15 @@ public class TimeEntryServiceAssociationTests : IDisposable
         var startedAtUtc = DateTime.UtcNow.AddHours(-2);
         var endedAtUtc = DateTime.UtcNow.AddHours(-1);
 
-        var result = await _service.CreateManualEntryAsync(new CreateManualEntryInput
+        var result = await _service.CreateAsync(new TimeEntryInput
         {
             StartedAtUtc = startedAtUtc,
             EndedAtUtc = endedAtUtc,
             ProjectTaskId = _taskId
         });
 
-        Assert.Equal(_projectId, result.Entry.ProjectId);
-        Assert.Equal(_taskId, result.Entry.ProjectTaskId);
+        Assert.Equal(_projectId, result.ProjectId);
+        Assert.Equal(_taskId, result.ProjectTaskId);
     }
 
     [Fact]
@@ -103,7 +103,7 @@ public class TimeEntryServiceAssociationTests : IDisposable
         var endedAtUtc = DateTime.UtcNow.AddHours(-1);
 
         var ex = await Assert.ThrowsAsync<AppException>(() =>
-            _service.CreateManualEntryAsync(new CreateManualEntryInput
+            _service.CreateAsync(new TimeEntryInput
             {
                 StartedAtUtc = startedAtUtc,
                 EndedAtUtc = endedAtUtc,
@@ -117,7 +117,7 @@ public class TimeEntryServiceAssociationTests : IDisposable
     [Fact]
     public async Task StartTimer_WithProject_PersistsProject()
     {
-        var entry = await _service.StartTimerAsync(new StartTimerInput
+        var entry = await _service.CreateAsync(new TimeEntryInput
         {
             Description = "Focus",
             ProjectId = _projectId,
@@ -132,12 +132,12 @@ public class TimeEntryServiceAssociationTests : IDisposable
     [Fact]
     public async Task StopTimer_WithProjectAndTags_PersistsAssociations()
     {
-        await _service.StartTimerAsync(new StartTimerInput
+        await _service.CreateAsync(new TimeEntryInput
         {
             Description = "Focus"
         });
 
-        var stopped = await _service.StopTimerAsync(new StopTimerInput
+        var stopped = await _service.StopTimerAsync(new TimeEntryInput
         {
             ProjectId = _projectId,
             ProjectTaskId = _taskId,
@@ -155,7 +155,7 @@ public class TimeEntryServiceAssociationTests : IDisposable
     [Fact]
     public async Task StopTimer_OmittingAssociations_PreservesExisting()
     {
-        await _service.StartTimerAsync(new StartTimerInput
+        await _service.CreateAsync(new TimeEntryInput
         {
             Description = "Focus",
             ProjectId = _projectId,
@@ -163,7 +163,7 @@ public class TimeEntryServiceAssociationTests : IDisposable
             TagIds = [_tagId]
         });
 
-        var stopped = await _service.StopTimerAsync(new StopTimerInput
+        var stopped = await _service.StopTimerAsync(new TimeEntryInput
         {
             Description = "Focus (done)"
         });
@@ -178,7 +178,7 @@ public class TimeEntryServiceAssociationTests : IDisposable
     {
         var startedAtUtc = DateTime.UtcNow.AddHours(-3);
         var endedAtUtc = DateTime.UtcNow.AddHours(-2);
-        var created = await _service.CreateManualEntryAsync(new CreateManualEntryInput
+        var created = await _service.CreateAsync(new TimeEntryInput
         {
             Description = "Keep tags",
             StartedAtUtc = startedAtUtc,
@@ -188,7 +188,7 @@ public class TimeEntryServiceAssociationTests : IDisposable
             TagIds = [_tagId]
         });
 
-        var updated = await _service.UpdateTimeEntryAsync(created.Entry.Id, new UpdateTimeEntryInput
+        var updated = await _service.UpdateAsync(created.Id, new TimeEntryInput
         {
             Description = "Updated desc",
             StartedAtUtc = startedAtUtc,
@@ -196,12 +196,12 @@ public class TimeEntryServiceAssociationTests : IDisposable
             IsBillable = true
         });
 
-        Assert.Equal(_projectId, updated.Entry.ProjectId);
-        Assert.Equal(_taskId, updated.Entry.ProjectTaskId);
-        Assert.Equal("Redesign", updated.Entry.ProjectName);
-        Assert.Equal("#4366E2", updated.Entry.ProjectColor);
-        Assert.Single(updated.Entry.Tags);
-        Assert.Equal("Design", updated.Entry.Tags[0].Name);
+        Assert.Equal(_projectId, updated.ProjectId);
+        Assert.Equal(_taskId, updated.ProjectTaskId);
+        Assert.Equal("Redesign", updated.ProjectName);
+        Assert.Equal("#4366E2", updated.ProjectColor);
+        Assert.Single(updated.Tags);
+        Assert.Equal("Design", updated.Tags[0].Name);
     }
 
     public void Dispose() => _db.Dispose();

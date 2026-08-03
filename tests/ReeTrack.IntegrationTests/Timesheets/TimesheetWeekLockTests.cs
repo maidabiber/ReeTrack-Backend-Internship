@@ -38,7 +38,7 @@ public class TimesheetWeekLockTests
         var timesheet = await submit.Content.ReadFromJsonAsync<TimesheetResponse>();
 
         // Manual create in the locked week.
-        var manual = await client.PostAsJsonAsync("/api/time-entries/manual", new
+        var manual = await client.PostAsJsonAsync("/api/time-entries", new
         {
             description = "Late addition",
             startedAtUtc = Monday(PreviousWeek, 14),
@@ -47,7 +47,7 @@ public class TimesheetWeekLockTests
         Assert.Equal(HttpStatusCode.Conflict, manual.StatusCode);
 
         // Duration-only create anchored in the locked week.
-        var duration = await client.PostAsJsonAsync("/api/time-entries/duration", new
+        var duration = await client.PostAsJsonAsync("/api/time-entries", new
         {
             description = "Late duration",
             entryDateUtc = Monday(PreviousWeek, 0),
@@ -122,7 +122,7 @@ public class TimesheetWeekLockTests
         var submit = await memberClient.PostAsJsonAsync("/api/timesheets/my/submit", new { weekStart = PreviousWeek });
         Assert.Equal(HttpStatusCode.OK, submit.StatusCode);
 
-        var share = await adminClient.PostAsJsonAsync("/api/time-entries/shared/manual", new
+        var share = await adminClient.PostAsJsonAsync("/api/time-entries/shared", new
         {
             assigneeUserIds = new[] { member.Id },
             description = "Into locked week",
@@ -143,7 +143,7 @@ public class TimesheetWeekLockTests
         var memberClient = factory.CreateAuthenticatedClient(memberToken);
 
         // Admin shares an entry in the member's previous week while it is still open.
-        var share = await adminClient.PostAsJsonAsync("/api/time-entries/shared/manual", new
+        var share = await adminClient.PostAsJsonAsync("/api/time-entries/shared", new
         {
             assigneeUserIds = new[] { member.Id },
             description = "Pending work",
@@ -169,15 +169,15 @@ public class TimesheetWeekLockTests
 
     private static async Task<Guid> CreateManualEntryAsync(HttpClient client, DateTime startedAtUtc)
     {
-        var response = await client.PostAsJsonAsync("/api/time-entries/manual", new
+        var response = await client.PostAsJsonAsync("/api/time-entries", new
         {
             description = "Logged work",
             startedAtUtc,
             endedAtUtc = startedAtUtc.AddHours(1)
         });
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var body = await response.Content.ReadFromJsonAsync<CreateEntryEnvelope>();
-        return body!.Entry.Id;
+        var body = await response.Content.ReadFromJsonAsync<TimesheetEntryResponse>();
+        return body!.Id;
     }
 
     private static async Task<HttpResponseMessage> ApproveFirstPendingAsync(HttpClient client)
@@ -217,10 +217,5 @@ public class TimesheetWeekLockTests
         var timesheet = await db.Timesheets.SingleAsync(t => t.Id == timesheetId);
         timesheet.Status = status;
         await db.SaveChangesAsync();
-    }
-
-    private sealed class CreateEntryEnvelope
-    {
-        public required TimesheetEntryResponse Entry { get; set; }
     }
 }

@@ -1,7 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ReeTrack.Api.Contracts;
-using ReeTrack.Application.Common.Exceptions;
 using ReeTrack.Application.Common.Interfaces;
 using ReeTrack.Application.Common.Models;
 
@@ -13,17 +12,10 @@ namespace ReeTrack.Api.Controllers;
 public class TimeEntriesController : ControllerBase
 {
     private readonly ITimeEntryService _timeEntryService;
-    private readonly ISharedTimeEntryService _sharedTimeEntryService;
-    private readonly ISharedTimeEntryApprovalService _sharedTimeEntryApprovalService;
 
-    public TimeEntriesController(
-        ITimeEntryService timeEntryService,
-        ISharedTimeEntryService sharedTimeEntryService,
-        ISharedTimeEntryApprovalService sharedTimeEntryApprovalService)
+    public TimeEntriesController(ITimeEntryService timeEntryService)
     {
         _timeEntryService = timeEntryService;
-        _sharedTimeEntryService = sharedTimeEntryService;
-        _sharedTimeEntryApprovalService = sharedTimeEntryApprovalService;
     }
 
     [HttpGet]
@@ -45,299 +37,125 @@ public class TimeEntriesController : ControllerBase
 
     [HttpPost("timer/start")]
     public async Task<ActionResult<TimeEntryResponse>> StartTimer(
-        [FromBody] StartTimerRequest? request,
+        [FromBody] TimeEntryRequest? request,
         CancellationToken cancellationToken)
     {
-        var input = new StartTimerInput
-        {
-            Description = request?.Description,
-            IsBillable = request?.IsBillable ?? true,
-            ProjectId = request?.ProjectId,
-            ProjectTaskId = request?.ProjectTaskId,
-            TagIds = request?.TagIds
-        };
-        var entry = await _timeEntryService.StartTimerAsync(input, cancellationToken);
-
+        var input = ToInput(request);
+        var entry = await _timeEntryService.CreateAsync(input, cancellationToken);
         return Ok(MapTimeEntry(entry));
     }
 
     [HttpPost("timer/stop")]
     public async Task<ActionResult> StopTimer(
-        [FromBody] StopTimerRequest? request,
+        [FromBody] TimeEntryRequest? request,
         CancellationToken cancellationToken)
     {
-        var assigneeUserIds = request?.AssigneeUserIds?
-            .Where(id => id != Guid.Empty)
-            .ToList() ?? [];
-
-        if (assigneeUserIds.Count > 0)
-        {
-            var sharedInput = new StopSharedTimerInput
-            {
-                AssigneeUserIds = assigneeUserIds,
-                Description = request?.Description,
-                IsBillable = request?.IsBillable,
-                ProjectId = request?.ProjectId,
-                ProjectTaskId = request?.ProjectTaskId,
-                TagIds = request?.TagIds
-            };
-            var sharedResult = await _sharedTimeEntryService.StopSharedTimerAsync(
-                sharedInput,
-                cancellationToken);
-
-            return Ok(new CreateSharedManualEntryResponse
-            {
-                Entries = sharedResult.Entries.Select(MapTimeEntry).ToList()
-            });
-        }
-
-        var stopInput = new StopTimerInput
-        {
-            Description = request?.Description,
-            IsBillable = request?.IsBillable,
-            ProjectId = request?.ProjectId,
-            ProjectTaskId = request?.ProjectTaskId,
-            TagIds = request?.TagIds
-        };
+        var stopInput = ToInput(request);
         var entry = await _timeEntryService.StopTimerAsync(stopInput, cancellationToken);
         return Ok(MapTimeEntry(entry));
     }
 
-    [HttpPost("manual")]
-    public async Task<ActionResult<CreateManualEntryResponse>> CreateManualEntry(
-        [FromBody] CreateManualEntryRequest request,
+    [HttpPost]
+    public async Task<ActionResult<TimeEntryResponse>> Create(
+        [FromBody] TimeEntryRequest request,
         CancellationToken cancellationToken)
     {
-        var input = new CreateManualEntryInput
-        {
-            Description = request.Description,
-            StartedAtUtc = request.StartedAtUtc,
-            EndedAtUtc = request.EndedAtUtc,
-            IsBillable = request.IsBillable ?? true,
-            ProjectId = request.ProjectId,
-            ProjectTaskId = request.ProjectTaskId,
-            TagIds = request.TagIds
-        };
-        var result = await _timeEntryService.CreateManualEntryAsync(input, cancellationToken);
-
-        return Ok(new CreateManualEntryResponse
-        {
-            Entry = MapTimeEntry(result.Entry)
-        });
-    }
-
-    [HttpPost("duration")]
-    public async Task<ActionResult<CreateManualEntryResponse>> CreateDurationOnlyEntry(
-        [FromBody] CreateDurationOnlyEntryRequest request,
-        CancellationToken cancellationToken)
-    {
-        var input = new CreateDurationOnlyEntryInput
-        {
-            Description = request.Description,
-            EntryDateUtc = request.EntryDateUtc,
-            DurationSeconds = request.DurationSeconds,
-            IsBillable = request.IsBillable ?? true,
-            ProjectId = request.ProjectId,
-            ProjectTaskId = request.ProjectTaskId,
-            TagIds = request.TagIds
-        };
-        var result = await _timeEntryService.CreateDurationOnlyEntryAsync(input, cancellationToken);
-
-        return Ok(new CreateManualEntryResponse
-        {
-            Entry = MapTimeEntry(result.Entry)
-        });
+        var input = ToInput(request);
+        var entry = await _timeEntryService.CreateAsync(input, cancellationToken);
+        return Ok(MapTimeEntry(entry));
     }
 
     [HttpPut("{id:guid}")]
-    public async Task<ActionResult<UpdateTimeEntryResponse>> UpdateTimeEntry(
+    public async Task<ActionResult<TimeEntryResponse>> Update(
         Guid id,
-        [FromBody] UpdateTimeEntryRequest request,
+        [FromBody] TimeEntryRequest request,
         CancellationToken cancellationToken)
     {
-        var input = new UpdateTimeEntryInput
-        {
-            Description = request.Description,
-            StartedAtUtc = request.StartedAtUtc,
-            EndedAtUtc = request.EndedAtUtc,
-            IsBillable = request.IsBillable ?? true,
-            ProjectId = request.ProjectId,
-            ProjectTaskId = request.ProjectTaskId,
-            TagIds = request.TagIds
-        };
-        var result = await _timeEntryService.UpdateTimeEntryAsync(id, input, cancellationToken);
-
-        return Ok(new UpdateTimeEntryResponse
-        {
-            Entry = MapTimeEntry(result.Entry)
-        });
+        var input = ToInput(request);
+        var entry = await _timeEntryService.UpdateAsync(id, input, cancellationToken);
+        return Ok(MapTimeEntry(entry));
     }
 
-    [HttpPut("{id:guid}/duration")]
-    public async Task<ActionResult<UpdateTimeEntryResponse>> UpdateDurationOnlyEntry(
-        Guid id,
-        [FromBody] UpdateDurationOnlyEntryRequest request,
+    [HttpPost("shared")]
+    public async Task<ActionResult<CreateSharedManualEntryResponse>> CreateShared(
+        [FromBody] TimeEntryRequest request,
         CancellationToken cancellationToken)
     {
-        var input = new UpdateDurationOnlyEntryInput
-        {
-            Description = request.Description,
-            EntryDateUtc = request.EntryDateUtc,
-            DurationSeconds = request.DurationSeconds,
-            IsBillable = request.IsBillable ?? true,
-            ProjectId = request.ProjectId,
-            ProjectTaskId = request.ProjectTaskId,
-            TagIds = request.TagIds
-        };
-        var result = await _timeEntryService.UpdateDurationOnlyEntryAsync(id, input, cancellationToken);
-
-        return Ok(new UpdateTimeEntryResponse
-        {
-            Entry = MapTimeEntry(result.Entry)
-        });
-    }
-
-    [HttpPost("shared/manual")]
-    public async Task<ActionResult<CreateSharedManualEntryResponse>> CreateSharedManualEntry(
-        [FromBody] CreateSharedManualEntryRequest request,
-        CancellationToken cancellationToken)
-    {
-        var input = new CreateSharedManualEntryInput
-        {
-            AssigneeUserIds = ResolveAssigneeUserIds(request),
-            Description = request.Description,
-            StartedAtUtc = request.StartedAtUtc,
-            EndedAtUtc = request.EndedAtUtc,
-            IsBillable = request.IsBillable ?? true,
-            ProjectId = request.ProjectId,
-            ProjectTaskId = request.ProjectTaskId,
-            TagIds = request.TagIds
-        };
-        var result = await _sharedTimeEntryService.CreateSharedManualEntryAsync(input, cancellationToken);
-
+        var assigneeUserIds = ResolveAssigneeUserIds(request);
+        var input = ToInput(request);
+        var results = await _timeEntryService.CreateAndShareAsync(input, assigneeUserIds, cancellationToken);
         return Ok(new CreateSharedManualEntryResponse
         {
-            Entries = result.Entries.Select(MapTimeEntry).ToList()
-        });
-    }
-
-    [HttpPost("shared/duration")]
-    public async Task<ActionResult<CreateSharedManualEntryResponse>> CreateSharedDurationOnlyEntry(
-        [FromBody] CreateSharedDurationOnlyEntryRequest request,
-        CancellationToken cancellationToken)
-    {
-        var assigneeUserIds = request.AssigneeUserIds?
-            .Where(id => id != Guid.Empty)
-            .ToList() ?? [];
-
-        if (assigneeUserIds.Count == 0 && request.AssigneeUserId is Guid singleId && singleId != Guid.Empty)
-            assigneeUserIds = [singleId];
-
-        if (assigneeUserIds.Count == 0)
-            throw new AppException("At least one teammate is required.", 400, ErrorCode.TeammatesRequired);
-
-        var input = new CreateSharedDurationOnlyEntryInput
-        {
-            AssigneeUserIds = assigneeUserIds,
-            Description = request.Description,
-            EntryDateUtc = request.EntryDateUtc,
-            DurationSeconds = request.DurationSeconds,
-            IsBillable = request.IsBillable ?? true,
-            ProjectId = request.ProjectId,
-            ProjectTaskId = request.ProjectTaskId,
-            TagIds = request.TagIds
-        };
-        var result = await _sharedTimeEntryService.CreateSharedDurationOnlyEntryAsync(
-            input,
-            cancellationToken);
-
-        return Ok(new CreateSharedManualEntryResponse
-        {
-            Entries = result.Entries.Select(MapTimeEntry).ToList()
+            Entries = results.Select(MapTimeEntry).ToList()
         });
     }
 
     [HttpPost("{id:guid}/share")]
     public async Task<ActionResult<CreateSharedManualEntryResponse>> ShareExistingEntry(
         Guid id,
-        [FromBody] ShareExistingEntryRequest request,
+        [FromBody] TimeEntryRequest request,
         CancellationToken cancellationToken)
     {
-        var assigneeUserIds = request.AssigneeUserIds?
-            .Where(assigneeId => assigneeId != Guid.Empty)
-            .ToList() ?? [];
-
-        if (assigneeUserIds.Count == 0)
-            throw new AppException("At least one teammate is required.", 400, ErrorCode.TeammatesRequired);
-
-        var input = new ShareExistingEntryInput
-        {
-            AssigneeUserIds = assigneeUserIds
-        };
-        var result = await _sharedTimeEntryService.ShareExistingEntryAsync(
-            id,
-            input,
-            cancellationToken);
-
+        var assigneeUserIds = ResolveAssigneeUserIds(request);
+        var entry = await _timeEntryService.ShareEntryAsync(id, assigneeUserIds, cancellationToken);
         return Ok(new CreateSharedManualEntryResponse
         {
-            Entries = result.Entries.Select(MapTimeEntry).ToList()
+            Entries = [MapTimeEntry(entry)]
         });
-    }
-
-    private static IReadOnlyList<Guid> ResolveAssigneeUserIds(CreateSharedManualEntryRequest request)
-    {
-        if (request.AssigneeUserIds is { Count: > 0 })
-            return request.AssigneeUserIds;
-
-        if (request.AssigneeUserId is Guid assigneeUserId)
-            return [assigneeUserId];
-
-        throw new AppException("At least one teammate is required.", 400, ErrorCode.TeammatesRequired);
     }
 
     [HttpGet("pending")]
     public async Task<ActionResult<IReadOnlyList<TimeEntryResponse>>> ListPending(CancellationToken cancellationToken)
     {
-        var entries = await _sharedTimeEntryApprovalService.ListPendingAsync(cancellationToken);
+        var entries = await _timeEntryService.ListPendingEntriesAsync(cancellationToken);
         return Ok(entries.Select(MapTimeEntry).ToList());
     }
 
     [HttpPut("pending/{id:guid}")]
-    public async Task<ActionResult<UpdateTimeEntryResponse>> UpdatePendingEntry(
+    public async Task<ActionResult<TimeEntryResponse>> UpdatePending(
         Guid id,
-        [FromBody] UpdateTimeEntryRequest request,
+        [FromBody] TimeEntryRequest request,
         CancellationToken cancellationToken)
     {
-        var input = new UpdatePendingEntryInput
-        {
-            Description = request.Description,
-            StartedAtUtc = request.StartedAtUtc,
-            EndedAtUtc = request.EndedAtUtc,
-            IsBillable = request.IsBillable ?? true,
-            ProjectId = request.ProjectId,
-            ProjectTaskId = request.ProjectTaskId,
-            TagIds = request.TagIds
-        };
-        var result = await _sharedTimeEntryApprovalService.UpdatePendingEntryAsync(
-            id,
-            input,
-            cancellationToken);
-
-        return Ok(new UpdateTimeEntryResponse
-        {
-            Entry = MapTimeEntry(result.Entry)
-        });
+        var input = ToInput(request);
+        var entry = await _timeEntryService.UpdateAsync(id, input, cancellationToken);
+        return Ok(MapTimeEntry(entry));
     }
 
     [HttpPost("pending/{id:guid}/approve")]
-    public async Task<ActionResult<TimeEntryResponse>> ApprovePendingEntry(
+    public async Task<ActionResult<TimeEntryResponse>> ApprovePending(
         Guid id,
         CancellationToken cancellationToken)
     {
-        var entry = await _sharedTimeEntryApprovalService.ApprovePendingEntryAsync(id, cancellationToken);
+        var entry = await _timeEntryService.ApprovePendingEntryAsync(id, cancellationToken);
         return Ok(MapTimeEntry(entry));
     }
+
+    private static IReadOnlyList<Guid> ResolveAssigneeUserIds(TimeEntryRequest? request)
+    {
+        if (request?.AssigneeUserIds is { Count: > 0 })
+            return request.AssigneeUserIds
+                .Where(id => id != Guid.Empty)
+                .ToList();
+
+        if (request?.AssigneeUserId is Guid singleId && singleId != Guid.Empty)
+            return [singleId];
+
+        return [];
+    }
+
+    private static TimeEntryInput ToInput(TimeEntryRequest? request) => new()
+    {
+        Description = request?.Description,
+        IsBillable = request?.IsBillable,
+        StartedAtUtc = request?.StartedAtUtc,
+        EndedAtUtc = request?.EndedAtUtc,
+        EntryDateUtc = request?.EntryDateUtc,
+        DurationSeconds = request?.DurationSeconds,
+        ProjectId = request?.ProjectId,
+        ProjectTaskId = request?.ProjectTaskId,
+        TagIds = request?.TagIds
+    };
 
     internal static TimeEntryResponse MapTimeEntry(TimeEntryDto entry) =>
         new()

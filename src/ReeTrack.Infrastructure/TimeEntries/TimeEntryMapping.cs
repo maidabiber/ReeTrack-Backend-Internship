@@ -85,7 +85,17 @@ internal static class TimeEntryMapping
 
         if (entry.ShareGroupId is Guid groupId && shareGroups.TryGetValue(groupId, out var siblings))
         {
-            foreach (var sibling in siblings.Where(sibling => sibling.SubmittedByUserId is not null))
+            var owner = siblings.FirstOrDefault(s => s.SubmittedByUserId is null);
+            if (owner is not null)
+            {
+                AddParticipant(
+                    owner.UserId,
+                    owner.User.DisplayName?.Trim() ?? owner.User.Email,
+                    owner.User.Email,
+                    "Submitter");
+            }
+
+            foreach (var sibling in siblings.Where(s => s.SubmittedByUserId is not null))
             {
                 AddParticipant(
                     sibling.UserId,

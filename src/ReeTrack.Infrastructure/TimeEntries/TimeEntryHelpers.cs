@@ -1,4 +1,6 @@
-using ReeTrack.Application.Common.Exceptions;
+using Microsoft.EntityFrameworkCore;
+using ReeTrack.Application.Common.Interfaces;
+using ReeTrack.Domain.Entities;
 
 namespace ReeTrack.Infrastructure.TimeEntries;
 
@@ -6,40 +8,64 @@ internal static class TimeEntryHelpers
 {
     public const int MaxDurationSeconds = 24 * 60 * 60;
 
-    public static void ValidateManualRange(DateTime startedAtUtc, DateTime endedAtUtc)
+    public static async Task<string?> FindOverlapMessageAsync(
+        IApplicationDbContext db,
+        Guid userId,
+        DateTime startedAtUtc,
+        DateTime endedAtUtc,
+        Guid? excludeEntryId,
+        CancellationToken cancellationToken)
     {
-        if (endedAtUtc <= startedAtUtc)
-            throw AppErrors.Validation("End time must be after start time.");
+        var now = DateTime.UtcNow;
+        var overlapping = await db.TimeEntries
+            .AsNoTracking()
+            .Where(e => e.UserId == userId && e.StartedAtUtc != null)
+            .Where(e => excludeEntryId == null || e.Id != excludeEntryId)
+            .Where(e =>
+                e.StartedAtUtc < endedAtUtc &&
+                (e.EndedAtUtc ?? now) > startedAtUtc)
+            .OrderBy(e => e.StartedAtUtc)
+            .Take(3)
+            .ToListAsync(cancellationToken);
 
-        var durationSeconds = (endedAtUtc - startedAtUtc).TotalSeconds;
-        if (durationSeconds > MaxDurationSeconds)
-            throw new AppException("Duration cannot exceed 24 hours.", 400, ErrorCode.DurationLimitExceeded);
-    }
-
-    public static void ValidateDurationOnly(int durationSeconds)
-    {
-        if (durationSeconds <= 0)
-            throw AppErrors.Validation("Duration must be greater than zero.");
-
-        if (durationSeconds > MaxDurationSeconds)
-            throw new AppException("Duration cannot exceed 24 hours.", 400, ErrorCode.DurationLimitExceeded);
-    }
-
-    public static DateTime NormalizeEntryDateUtc(DateTime entryDateUtc)
-    {
-        var utc = entryDateUtc.Kind == DateTimeKind.Unspecified
-            ? DateTime.SpecifyKind(entryDateUtc, DateTimeKind.Utc)
-            : entryDateUtc.ToUniversalTime();
-
-        return new DateTime(utc.Year, utc.Month, utc.Day, 12, 0, 0, DateTimeKind.Utc);
-    }
-
-    public static string? NormalizeDescription(string? description)
-    {
-        if (string.IsNullOrWhiteSpace(description))
+        if (overlapping.Count == 0)
             return null;
 
-        var trimmed = description.Trim();
-        return trimmed.Length > 1000 ? trimmed[..1000] : trimmed;
+        var labels = overlapping
+            .Select(e => e.Description?.Trim())
+            .Where(label => !string.IsNullOrWhiteSpace(label))
+            .Take(2)
+            .ToList();
+
+        if (labels.Count > 0)
+            return $"This entry overlaps with: {string.Join(", ", labels)}.";
+
+        return "This entry overlaps with an existing time entry.";
+    }
+
+    public static async Task<IReadOnlyDictionary<Guid, List<TimeEntry>>> LoadShareGroupsAsync(
+        IApplicationDbContext db,
+        IReadOnlyList<TimeEntry> entries,
+        CancellationToken cancellationToken)
+    {
+        var shareGroupIds = entries
+            .Where(e => e.ShareGroupId is not null)
+            .Select(e => e.ShareGroupId!.Value)
+            .Distinct()
+            .ToList();
+
+        if (shareGroupIds.Count == 0)
+            return new Dictionary<Guid, List<TimeEntry>>();
+
+        var siblings = await db.TimeEntries
+            .AsNoTracking()
+            .Include(e => e.User)
+            .Include(e => e.SubmittedByUser)
+            .Where(e => e.ShareGroupId != null && shareGroupIds.Contains(e.ShareGroupId.Value))
+            .ToListAsync(cancellationToken);
+
+        return siblings
+            .GroupBy(e => e.ShareGroupId!.Value)
+            .ToDictionary(group => group.Key, group => group.ToList());
     }
 }

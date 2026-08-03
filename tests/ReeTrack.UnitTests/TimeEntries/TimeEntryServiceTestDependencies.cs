@@ -6,6 +6,7 @@ using ReeTrack.Application.Notifications;
 using ReeTrack.Domain.Events;
 using ReeTrack.Infrastructure.Persistence;
 using ReeTrack.Infrastructure.TimeEntries;
+using ReeTrack.Infrastructure.Timesheets;
 
 namespace ReeTrack.UnitTests.TimeEntries;
 
@@ -42,16 +43,8 @@ internal static class TimeEntryServiceTestDependencies
             db,
             currentUser,
             entryGuard,
-            new TimeEntryAssociationService(db));
-
-    public static SharedTimeEntryService CreateSharedTimeEntryService(
-        AppDbContext db,
-        ICurrentUserService currentUser,
-        ITimeEntryGuardService entryGuard,
-        IDomainEventPublisher eventPublisher)
-    {
-        var associations = new TimeEntryAssociationService(db);
-        var timeEntries = new TimeEntryService(db, currentUser, entryGuard, associations);
-        return new SharedTimeEntryService(db, currentUser, timeEntries, eventPublisher, entryGuard, associations);
-    }
+            new TimeEntryAssociationService(db),
+            new TimeEntryOverlapChecker(db),
+            new DailyTimeBudget(db),
+            new NoOpDomainEventPublisher());
 }

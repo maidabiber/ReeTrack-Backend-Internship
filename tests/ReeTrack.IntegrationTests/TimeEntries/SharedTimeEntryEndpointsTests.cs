@@ -20,7 +20,7 @@ public class SharedTimeEntryEndpointsTests
         var startedAtUtc = DateTime.UtcNow.AddHours(-2);
         var endedAtUtc = DateTime.UtcNow.AddHours(-1);
 
-        var response = await adminClient.PostAsJsonAsync("/api/time-entries/shared/manual", new
+        var response = await adminClient.PostAsJsonAsync("/api/time-entries/shared", new
         {
             assigneeUserId = member.Id,
             description = "Pair programming",
@@ -31,38 +31,32 @@ public class SharedTimeEntryEndpointsTests
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<CreateSharedManualEntryResponse>();
         Assert.NotNull(body);
-        Assert.Equal(2, body!.Entries.Count);
-
-        var owned = Assert.Single(body.Entries, e => e.Status == "Confirmed");
-        var pending = Assert.Single(body.Entries, e => e.Status == "Pending");
+        var owned = Assert.Single(body!.Entries);
+        Assert.Equal("Confirmed", owned.Status);
         Assert.Equal(admin.Id, owned.AssigneeUserId);
         Assert.Null(owned.SubmittedByUserId);
-        Assert.Equal(member.Id, pending.AssigneeUserId);
-        Assert.Equal(admin.Id, pending.SubmittedByUserId);
-        Assert.Equal(owned.ShareGroupId, pending.ShareGroupId);
         Assert.NotNull(owned.ShareGroupId);
-        Assert.Equal(2, pending.Participants.Count);
+        Assert.Equal(2, owned.Participants.Count);
 
         var adminList = await adminClient.GetAsync("/api/time-entries");
         var adminEntries = await adminList.Content.ReadFromJsonAsync<List<TimeEntryResponse>>();
-        Assert.Equal(2, adminEntries!.Count);
-        Assert.Contains(adminEntries, e => e.Status == "Confirmed" && e.AssigneeUserId == admin.Id);
-        Assert.Contains(adminEntries, e => e.Status == "Pending" && e.AssigneeUserId == member.Id);
+        Assert.Single(adminEntries!);
+        Assert.Equal("Confirmed", adminEntries![0].Status);
+        Assert.Equal(admin.Id, adminEntries[0].AssigneeUserId);
+        Assert.Equal(owned.ShareGroupId, adminEntries[0].ShareGroupId);
 
         var memberList = await memberClient.GetAsync("/api/time-entries");
         var memberEntries = await memberList.Content.ReadFromJsonAsync<List<TimeEntryResponse>>();
         Assert.Single(memberEntries!);
         Assert.Equal("Pending", memberEntries![0].Status);
-        Assert.Equal("Test Admin", memberEntries[0].SubmittedByDisplayName);
+        Assert.Equal(owned.ShareGroupId, memberEntries[0].ShareGroupId);
 
         var pendingList = await memberClient.GetAsync("/api/time-entries/pending");
         var pendingEntries = await pendingList.Content.ReadFromJsonAsync<List<TimeEntryResponse>>();
         Assert.Single(pendingEntries!);
-        Assert.Equal(pending.Id, pendingEntries![0].Id);
+        Assert.Equal(memberEntries[0].Id, pendingEntries![0].Id);
+        Assert.Equal(admin.Id, pendingEntries[0].SubmittedByUserId);
         Assert.Equal("Test Admin", pendingEntries[0].SubmittedByDisplayName);
-
-        await factory.EmailChannel.WaitForMentionEmailAsync(member.Id);
-        Assert.Contains("/approvals", factory.EmailChannel.LastMentionReviewUrl, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -92,26 +86,27 @@ public class SharedTimeEntryEndpointsTests
         Assert.Equal(HttpStatusCode.OK, stop.StatusCode);
         var body = await stop.Content.ReadFromJsonAsync<CreateSharedManualEntryResponse>();
         Assert.NotNull(body);
-        Assert.Equal(2, body!.Entries.Count);
-        Assert.Contains(body.Entries, e => e.Status == "Confirmed" && e.Mode == "Timer" && e.AssigneeUserId == admin.Id);
-        Assert.Contains(body.Entries, e => e.Status == "Pending" && e.Mode == "Timer" && e.AssigneeUserId == member.Id);
-        Assert.All(body.Entries, e => Assert.True(e.DurationSeconds >= 1));
+        var owned = Assert.Single(body!.Entries);
+        Assert.Equal("Confirmed", owned.Status);
+        Assert.Equal("Timer", owned.Mode);
+        Assert.Equal(admin.Id, owned.AssigneeUserId);
+        Assert.True(owned.DurationSeconds >= 1);
 
         var noActive = await adminClient.GetAsync("/api/time-entries/timer/active");
         Assert.Equal(HttpStatusCode.NoContent, noActive.StatusCode);
 
         var adminList = await adminClient.GetAsync("/api/time-entries");
         var adminEntries = await adminList.Content.ReadFromJsonAsync<List<TimeEntryResponse>>();
-        Assert.Equal(2, adminEntries!.Count);
-        Assert.Contains(adminEntries, e => e.Status == "Confirmed" && e.AssigneeUserId == admin.Id);
-        Assert.Contains(adminEntries, e => e.Status == "Pending" && e.AssigneeUserId == member.Id);
+        Assert.Single(adminEntries!);
+        Assert.Equal("Confirmed", adminEntries![0].Status);
+        Assert.Equal(admin.Id, adminEntries[0].AssigneeUserId);
 
         var memberList = await memberClient.GetAsync("/api/time-entries");
         var memberEntries = await memberList.Content.ReadFromJsonAsync<List<TimeEntryResponse>>();
         Assert.Single(memberEntries!);
         Assert.Equal("Pending", memberEntries![0].Status);
-
-        await factory.EmailChannel.WaitForMentionEmailAsync(member.Id);
+        Assert.Equal("Timer", memberEntries[0].Mode);
+        Assert.Equal(owned.ShareGroupId, memberEntries[0].ShareGroupId);
     }
 
     [Fact]
@@ -127,15 +122,15 @@ public class SharedTimeEntryEndpointsTests
         var startedAtUtc = DateTime.UtcNow.AddHours(-2);
         var endedAtUtc = DateTime.UtcNow.AddHours(-1);
 
-        var create = await adminClient.PostAsJsonAsync("/api/time-entries/manual", new
+        var create = await adminClient.PostAsJsonAsync("/api/time-entries", new
         {
             description = "Solo work",
             startedAtUtc,
             endedAtUtc
         });
-        var created = await create.Content.ReadFromJsonAsync<CreateManualEntryResponse>();
+        var created = await create.Content.ReadFromJsonAsync<TimeEntryResponse>();
 
-        var share = await adminClient.PostAsJsonAsync($"/api/time-entries/{created!.Entry.Id}/share", new
+        var share = await adminClient.PostAsJsonAsync($"/api/time-entries/{created!.Id}/share", new
         {
             assigneeUserIds = new[] { member.Id }
         });
@@ -143,23 +138,24 @@ public class SharedTimeEntryEndpointsTests
         Assert.Equal(HttpStatusCode.OK, share.StatusCode);
         var body = await share.Content.ReadFromJsonAsync<CreateSharedManualEntryResponse>();
         Assert.NotNull(body);
-        Assert.Equal(2, body!.Entries.Count);
-        Assert.Contains(body.Entries, e => e.Status == "Confirmed" && e.AssigneeUserId == admin.Id && e.Id == created!.Entry.Id);
-        Assert.Contains(body.Entries, e => e.Status == "Pending" && e.AssigneeUserId == member.Id);
+        var owned = Assert.Single(body!.Entries);
+        Assert.Equal("Confirmed", owned.Status);
+        Assert.Equal(admin.Id, owned.AssigneeUserId);
+        Assert.Equal(created.Id, owned.Id);
+        Assert.NotNull(owned.ShareGroupId);
 
         var adminList = await adminClient.GetAsync("/api/time-entries");
         var adminEntries = await adminList.Content.ReadFromJsonAsync<List<TimeEntryResponse>>();
-        Assert.Equal(2, adminEntries!.Count);
-        Assert.Contains(adminEntries, e => e.Status == "Confirmed" && e.AssigneeUserId == admin.Id);
-        Assert.Contains(adminEntries, e => e.Status == "Pending" && e.AssigneeUserId == member.Id);
-        Assert.All(adminEntries, e => Assert.Equal(body.Entries[0].ShareGroupId, e.ShareGroupId));
+        Assert.Single(adminEntries!);
+        Assert.Equal("Confirmed", adminEntries![0].Status);
+        Assert.Equal(admin.Id, adminEntries[0].AssigneeUserId);
+        Assert.Equal(owned.ShareGroupId, adminEntries[0].ShareGroupId);
 
         var memberList = await memberClient.GetAsync("/api/time-entries");
         var memberEntries = await memberList.Content.ReadFromJsonAsync<List<TimeEntryResponse>>();
         Assert.Single(memberEntries!);
         Assert.Equal("Pending", memberEntries![0].Status);
-
-        await factory.EmailChannel.WaitForMentionEmailAsync(member.Id);
+        Assert.Equal(owned.ShareGroupId, memberEntries[0].ShareGroupId);
     }
 
     [Fact]
@@ -168,14 +164,18 @@ public class SharedTimeEntryEndpointsTests
         using var factory = new ReeTrackWebApplicationFactory();
         var (admin, adminToken) = await factory.SeedAdminAsync();
         var (member, memberToken) = await factory.SeedMemberAsync();
-        var (other, _) = await factory.SeedMemberAsync(email: "other.member@reetrack.test", displayName: "Other Member");
+        var (other, otherToken) = await factory.SeedMemberAsync(
+            email: "other.member@reetrack.test",
+            displayName: "Other Member");
 
         var adminClient = factory.CreateAuthenticatedClient(adminToken);
+        var memberClient = factory.CreateAuthenticatedClient(memberToken);
+        var otherClient = factory.CreateAuthenticatedClient(otherToken);
 
         var startedAtUtc = DateTime.UtcNow.AddHours(-3);
         var endedAtUtc = DateTime.UtcNow.AddHours(-2);
 
-        var create = await adminClient.PostAsJsonAsync("/api/time-entries/shared/manual", new
+        var create = await adminClient.PostAsJsonAsync("/api/time-entries/shared", new
         {
             assigneeUserId = member.Id,
             description = "Shared work",
@@ -183,8 +183,14 @@ public class SharedTimeEntryEndpointsTests
             endedAtUtc
         });
         var created = await create.Content.ReadFromJsonAsync<CreateSharedManualEntryResponse>();
+        var owned = Assert.Single(created!.Entries);
+        Assert.NotNull(owned.ShareGroupId);
 
-        var share = await adminClient.PostAsJsonAsync($"/api/time-entries/{created!.Entries.Single(e => e.Status == "Pending").Id}/share", new
+        var memberPending = await memberClient.GetAsync("/api/time-entries/pending");
+        var memberPendingEntries = await memberPending.Content.ReadFromJsonAsync<List<TimeEntryResponse>>();
+        var pendingId = Assert.Single(memberPendingEntries!).Id;
+
+        var share = await adminClient.PostAsJsonAsync($"/api/time-entries/{pendingId}/share", new
         {
             assigneeUserIds = new[] { other.Id }
         });
@@ -192,14 +198,18 @@ public class SharedTimeEntryEndpointsTests
         Assert.Equal(HttpStatusCode.OK, share.StatusCode);
         var body = await share.Content.ReadFromJsonAsync<CreateSharedManualEntryResponse>();
         Assert.NotNull(body);
-        Assert.Single(body!.Entries);
-        Assert.Equal(other.Id, body.Entries[0].AssigneeUserId);
-        Assert.NotNull(body.Entries[0].ShareGroupId);
+        Assert.Empty(body!.Entries);
 
         var adminList = await adminClient.GetAsync("/api/time-entries");
         var adminEntries = await adminList.Content.ReadFromJsonAsync<List<TimeEntryResponse>>();
-        Assert.Equal(3, adminEntries!.Count);
-        Assert.All(adminEntries, entry => Assert.Equal(body.Entries[0].ShareGroupId, entry.ShareGroupId));
+        Assert.Single(adminEntries!);
+        Assert.Equal(owned.ShareGroupId, adminEntries![0].ShareGroupId);
+
+        var otherList = await otherClient.GetAsync("/api/time-entries/pending");
+        var otherPending = await otherList.Content.ReadFromJsonAsync<List<TimeEntryResponse>>();
+        Assert.Single(otherPending!);
+        Assert.Equal(owned.ShareGroupId, otherPending![0].ShareGroupId);
+        Assert.Equal(other.Id, otherPending[0].AssigneeUserId);
     }
 
     [Fact]
@@ -215,19 +225,23 @@ public class SharedTimeEntryEndpointsTests
         var startedAtUtc = DateTime.UtcNow.AddHours(-3);
         var endedAtUtc = DateTime.UtcNow.AddHours(-2);
 
-        var create = await adminClient.PostAsJsonAsync("/api/time-entries/shared/manual", new
+        var create = await adminClient.PostAsJsonAsync("/api/time-entries/shared", new
         {
             assigneeUserId = member.Id,
             description = "Shared work",
             startedAtUtc,
             endedAtUtc
         });
-        var created = await create.Content.ReadFromJsonAsync<CreateSharedManualEntryResponse>();
+        Assert.Equal(HttpStatusCode.OK, create.StatusCode);
+
+        var pendingList = await memberClient.GetAsync("/api/time-entries/pending");
+        var pendingEntries = await pendingList.Content.ReadFromJsonAsync<List<TimeEntryResponse>>();
+        var pendingId = Assert.Single(pendingEntries!).Id;
 
         var newStart = startedAtUtc.AddMinutes(-30);
         var newEnd = endedAtUtc.AddMinutes(30);
 
-        var update = await memberClient.PutAsJsonAsync($"/api/time-entries/pending/{created!.Entries.Single(e => e.Status == "Pending").Id}", new
+        var update = await memberClient.PutAsJsonAsync($"/api/time-entries/pending/{pendingId}", new
         {
             description = "Adjusted shared work",
             startedAtUtc = newStart,
@@ -236,10 +250,10 @@ public class SharedTimeEntryEndpointsTests
         });
 
         Assert.Equal(HttpStatusCode.OK, update.StatusCode);
-        var updated = await update.Content.ReadFromJsonAsync<UpdateTimeEntryResponse>();
-        Assert.Equal("Adjusted shared work", updated!.Entry.Description);
-        Assert.Equal(7200, updated.Entry.DurationSeconds);
-        Assert.False(updated.Entry.IsBillable);
+        var updated = await update.Content.ReadFromJsonAsync<TimeEntryResponse>();
+        Assert.Equal("Adjusted shared work", updated!.Description);
+        Assert.Equal(7200, updated.DurationSeconds);
+        Assert.False(updated.IsBillable);
     }
 
     [Fact]
@@ -255,24 +269,27 @@ public class SharedTimeEntryEndpointsTests
         var startedAtUtc = DateTime.UtcNow.AddHours(-2);
         var endedAtUtc = DateTime.UtcNow.AddHours(-1);
 
-        var create = await adminClient.PostAsJsonAsync("/api/time-entries/shared/manual", new
+        var create = await adminClient.PostAsJsonAsync("/api/time-entries/shared", new
         {
             assigneeUserId = member.Id,
             description = "Shared work",
             startedAtUtc,
             endedAtUtc
         });
-        var created = await create.Content.ReadFromJsonAsync<CreateSharedManualEntryResponse>();
+        Assert.Equal(HttpStatusCode.OK, create.StatusCode);
 
-        var pendingId = created!.Entries.Single(e => e.Status == "Pending").Id;
+        var pendingList = await memberClient.GetAsync("/api/time-entries/pending");
+        var pendingEntries = await pendingList.Content.ReadFromJsonAsync<List<TimeEntryResponse>>();
+        var pendingId = Assert.Single(pendingEntries!).Id;
+
         var approve = await memberClient.PostAsync($"/api/time-entries/pending/{pendingId}/approve", null);
         Assert.Equal(HttpStatusCode.OK, approve.StatusCode);
         var approved = await approve.Content.ReadFromJsonAsync<TimeEntryResponse>();
         Assert.Equal("Confirmed", approved!.Status);
 
         var pending = await memberClient.GetAsync("/api/time-entries/pending");
-        var pendingEntries = await pending.Content.ReadFromJsonAsync<List<TimeEntryResponse>>();
-        Assert.Empty(pendingEntries!);
+        var remainingPending = await pending.Content.ReadFromJsonAsync<List<TimeEntryResponse>>();
+        Assert.Empty(remainingPending!);
 
         var list = await memberClient.GetAsync("/api/time-entries");
         var entries = await list.Content.ReadFromJsonAsync<List<TimeEntryResponse>>();
@@ -281,9 +298,10 @@ public class SharedTimeEntryEndpointsTests
 
         var adminList = await adminClient.GetAsync("/api/time-entries");
         var adminEntries = await adminList.Content.ReadFromJsonAsync<List<TimeEntryResponse>>();
-        Assert.Equal(2, adminEntries!.Count);
-        Assert.Contains(adminEntries, e => e.Status == "Confirmed" && e.AssigneeUserId == admin.Id && e.SubmittedByUserId is null);
-        Assert.Contains(adminEntries, e => e.Id == pendingId && e.Status == "Confirmed" && e.SubmittedByUserId == admin.Id);
+        Assert.Single(adminEntries!);
+        Assert.Equal("Confirmed", adminEntries![0].Status);
+        Assert.Equal(admin.Id, adminEntries[0].AssigneeUserId);
+        Assert.Null(adminEntries[0].SubmittedByUserId);
     }
 
     [Fact]
@@ -313,16 +331,6 @@ internal sealed class TeammateResponse
 internal sealed class CreateSharedManualEntryResponse
 {
     public List<TimeEntryResponse> Entries { get; set; } = [];
-}
-
-internal sealed class CreateManualEntryResponse
-{
-    public TimeEntryResponse Entry { get; set; } = null!;
-}
-
-internal sealed class UpdateTimeEntryResponse
-{
-    public TimeEntryResponse Entry { get; set; } = null!;
 }
 
 internal sealed class TimeEntryResponse

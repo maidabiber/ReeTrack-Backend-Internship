@@ -17,7 +17,7 @@ public class ManualEntryEndpointsTests
         var startedAtUtc = DateTime.UtcNow.AddHours(-2);
         var endedAtUtc = DateTime.UtcNow.AddHours(-1);
 
-        var response = await client.PostAsJsonAsync("/api/time-entries/manual", new
+        var response = await client.PostAsJsonAsync("/api/time-entries", new
         {
             description = "Manual design review",
             startedAtUtc,
@@ -25,16 +25,16 @@ public class ManualEntryEndpointsTests
         });
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var body = await response.Content.ReadFromJsonAsync<CreateManualEntryResponse>();
+        var body = await response.Content.ReadFromJsonAsync<TimeEntryResponse>();
         Assert.NotNull(body);
-        Assert.Equal("Manual", body!.Entry.Mode);
-        Assert.Equal("Manual design review", body.Entry.Description);
-        Assert.Equal(3600, body.Entry.DurationSeconds);
+        Assert.Equal("Manual", body!.Mode);
+        Assert.Equal("Manual design review", body.Description);
+        Assert.Equal(3600, body.DurationSeconds);
 
         var list = await client.GetAsync("/api/time-entries");
         var entries = await list.Content.ReadFromJsonAsync<List<TimeEntryResponse>>();
         Assert.Single(entries!);
-        Assert.Equal(body.Entry.Id, entries![0].Id);
+        Assert.Equal(body.Id, entries![0].Id);
     }
 
     [Fact]
@@ -44,7 +44,7 @@ public class ManualEntryEndpointsTests
         var (_, token) = await factory.SeedAdminAsync();
         var client = factory.CreateAuthenticatedClient(token);
 
-        var response = await client.PostAsJsonAsync("/api/time-entries/manual", new
+        var response = await client.PostAsJsonAsync("/api/time-entries", new
         {
             startedAtUtc = DateTime.UtcNow.AddHours(-1),
             endedAtUtc = DateTime.UtcNow.AddHours(-2)
@@ -60,7 +60,7 @@ public class ManualEntryEndpointsTests
         var (_, token) = await factory.SeedAdminAsync();
         var client = factory.CreateAuthenticatedClient(token);
 
-        var response = await client.PostAsJsonAsync("/api/time-entries/manual", new
+        var response = await client.PostAsJsonAsync("/api/time-entries", new
         {
             description = "Future work block",
             startedAtUtc = DateTime.UtcNow.AddHours(2),
@@ -68,8 +68,8 @@ public class ManualEntryEndpointsTests
         });
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var body = await response.Content.ReadFromJsonAsync<CreateManualEntryResponse>();
-        Assert.Equal(3600, body!.Entry.DurationSeconds);
+        var body = await response.Content.ReadFromJsonAsync<TimeEntryResponse>();
+        Assert.Equal(3600, body!.DurationSeconds);
     }
 
     [Fact]
@@ -79,7 +79,7 @@ public class ManualEntryEndpointsTests
         var (_, token) = await factory.SeedAdminAsync();
         var client = factory.CreateAuthenticatedClient(token);
 
-        var response = await client.PostAsJsonAsync("/api/time-entries/manual", new
+        var response = await client.PostAsJsonAsync("/api/time-entries", new
         {
             startedAtUtc = DateTime.UtcNow.AddHours(-30),
             endedAtUtc = DateTime.UtcNow.AddHours(-5)
@@ -98,7 +98,7 @@ public class ManualEntryEndpointsTests
         var startedAtUtc = DateTime.UtcNow.AddHours(-3);
         var endedAtUtc = DateTime.UtcNow.AddHours(-2);
 
-        var first = await client.PostAsJsonAsync("/api/time-entries/manual", new
+        var first = await client.PostAsJsonAsync("/api/time-entries", new
         {
             description = "Existing entry",
             startedAtUtc,
@@ -106,7 +106,7 @@ public class ManualEntryEndpointsTests
         });
         Assert.Equal(HttpStatusCode.OK, first.StatusCode);
 
-        var overlapAttempt = await client.PostAsJsonAsync("/api/time-entries/manual", new
+        var overlapAttempt = await client.PostAsJsonAsync("/api/time-entries", new
         {
             description = "Overlapping entry",
             startedAtUtc = startedAtUtc.AddMinutes(30),
@@ -114,7 +114,7 @@ public class ManualEntryEndpointsTests
         });
         Assert.Equal(HttpStatusCode.Conflict, overlapAttempt.StatusCode);
 
-        var confirmedStillRejected = await client.PostAsJsonAsync("/api/time-entries/manual", new
+        var confirmedStillRejected = await client.PostAsJsonAsync("/api/time-entries", new
         {
             description = "Overlapping entry",
             startedAtUtc = startedAtUtc.AddMinutes(30),
@@ -122,11 +122,6 @@ public class ManualEntryEndpointsTests
             confirmOverlap = true
         });
         Assert.Equal(HttpStatusCode.Conflict, confirmedStillRejected.StatusCode);
-    }
-
-    private sealed class CreateManualEntryResponse
-    {
-        public TimeEntryResponse Entry { get; set; } = null!;
     }
 
     private sealed class TimeEntryResponse

@@ -148,7 +148,7 @@ public class TimesheetReviewEndpointsTests
 
         // Approved week stays locked for the member.
         var memberClient = factory.CreateAuthenticatedClient(submitted.MemberToken);
-        var edit = await memberClient.PostAsJsonAsync("/api/time-entries/manual", new
+        var edit = await memberClient.PostAsJsonAsync("/api/time-entries", new
         {
             description = "After approval",
             startedAtUtc = PreviousWeek.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc).AddHours(14),
@@ -182,7 +182,7 @@ public class TimesheetReviewEndpointsTests
         // Member can edit the week again and resubmit; the sheet re-enters the queue.
         var memberClient = factory.CreateAuthenticatedClient(submitted.MemberToken);
         var monday = PreviousWeek.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
-        var edit = await memberClient.PostAsJsonAsync("/api/time-entries/manual", new
+        var edit = await memberClient.PostAsJsonAsync("/api/time-entries", new
         {
             description = "Tuesday fix",
             startedAtUtc = monday.AddDays(1).AddHours(9),
@@ -248,7 +248,7 @@ public class TimesheetReviewEndpointsTests
         // The week is editable again and can be resubmitted into the review queue.
         var memberClient = factory.CreateAuthenticatedClient(submitted.MemberToken);
         var monday = PreviousWeek.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
-        var edit = await memberClient.PostAsJsonAsync("/api/time-entries/manual", new
+        var edit = await memberClient.PostAsJsonAsync("/api/time-entries", new
         {
             description = "Monday fix",
             startedAtUtc = monday.AddHours(13),
@@ -353,7 +353,7 @@ public class TimesheetReviewEndpointsTests
 
     private static async Task CreateManualEntryAsync(HttpClient client, DateTime startedAtUtc)
     {
-        var response = await client.PostAsJsonAsync("/api/time-entries/manual", new
+        var response = await client.PostAsJsonAsync("/api/time-entries", new
         {
             description = "Logged work",
             startedAtUtc,
