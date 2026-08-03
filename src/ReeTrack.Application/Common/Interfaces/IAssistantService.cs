@@ -1,0 +1,10 @@
+using ReeTrack.Application.Common.Models;
+
+namespace ReeTrack.Application.Common.Interfaces;
+
+public interface IAssistantService
+{
+    IAsyncEnumerable<AssistantEvent> StreamChatAsync(
+        AssistantChatRequest request,
+        CancellationToken cancellationToken = default);
+}

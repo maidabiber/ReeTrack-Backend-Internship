@@ -11,6 +11,18 @@ public sealed class CreateProjectInput
     public string? Color { get; init; }
 }
 
+public sealed class CreateProjectWithTasksInput
+{
+    public string? Name { get; init; }
+    public Guid? ClientId { get; init; }
+    public string? CurrencyCode { get; init; }
+    public decimal? HourlyRate { get; init; }
+    public decimal? FixedFeeAmount { get; init; }
+    public decimal? TimeEstimateHours { get; init; }
+    public string? Color { get; init; }
+    public List<CreateTaskInput> Tasks { get; init; } = [];
+}
+
 // Patch semantics: Name/ClientId/Status apply only when present. The billing
 // block (currency, rate, fee, estimate, color) is applied wholesale whenever
 // CurrencyCode is present — null clears — because the edit form always sends

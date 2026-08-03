@@ -1,6 +1,10 @@
+using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using OpenAI;
 using ReeTrack.Application.Calendar;
+using System.ClientModel;
 using ReeTrack.Application.Common.Interfaces;
 using ReeTrack.Application.Common.Models;
 using ReeTrack.Application.Common.Options;
@@ -24,6 +28,7 @@ using ReeTrack.Infrastructure.Teammates;
 using ReeTrack.Infrastructure.TimeEntries;
 using ReeTrack.Infrastructure.Timesheets;
 using ReeTrack.Infrastructure.SmartTimeParse;
+using ReeTrack.Infrastructure.Assistant;
 using ReeTrack.Infrastructure.UserHourlyRates;
 using ReeTrack.Infrastructure.Background;
 using ReeTrack.Infrastructure.Calendar;
@@ -47,6 +52,28 @@ public static class DependencyInjection
         services.Configure<TimeEntryOptions>(configuration.GetSection(TimeEntryOptions.SectionName));
         services.Configure<LlmOptions>(configuration.GetSection(LlmOptions.SectionName));
         services.Configure<JiraOptions>(configuration.GetSection(JiraOptions.SectionName));
+
+        // Register IChatClient using Microsoft.Extensions.AI + OpenAI adapter.
+        // Always register so DI validation passes; the actual call will fail with a clear
+        // error at request time if the key is missing.
+        services.AddSingleton<IChatClient>(sp =>
+        {
+            var llmOptions = configuration.GetSection(LlmOptions.SectionName).Get<LlmOptions>() ?? new LlmOptions();
+            var apiKey = Environment.GetEnvironmentVariable("GROQ_API_KEY") ?? llmOptions.ApiKey;
+            if (string.IsNullOrWhiteSpace(apiKey))
+            {
+                apiKey = "not-configured";
+            }
+            var openAiClient = new OpenAIClient(
+                new ApiKeyCredential(apiKey),
+                new OpenAIClientOptions { Endpoint = new Uri(llmOptions.BaseUrl) });
+            var chatClient = openAiClient.GetChatClient(llmOptions.Model);
+            var innerClient = chatClient.AsIChatClient();
+            return innerClient
+                .AsBuilder()
+                .UseFunctionInvocation(sp.GetRequiredService<ILoggerFactory>())
+                .Build(sp);
+        });
 
         services.AddHttpContextAccessor();
         services.Configure<CalendarSyncOptions>(configuration.GetSection(CalendarSyncOptions.SectionName));
@@ -75,7 +102,9 @@ public static class DependencyInjection
         services.AddScoped<IDomainEventPublisher, DomainEventPublisher>();
         services.AddScoped<INotificationDispatcher, NotificationDispatcher>();
         services.AddScoped<INotificationPreferenceService, NotificationPreferenceService>();
+        services.AddScoped<IInAppNotificationService, InAppNotificationService>();
         services.AddScoped<IChannelProvider, EmailChannelProvider>();
+        services.AddScoped<IChannelProvider, InAppChannelProvider>();
         services.AddDomainEventHandlers(typeof(IDomainEventHandler<>).Assembly);
 
         services.AddScoped<IInvitationService, InvitationService>();
@@ -92,6 +121,8 @@ public static class DependencyInjection
         services.AddScoped<ITimeEntryOverlapChecker, TimeEntryOverlapChecker>();
         services.AddScoped<ITimeEntryTemplateService, TimeEntryTemplateService>();
         services.AddScoped<ISmartTimeParseService, SmartTimeParseService>();
+        services.AddScoped<AssistantTools>();
+        services.AddScoped<IAssistantService, AssistantService>();
         services.AddScoped<ITimeEntrySuggestionService, TimeEntrySuggestionService>();
         services.AddScoped<IProjectService, ProjectService>();
         services.AddScoped<IProjectCostService, ProjectCostService>();

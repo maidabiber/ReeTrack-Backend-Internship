@@ -88,6 +88,7 @@ builder.Services.AddCors(o => o.AddPolicy("frontend", p => p
     .AllowAnyMethod()
     .AllowCredentials()));
 
+
 var app = builder.Build();
 
 if (app.Environment.IsDevelopment() && !app.Environment.IsEnvironment("Testing"))

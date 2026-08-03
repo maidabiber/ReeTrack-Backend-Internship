@@ -6,26 +6,31 @@ using ReeTrack.Application.Common.Interfaces;
 using ReeTrack.Application.Common.Models;
 using ReeTrack.Domain.Entities;
 using ReeTrack.Domain.Enums;
+using ReeTrack.Infrastructure.Persistence;
 
 namespace ReeTrack.Infrastructure.Projects;
 
 public class ProjectService : IProjectService
 {
     private const int NameMaxLength = 200;
+    private const int TaskNameMaxLength = 200;
     private const decimal EstimateMax = 100_000_000m; // fits numeric(10,2)
 
     private static readonly Regex ColorPattern = new("^#[0-9A-Fa-f]{6}$", RegexOptions.Compiled);
 
     private readonly IApplicationDbContext _db;
+    private readonly AppDbContext _dbContext;
     private readonly ICurrentUserService _currentUser;
     private readonly ICurrencyService _currencyService;
 
     public ProjectService(
         IApplicationDbContext db,
+        AppDbContext dbContext,
         ICurrentUserService currentUser,
         ICurrencyService currencyService)
     {
         _db = db;
+        _dbContext = dbContext;
         _currentUser = currentUser;
         _currencyService = currencyService;
     }
@@ -163,6 +168,73 @@ public class ProjectService : IProjectService
         return MapEntity(project, clientName, taskCount: 0, actualHours: 0m);
     }
 
+    public async Task<ProjectDto> CreateWithTasksAsync(
+        CreateProjectWithTasksInput input,
+        CancellationToken cancellationToken = default)
+    {
+        var name = NormalizeName(input.Name);
+        await EnsureNameIsAvailableAsync(name, excludeId: null, cancellationToken);
+        var clientName = await EnsureClientExistsAsync(input.ClientId, cancellationToken);
+
+        var project = new Project
+        {
+            ClientId = input.ClientId!.Value,
+            Name = name,
+            Status = ProjectStatus.Active,
+            CreatedByUserId = _currentUser.UserId
+        };
+
+        await ApplyBillingBlockAsync(
+            project,
+            input.CurrencyCode,
+            input.HourlyRate,
+            input.FixedFeeAmount,
+            input.TimeEstimateHours,
+            input.Color,
+            cancellationToken);
+
+        _db.Projects.Add(project);
+
+        var tasks = new List<ProjectTask>();
+        if (input.Tasks is { Count: > 0 })
+        {
+            var usedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var taskInput in input.Tasks)
+            {
+                var taskName = NormalizeTaskName(taskInput.Name);
+
+                if (!usedNames.Add(taskName))
+                    throw new AppException($"Duplicate task name: \"{taskName}\".");
+
+                tasks.Add(new ProjectTask
+                {
+                    Name = taskName,
+                    Status = ProjectTaskStatus.Open,
+                    AssignedToUserId = taskInput.AssignedToUserId,
+                    TimeEstimateHours = ValidateEstimate(taskInput.TimeEstimateHours)
+                });
+            }
+        }
+
+        foreach (var task in tasks)
+            project.Tasks.Add(task);
+
+        await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+        try
+        {
+            await SaveGuardingNameConflictAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+        }
+        catch
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            throw;
+        }
+
+        return MapEntity(project, clientName, taskCount: tasks.Count, actualHours: 0m);
+    }
+
     public async Task<ProjectDto> UpdateAsync(Guid id, UpdateProjectInput input, CancellationToken cancellationToken = default)
     {
         var project = await _db.Projects.FirstOrDefaultAsync(p => p.Id == id, cancellationToken)
@@ -250,6 +322,26 @@ public class ProjectService : IProjectService
         await _db.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<ProjectLookupDto>> SearchAsync(
+        string query,
+        int maxResults = 10,
+        CancellationToken cancellationToken = default)
+    {
+        var trimmed = query?.Trim();
+        if (string.IsNullOrEmpty(trimmed))
+            return [];
+
+        var lowered = trimmed.ToLowerInvariant();
+
+        return await _db.Projects.AsNoTracking()
+            .Where(p => p.Status == ProjectStatus.Active &&
+                (p.Name.ToLower().Contains(lowered) || p.Client.Name.ToLower().Contains(lowered)))
+            .OrderBy(p => p.Client.Name).ThenBy(p => p.Name)
+            .Take(maxResults)
+            .Select(p => new ProjectLookupDto(p.Id, p.Name, p.Client.Name, p.Tasks.Count))
+            .ToListAsync(cancellationToken);
+    }
+
     private async Task ApplyBillingBlockAsync(
         Project project,
         string? currencyCode,
@@ -290,6 +382,17 @@ public class ProjectService : IProjectService
             throw AppErrors.Validation("Project name is required.");
         if (trimmed.Length > NameMaxLength)
             throw AppErrors.Validation($"Project name must be at most {NameMaxLength} characters.");
+
+        return trimmed;
+    }
+
+    private static string NormalizeTaskName(string? name)
+    {
+        var trimmed = name?.Trim();
+        if (string.IsNullOrEmpty(trimmed))
+            throw new AppException("Task name is required.");
+        if (trimmed.Length > TaskNameMaxLength)
+            throw new AppException($"Task name must be at most {TaskNameMaxLength} characters.");
 
         return trimmed;
     }

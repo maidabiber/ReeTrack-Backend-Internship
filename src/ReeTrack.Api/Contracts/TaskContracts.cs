@@ -7,6 +7,11 @@ public sealed class CreateTaskRequest
     public decimal? TimeEstimateHours { get; set; }
 }
 
+public sealed class CreateTasksBatchRequest
+{
+    public List<CreateTaskRequest> Tasks { get; set; } = [];
+}
+
 public sealed class UpdateTaskRequest
 {
     public string? Name { get; set; }

@@ -79,6 +79,32 @@ public class ProjectsController : ControllerBase
         return Ok(MapProject(project));
     }
 
+    [HttpPost("with-tasks")]
+    public async Task<ActionResult<ProjectResponse>> CreateWithTasks(
+        [FromBody] CreateProjectWithTasksRequest? request,
+        CancellationToken cancellationToken)
+    {
+        var input = new CreateProjectWithTasksInput
+        {
+            Name = request?.Name,
+            ClientId = request?.ClientId,
+            CurrencyCode = request?.CurrencyCode,
+            HourlyRate = request?.HourlyRate,
+            FixedFeeAmount = request?.FixedFeeAmount,
+            TimeEstimateHours = request?.TimeEstimateHours,
+            Color = request?.Color,
+            Tasks = request?.Tasks?.Select(t => new CreateTaskInput
+            {
+                Name = t.Name,
+                AssignedToUserId = t.AssignedToUserId,
+                TimeEstimateHours = t.TimeEstimateHours
+            }).ToList() ?? []
+        };
+
+        var project = await _projectService.CreateWithTasksAsync(input, cancellationToken);
+        return Ok(MapProject(project));
+    }
+
     [HttpPatch("{id:guid}")]
     public async Task<ActionResult<ProjectResponse>> Update(
         Guid id,

@@ -65,6 +65,30 @@ public class ProjectTasksController : ControllerBase
         return Ok(MapTask(task));
     }
 
+    [HttpPost("batch")]
+    public async Task<ActionResult<List<TaskResponse>>> CreateBatch(
+        Guid projectId,
+        [FromBody] CreateTasksBatchRequest? request,
+        CancellationToken cancellationToken)
+    {
+        var results = new List<TaskResponse>();
+
+        foreach (var item in request?.Tasks ?? [])
+        {
+            var input = new CreateTaskInput
+            {
+                Name = item.Name,
+                AssignedToUserId = item.AssignedToUserId,
+                TimeEstimateHours = item.TimeEstimateHours
+            };
+
+            var task = await _taskService.CreateAsync(projectId, input, cancellationToken);
+            results.Add(MapTask(task));
+        }
+
+        return Ok(results);
+    }
+
     [HttpPatch("{taskId:guid}")]
     public async Task<ActionResult<TaskResponse>> Update(
         Guid projectId,

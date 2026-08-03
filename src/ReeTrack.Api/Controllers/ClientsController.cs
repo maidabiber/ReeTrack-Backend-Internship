@@ -21,6 +21,16 @@ public class ClientsController : ControllerBase
         _clientService = clientService;
     }
 
+    [HttpGet("search")]
+    public async Task<ActionResult<IReadOnlyList<ClientLookupDto>>> Search(
+        [FromQuery] string q,
+        [FromQuery] int max = 8,
+        CancellationToken cancellationToken = default)
+    {
+        max = Math.Clamp(max, 1, 20);
+        return Ok(await _clientService.SearchAsync(q, max, cancellationToken));
+    }
+
     [HttpGet]
     public async Task<ActionResult<PagedResult<ClientResponse>>> List(
         [FromQuery] string? status,

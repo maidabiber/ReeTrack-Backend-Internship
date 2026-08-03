@@ -1,17 +1,13 @@
-using System.ClientModel;
 using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
+using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
-using OpenAI;
-using OpenAI.Chat;
 using ReeTrack.Application.Common.Exceptions;
 using ReeTrack.Application.Common.Interfaces;
 using ReeTrack.Application.Common.Models;
-using ReeTrack.Application.Common.Options;
 
 namespace ReeTrack.Infrastructure.SmartTimeParse;
 
@@ -25,83 +21,84 @@ public sealed class SmartTimeParseService : ISmartTimeParseService
         @"^\d{4}-\d{2}-\d{2}$",
         RegexOptions.Compiled);
 
-    // Groq constrained decoding often quotes numbers/bools. Use strings in the schema
-    // (strict-mode safe) and coerce in Normalize — union types are unreliable here.
-    private static readonly BinaryData ResponseSchema = BinaryData.FromBytes("""
+    private static readonly JsonElement ResponseSchema = JsonSerializer.SerializeToElement(new
+    {
+        type = "object",
+        properties = new
         {
-          "type": "object",
-          "properties": {
-            "description": {
-              "type": "string",
-              "description": "Cleaned activity description. Remove duration, clock times, dates, project/task/tag names, and billable terms."
+            description = new
+            {
+                type = "string",
+                description = "Cleaned activity description. Remove duration, clock times, dates, project/task/tag names, and billable terms."
             },
-            "duration_minutes": {
-              "type": "string",
-              "description": "Total duration in minutes as a numeric string, e.g. \"120\". Use \"0\" if unknown."
+            duration_minutes = new
+            {
+                type = "string",
+                description = "Total duration in minutes as a numeric string, e.g. \"120\". Use \"0\" if unknown."
             },
-            "matched_project_id": {
-              "type": ["string", "null"],
-              "description": "Exact id of the best-matching project from the provided list, or null."
+            matched_project_id = new
+            {
+                type = new[] { "string", "null" },
+                description = "Exact id of the best-matching project from the provided list, or null."
             },
-            "matched_project_task_id": {
-              "type": ["string", "null"],
-              "description": "Exact id of the best-matching open task from the provided list (must belong to matched_project_id when both set), or null."
+            matched_project_task_id = new
+            {
+                type = new[] { "string", "null" },
+                description = "Exact id of the best-matching open task from the provided list (must belong to matched_project_id when both set), or null."
             },
-            "matched_tag_ids": {
-              "type": "array",
-              "items": { "type": "string" },
-              "description": "Exact ids of matching tags from the provided list. Empty array if none."
+            matched_tag_ids = new
+            {
+                type = "array",
+                items = new { type = "string" },
+                description = "Exact ids of matching tags from the provided list. Empty array if none."
             },
-            "is_billable": {
-              "type": "string",
-              "description": "\"true\" or \"false\". Use \"false\" for non-billable/internal/unpaid work; otherwise \"true\"."
+            is_billable = new
+            {
+                type = "string",
+                description = "\"true\" or \"false\". Use \"false\" for non-billable/internal/unpaid work; otherwise \"true\"."
             },
-            "start_time": {
-              "type": ["string", "null"],
-              "description": "Local start time as HH:mm (24h) when a clock time or range is present; otherwise null."
+            start_time = new
+            {
+                type = new[] { "string", "null" },
+                description = "Local start time as HH:mm (24h) when a clock time or range is present; otherwise null."
             },
-            "end_time": {
-              "type": ["string", "null"],
-              "description": "Local end time as HH:mm (24h) when a range/end time is present; otherwise null."
+            end_time = new
+            {
+                type = new[] { "string", "null" },
+                description = "Local end time as HH:mm (24h) when a range/end time is present; otherwise null."
             },
-            "entry_date": {
-              "type": ["string", "null"],
-              "description": "Calendar date as YYYY-MM-DD when a date or relative day is present; otherwise null."
+            entry_date = new
+            {
+                type = new[] { "string", "null" },
+                description = "Calendar date as YYYY-MM-DD when a date or relative day is present; otherwise null."
             },
-            "confidence_score": {
-              "type": "string",
-              "description": "Overall confidence from 0.0 to 1.0 as a numeric string, e.g. \"0.85\"."
+            confidence_score = new
+            {
+                type = "string",
+                description = "Overall confidence from 0.0 to 1.0 as a numeric string, e.g. \"0.85\"."
             }
-          },
-          "required": [
-            "description",
-            "duration_minutes",
-            "matched_project_id",
-            "matched_project_task_id",
-            "matched_tag_ids",
-            "is_billable",
-            "start_time",
-            "end_time",
-            "entry_date",
-            "confidence_score"
-          ],
-          "additionalProperties": false
-        }
-        """u8.ToArray());
+        },
+        required = new[]
+        {
+            "description", "duration_minutes", "matched_project_id", "matched_project_task_id",
+            "matched_tag_ids", "is_billable", "start_time", "end_time", "entry_date", "confidence_score"
+        },
+        additionalProperties = false,
+    });
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNameCaseInsensitive = true
     };
 
-    private readonly LlmOptions _options;
+    private readonly IChatClient _chatClient;
     private readonly ILogger<SmartTimeParseService> _logger;
 
     public SmartTimeParseService(
-        IOptions<LlmOptions> options,
+        IChatClient chatClient,
         ILogger<SmartTimeParseService> logger)
     {
-        _options = options.Value;
+        _chatClient = chatClient;
         _logger = logger;
     }
 
@@ -116,53 +113,26 @@ public sealed class SmartTimeParseService : ISmartTimeParseService
         if (string.IsNullOrWhiteSpace(trimmed))
             throw AppErrors.Validation("Time entry text is required.");
 
-        if (string.IsNullOrWhiteSpace(_options.ApiKey)
-            && string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("GROQ_API_KEY")))
-            throw new AppException("Smart time parsing is not configured (missing Llm:ApiKey / GROQ_API_KEY).", 503, ErrorCode.ServiceUnavailable);
-
-        if (string.IsNullOrWhiteSpace(_options.BaseUrl))
-            throw new AppException("Smart time parsing is not configured (missing Llm:BaseUrl).", 503, ErrorCode.ServiceUnavailable);
-
-        var client = CreateChatClient();
         var messages = BuildMessages(trimmed, catalog);
-        var chatOptions = new ChatCompletionOptions
+        var chatOptions = new ChatOptions
         {
-            ResponseFormat = ChatResponseFormat.CreateJsonSchemaFormat(
-                jsonSchemaFormatName: SchemaName,
-                jsonSchema: ResponseSchema,
-                jsonSchemaIsStrict: true)
+            ResponseFormat = new ChatResponseFormatJson(
+                schema: ResponseSchema,
+                schemaName: SchemaName,
+                schemaDescription: "Structured time entry parsed from user input"),
         };
 
-        ChatCompletion completion;
+        ChatResponse completion;
         try
         {
-            completion = await client.CompleteChatAsync(messages, chatOptions, cancellationToken);
-        }
-        catch (ClientResultException ex) when (ex.Status is 401 or 403)
-        {
-            _logger.LogError(ex, "LLM authentication failed while parsing time entry.");
-            throw new AppException("Smart time parsing is misconfigured.", 503, ErrorCode.ServiceUnavailable);
-        }
-        catch (ClientResultException ex) when (ex.Status == 429)
-        {
-            _logger.LogWarning(ex, "LLM rate limit hit while parsing time entry.");
-            throw new AppException("Smart time parsing is temporarily unavailable. Please try again.", 503, ErrorCode.ServiceUnavailable);
+            completion = await _chatClient.GetResponseAsync(messages, chatOptions, cancellationToken);
         }
         catch (HttpRequestException ex)
         {
-            _logger.LogError(ex, "Could not reach LLM endpoint {BaseUrl}.", _options.BaseUrl);
-            throw new AppException("Could not reach Groq. Check network connectivity and Llm:BaseUrl.", 503, ErrorCode.ServiceUnavailable);
-        }
-        catch (ClientResultException ex)
-        {
-            _logger.LogError(ex, "LLM request failed with status {Status}.", ex.Status);
-            // Groq often returns actionable schema/validation details in the exception message.
-            var detail = Truncate(ex.Message, 280);
+            _logger.LogError(ex, "Could not reach the AI service while parsing time entry.");
             throw new AppException(
-                string.IsNullOrWhiteSpace(detail)
-                    ? "Smart time parsing failed. Please try again."
-                    : $"Smart time parsing failed: {detail}",
-                502,
+                "Could not reach the AI service. Check network connectivity and Llm:BaseUrl.",
+                503,
                 ErrorCode.ServiceUnavailable);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -172,54 +142,41 @@ public sealed class SmartTimeParseService : ISmartTimeParseService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Unexpected error calling LLM for time entry parse.");
-            throw new AppException("Smart time parsing failed. Please try again.", 502, ErrorCode.ServiceUnavailable);
+            throw new AppException(
+                "Smart time parsing failed. Please try again.",
+                502,
+                ErrorCode.ServiceUnavailable);
         }
 
         if (completion.FinishReason == ChatFinishReason.ContentFilter)
             throw AppErrors.Validation("The time entry text could not be processed.");
 
-        if (completion.Content.Count == 0 || string.IsNullOrWhiteSpace(completion.Content[0].Text))
+        var responseText = completion.Text;
+        if (string.IsNullOrWhiteSpace(responseText))
         {
             _logger.LogWarning("LLM returned an empty structured response.");
-            throw new AppException("Smart time parsing returned an empty result.", 502, ErrorCode.ServiceUnavailable);
+            throw new AppException(
+                "Smart time parsing returned an empty result.",
+                502,
+                ErrorCode.ServiceUnavailable);
         }
 
         LlmParsedTimeEntry raw;
         try
         {
-            raw = JsonSerializer.Deserialize<LlmParsedTimeEntry>(completion.Content[0].Text, JsonOptions)
+            raw = JsonSerializer.Deserialize<LlmParsedTimeEntry>(responseText, JsonOptions)
                 ?? throw new JsonException("Deserialized payload was null.");
         }
         catch (JsonException ex)
         {
-            _logger.LogError(ex, "Failed to deserialize LLM structured output: {Payload}",
-                completion.Content[0].Text);
-            throw new AppException("Smart time parsing returned an invalid result.", 502, ErrorCode.ServiceUnavailable);
+            _logger.LogError(ex, "Failed to deserialize LLM structured output: {Payload}", responseText);
+            throw new AppException(
+                "Smart time parsing returned an invalid result.",
+                502,
+                ErrorCode.ServiceUnavailable);
         }
 
         return Normalize(raw, catalog);
-    }
-
-    private ChatClient CreateChatClient()
-    {
-        var apiKey = ResolveApiKey();
-        var openAiClient = new OpenAIClient(
-            new ApiKeyCredential(apiKey),
-            new OpenAIClientOptions { Endpoint = new Uri(_options.BaseUrl) });
-
-        return openAiClient.GetChatClient(_options.Model);
-    }
-
-    private string ResolveApiKey()
-    {
-        if (!string.IsNullOrWhiteSpace(_options.ApiKey))
-            return _options.ApiKey;
-
-        var groqKey = Environment.GetEnvironmentVariable("GROQ_API_KEY");
-        if (!string.IsNullOrWhiteSpace(groqKey))
-            return groqKey;
-
-        throw new AppException("Smart time parsing is not configured (missing Llm:ApiKey / GROQ_API_KEY).", 503, ErrorCode.ServiceUnavailable);
     }
 
     private static List<ChatMessage> BuildMessages(string userInput, SmartTimeParseCatalog catalog)
@@ -267,8 +224,8 @@ public sealed class SmartTimeParseService : ISmartTimeParseService
 
         return
         [
-            new SystemChatMessage(system),
-            new UserChatMessage(user.ToString())
+            new ChatMessage(ChatRole.System, system),
+            new ChatMessage(ChatRole.User, user.ToString())
         ];
     }
 
@@ -422,9 +379,6 @@ public sealed class SmartTimeParseService : ISmartTimeParseService
             ? trimmed
             : null;
     }
-
-    private static string Truncate(string value, int maxLength) =>
-        value.Length <= maxLength ? value : value[..maxLength] + "…";
 
     private sealed class LlmParsedTimeEntry
     {

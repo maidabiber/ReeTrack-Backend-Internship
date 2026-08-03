@@ -163,6 +163,25 @@ public class ClientService : IClientService
         }
     }
 
+    public async Task<IReadOnlyList<ClientLookupDto>> SearchAsync(
+        string query,
+        int maxResults = 10,
+        CancellationToken cancellationToken = default)
+    {
+        var trimmed = query?.Trim();
+        if (string.IsNullOrEmpty(trimmed))
+            return [];
+
+        var lowered = trimmed.ToLowerInvariant();
+
+        return await _db.Clients.AsNoTracking()
+            .Where(c => c.IsActive && c.Name.ToLower().Contains(lowered))
+            .OrderBy(c => c.Name)
+            .Take(maxResults)
+            .Select(c => new ClientLookupDto(c.Id, c.Name))
+            .ToListAsync(cancellationToken);
+    }
+
     internal static ClientDto MapClient(Client client, int projectCount) =>
         new()
         {

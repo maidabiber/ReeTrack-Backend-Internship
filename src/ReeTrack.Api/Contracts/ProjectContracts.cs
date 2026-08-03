@@ -11,6 +11,18 @@ public sealed class CreateProjectRequest
     public string? Color { get; set; }
 }
 
+public sealed class CreateProjectWithTasksRequest
+{
+    public string? Name { get; set; }
+    public Guid? ClientId { get; set; }
+    public string? CurrencyCode { get; set; }
+    public decimal? HourlyRate { get; set; }
+    public decimal? FixedFeeAmount { get; set; }
+    public decimal? TimeEstimateHours { get; set; }
+    public string? Color { get; set; }
+    public List<CreateTaskRequest> Tasks { get; set; } = [];
+}
+
 public sealed class UpdateProjectRequest
 {
     public string? Name { get; set; }

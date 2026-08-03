@@ -11,4 +11,6 @@ public interface IClientService
     Task<ClientDto> UpdateAsync(Guid id, string? name, bool? isActive, CancellationToken cancellationToken = default);
 
     Task DeleteAsync(Guid id, CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<ClientLookupDto>> SearchAsync(string query, int maxResults = 10, CancellationToken cancellationToken = default);
 }
