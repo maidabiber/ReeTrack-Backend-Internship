@@ -38,6 +38,8 @@ public class AppDbContext : DbContext, IApplicationDbContext
     public DbSet<NotificationPreference> NotificationPreferences => Set<NotificationPreference>();
     public DbSet<ReportFilterSet> ReportFilterSets => Set<ReportFilterSet>();
     public DbSet<InAppNotification> InAppNotifications => Set<InAppNotification>();
+    public DbSet<Invoice> Invoices => Set<Invoice>();
+    public DbSet<InvoiceLineItem> InvoiceLineItems => Set<InvoiceLineItem>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

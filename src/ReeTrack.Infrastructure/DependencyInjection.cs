@@ -146,6 +146,7 @@ public static class DependencyInjection
         services.AddScoped<ReportEntryPipeline>();
         services.AddScoped<IReportService, ReportService>();
         services.AddScoped<IReportFilterSetService, ReportFilterSetService>();
+        services.AddScoped<IInvoiceService, Invoices.InvoiceService>();
         services.AddScoped<IReportWriter<SummaryReportDto>, CsvReportWriter>();
         services.AddScoped<IReportWriter<SummaryReportDto>, ExcelReportWriter>();
         services.AddScoped<IReportWriter<SummaryReportDto>, PdfReportWriter>();

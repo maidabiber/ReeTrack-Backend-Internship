@@ -11,4 +11,5 @@ public class Client : BaseEntity, ISoftDeletable, IAuditable
     public Guid? DeletedByUserId { get; set; }
 
     public ICollection<Project> Projects { get; set; } = [];
+    public ICollection<Invoice> Invoices { get; set; } = [];
 }

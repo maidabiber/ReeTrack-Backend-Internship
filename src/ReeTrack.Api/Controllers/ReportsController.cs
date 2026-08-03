@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ReeTrack.Api.Contracts;
+using ReeTrack.Api.Mapping;
 using ReeTrack.Application.Common.Exceptions;
 using ReeTrack.Application.Common.Interfaces;
 using ReeTrack.Application.Common.Models;
@@ -32,7 +33,7 @@ public class ReportsController : ControllerBase
         [FromQuery] ReportQueryRequest query,
         CancellationToken cancellationToken)
     {
-        var summary = await _reports.GetSummaryAsync(MapQuery(query), cancellationToken);
+        var summary = await _reports.GetSummaryAsync(ReportQueryMapping.FromRequest(query), cancellationToken);
         return Ok(Map(summary));
     }
 
@@ -56,7 +57,7 @@ public class ReportsController : ControllerBase
             throw AppErrors.Validation("pageSize must be between 1 and 200.");
 
         var detailed = await _reports.GetDetailedAsync(
-            MapQuery(query),
+            ReportQueryMapping.FromRequest(query),
             page,
             pageSize,
             cancellationToken);
@@ -75,7 +76,7 @@ public class ReportsController : ControllerBase
         [FromQuery] ReportQueryRequest query,
         CancellationToken cancellationToken)
     {
-        var workload = await _reports.GetWorkloadAsync(MapQuery(query), cancellationToken);
+        var workload = await _reports.GetWorkloadAsync(ReportQueryMapping.FromRequest(query), cancellationToken);
         return Ok(MapWorkload(workload));
     }
 
@@ -91,7 +92,7 @@ public class ReportsController : ControllerBase
         [FromQuery] ReportQueryRequest query,
         CancellationToken cancellationToken)
     {
-        var profitability = await _reports.GetProfitabilityAsync(MapQuery(query), cancellationToken);
+        var profitability = await _reports.GetProfitabilityAsync(ReportQueryMapping.FromRequest(query), cancellationToken);
         return Ok(MapProfitability(profitability));
     }
 
@@ -128,7 +129,7 @@ public class ReportsController : ControllerBase
 
         var created = await _filterSets.CreateAsync(
             request.Name,
-            MapQuery(request.Query),
+            ReportQueryMapping.FromRequest(request.Query),
             cancellationToken);
         return Ok(MapFilterSet(created));
     }
@@ -145,7 +146,7 @@ public class ReportsController : ControllerBase
         var updated = await _filterSets.UpdateAsync(
             id,
             request.Name,
-            MapQuery(request.Query),
+            ReportQueryMapping.FromRequest(request.Query),
             cancellationToken);
         return Ok(MapFilterSet(updated));
     }
@@ -166,7 +167,7 @@ public class ReportsController : ControllerBase
         if (!TryParseFormat(format, out var parsed))
             throw new AppException("format must be csv, xlsx, or pdf.", 400, ErrorCode.ExportFormatInvalid);
 
-        var file = await exportFn(parsed, MapQuery(query), cancellationToken);
+        var file = await exportFn(parsed, ReportQueryMapping.FromRequest(query), cancellationToken);
         return File(file.Bytes, file.ContentType, file.FileName);
     }
 
@@ -479,35 +480,6 @@ public class ReportsController : ControllerBase
             HolidayPremium = basis.HolidayPremium,
             OvertimePremium = basis.OvertimePremium,
             WeeklyOvertimeThresholdHours = basis.WeeklyOvertimeThresholdHours
-        };
-
-    private static ReportQuery MapQuery(ReportQueryRequest request) =>
-        new()
-        {
-            UserIds = request.UserIds ?? [],
-            ProjectIds = request.ProjectIds ?? [],
-            ClientIds = request.ClientIds ?? [],
-            TaskIds = request.TaskIds ?? [],
-            TagIds = request.TagIds ?? [],
-            Billable = request.Billable,
-            From = request.From,
-            To = request.To,
-            GroupBy = (request.GroupBy ?? []).Select(ParseGroupBy).ToList()
-        };
-
-    private static ReportGroupBy ParseGroupBy(string? value) =>
-        value?.Trim().ToLowerInvariant() switch
-        {
-            "user" => ReportGroupBy.User,
-            "project" => ReportGroupBy.Project,
-            "client" => ReportGroupBy.Client,
-            "task" => ReportGroupBy.Task,
-            "tag" => ReportGroupBy.Tag,
-            "billable" => ReportGroupBy.Billable,
-            "day" => ReportGroupBy.Day,
-            "week" => ReportGroupBy.Week,
-            _ => throw AppErrors.Validation(
-                "GroupBy must contain only: user, project, client, task, tag, billable, day, or week.")
         };
 
     private static ReportFilterSetResponse MapFilterSet(ReportFilterSetDto filterSet) =>

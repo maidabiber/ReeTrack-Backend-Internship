@@ -32,6 +32,8 @@ public interface IApplicationDbContext
     DbSet<NotificationPreference> NotificationPreferences { get; }
     DbSet<ReportFilterSet> ReportFilterSets { get; }
     DbSet<InAppNotification> InAppNotifications { get; }
+    DbSet<Invoice> Invoices { get; }
+    DbSet<InvoiceLineItem> InvoiceLineItems { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }
