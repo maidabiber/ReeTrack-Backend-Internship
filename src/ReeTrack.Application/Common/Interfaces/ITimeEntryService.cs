@@ -6,9 +6,11 @@ public interface ITimeEntryService
 {
     Task<TimeEntryDto?> GetActiveTimerAsync(CancellationToken cancellationToken = default);
 
-    Task<TimeEntryDto> StopTimerAsync(
+    Task<StopTimerResultDto> StopTimerAsync(
         TimeEntryInput? input = null,
         CancellationToken cancellationToken = default);
+
+    Task DeleteAsync(Guid entryId, CancellationToken cancellationToken = default);
 
     Task<TimeEntryDto> CreateAsync(
         TimeEntryInput input,

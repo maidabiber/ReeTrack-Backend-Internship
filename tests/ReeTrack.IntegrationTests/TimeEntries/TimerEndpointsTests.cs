@@ -40,7 +40,10 @@ public class TimerEndpointsTests
         });
 
         Assert.Equal(HttpStatusCode.OK, stop.StatusCode);
-        var completed = await stop.Content.ReadFromJsonAsync<TimeEntryResponse>();
+        var stopBody = await stop.Content.ReadFromJsonAsync<StopTimerResponse>();
+        Assert.NotNull(stopBody);
+        Assert.False(stopBody.HasOverlap);
+        var completed = stopBody.Entry;
         Assert.NotNull(completed);
         Assert.False(completed.IsRunning);
         Assert.NotNull(completed.EndedAtUtc);
@@ -80,6 +83,25 @@ public class TimerEndpointsTests
 
         var response = await client.PostAsJsonAsync("/api/time-entries/timer/stop", new { });
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task StopTimer_WhenNotRunning_ReturnsNotFound()
+    {
+        using var factory = new ReeTrackWebApplicationFactory();
+        var (_, token) = await factory.SeedAdminAsync();
+        var client = factory.CreateAuthenticatedClient(token);
+
+        var response = await client.PostAsJsonAsync("/api/time-entries/timer/stop", new { });
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    private sealed class StopTimerResponse
+    {
+        public TimeEntryResponse Entry { get; set; } = null!;
+        public bool HasOverlap { get; set; }
+        public string? OverlapMessage { get; set; }
+        public DateTime? SuggestedClipEndedAtUtc { get; set; }
     }
 
     private sealed class TimeEntryResponse

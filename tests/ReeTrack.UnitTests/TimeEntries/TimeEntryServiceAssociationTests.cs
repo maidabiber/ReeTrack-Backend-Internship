@@ -145,11 +145,11 @@ public class TimeEntryServiceAssociationTests : IDisposable
             IsBillable = false
         });
 
-        Assert.Equal(_projectId, stopped.ProjectId);
-        Assert.Equal(_taskId, stopped.ProjectTaskId);
-        Assert.Single(stopped.Tags);
-        Assert.Equal(_tagId, stopped.Tags[0].Id);
-        Assert.False(stopped.IsBillable);
+        Assert.Equal(_projectId, stopped.Entry.ProjectId);
+        Assert.Equal(_taskId, stopped.Entry.ProjectTaskId);
+        Assert.Single(stopped.Entry.Tags);
+        Assert.Equal(_tagId, stopped.Entry.Tags[0].Id);
+        Assert.False(stopped.Entry.IsBillable);
     }
 
     [Fact]
@@ -168,9 +168,9 @@ public class TimeEntryServiceAssociationTests : IDisposable
             Description = "Focus (done)"
         });
 
-        Assert.Equal(_projectId, stopped.ProjectId);
-        Assert.Equal(_taskId, stopped.ProjectTaskId);
-        Assert.Single(stopped.Tags);
+        Assert.Equal(_projectId, stopped.Entry.ProjectId);
+        Assert.Equal(_taskId, stopped.Entry.ProjectTaskId);
+        Assert.Single(stopped.Entry.Tags);
     }
 
     [Fact]

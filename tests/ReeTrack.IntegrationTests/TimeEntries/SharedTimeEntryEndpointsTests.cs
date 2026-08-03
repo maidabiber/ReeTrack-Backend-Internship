@@ -79,12 +79,24 @@ public class SharedTimeEntryEndpointsTests
 
         var stop = await adminClient.PostAsJsonAsync("/api/time-entries/timer/stop", new
         {
-            description = "Pair programming session",
-            assigneeUserIds = new[] { member.Id }
+            description = "Pair programming session"
         });
 
         Assert.Equal(HttpStatusCode.OK, stop.StatusCode);
-        var body = await stop.Content.ReadFromJsonAsync<CreateSharedManualEntryResponse>();
+        var stopBody = await stop.Content.ReadFromJsonAsync<StopTimerResponse>();
+        Assert.NotNull(stopBody);
+        Assert.False(stopBody.HasOverlap);
+        var stopped = stopBody.Entry;
+        Assert.Equal("Confirmed", stopped.Status);
+        Assert.Equal("Timer", stopped.Mode);
+        Assert.True(stopped.DurationSeconds >= 1);
+
+        var share = await adminClient.PostAsJsonAsync($"/api/time-entries/{stopped.Id}/share", new
+        {
+            assigneeUserIds = new[] { member.Id }
+        });
+        Assert.Equal(HttpStatusCode.OK, share.StatusCode);
+        var body = await share.Content.ReadFromJsonAsync<CreateSharedManualEntryResponse>();
         Assert.NotNull(body);
         var owned = Assert.Single(body!.Entries);
         Assert.Equal("Confirmed", owned.Status);
@@ -331,6 +343,14 @@ internal sealed class TeammateResponse
 internal sealed class CreateSharedManualEntryResponse
 {
     public List<TimeEntryResponse> Entries { get; set; } = [];
+}
+
+internal sealed class StopTimerResponse
+{
+    public TimeEntryResponse Entry { get; set; } = null!;
+    public bool HasOverlap { get; set; }
+    public string? OverlapMessage { get; set; }
+    public DateTime? SuggestedClipEndedAtUtc { get; set; }
 }
 
 internal sealed class TimeEntryResponse

@@ -45,7 +45,7 @@ public class TimeEntryService : ITimeEntryService
         return entry is null ? null : MapEntity(entry);
     }
 
-    public async Task<TimeEntryDto> StopTimerAsync(
+    public async Task<StopTimerResultDto> StopTimerAsync(
         TimeEntryInput? input = null,
         CancellationToken cancellationToken = default)
     {
@@ -63,7 +63,51 @@ public class TimeEntryService : ITimeEntryService
 
         entry.UpdatedAtUtc = DateTime.UtcNow;
         await _db.SaveChangesAsync(cancellationToken);
-        return MapEntity(entry);
+
+        var overlapping = await _overlap.FindOverlapsAsync(
+            userId,
+            entry.StartedAtUtc!.Value,
+            entry.EndedAtUtc!.Value,
+            entry.Id,
+            cancellationToken);
+
+        DateTime? suggestedClipEndedAtUtc = null;
+        string? overlapMessage = null;
+        if (overlapping.Count > 0)
+        {
+            overlapMessage = TimeEntryOverlapChecker.BuildOverlapMessage(overlapping);
+            var earliestOverlapStart = overlapping[0].StartedAtUtc;
+            if (earliestOverlapStart > entry.StartedAtUtc.Value)
+                suggestedClipEndedAtUtc = earliestOverlapStart;
+        }
+
+        return new StopTimerResultDto
+        {
+            Entry = MapEntity(entry),
+            HasOverlap = overlapping.Count > 0,
+            OverlapMessage = overlapMessage,
+            SuggestedClipEndedAtUtc = suggestedClipEndedAtUtc,
+            OverlappingEntries = overlapping
+        };
+    }
+
+    public async Task DeleteAsync(Guid entryId, CancellationToken cancellationToken = default)
+    {
+        var userId = _currentUser.UserId;
+        var entry = await _db.TimeEntries
+            .FirstOrDefaultAsync(e => e.Id == entryId && e.UserId == userId, cancellationToken)
+            ?? throw AppErrors.NotFound("Time entry");
+
+        if (entry.Mode == TimeEntryMode.Timer && entry.EndedAtUtc is null)
+            throw AppErrors.Conflict("Cannot delete a running timer entry.");
+
+        if (entry.StartedAtUtc is not null)
+            await _entryGuard.EnsureEditableAsync(userId, entry.StartedAtUtc.Value, cancellationToken);
+
+        entry.DeletedAtUtc = DateTime.UtcNow;
+        entry.DeletedByUserId = userId;
+        entry.UpdatedAtUtc = DateTime.UtcNow;
+        await _db.SaveChangesAsync(cancellationToken);
     }
 
     public async Task<TimeEntryDto> CreateAsync(

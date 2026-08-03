@@ -59,3 +59,20 @@ public sealed class TimeEntryParticipantResponse
     public required string Email { get; init; }
     public required string Role { get; init; }
 }
+
+public sealed class OverlapEntryResponse
+{
+    public required Guid Id { get; init; }
+    public string? Description { get; init; }
+    public required DateTime StartedAtUtc { get; init; }
+    public DateTime? EndedAtUtc { get; init; }
+}
+
+public sealed class StopTimerResponse
+{
+    public required TimeEntryResponse Entry { get; init; }
+    public required bool HasOverlap { get; init; }
+    public string? OverlapMessage { get; init; }
+    public DateTime? SuggestedClipEndedAtUtc { get; init; }
+    public IReadOnlyList<OverlapEntryResponse> OverlappingEntries { get; init; } = [];
+}

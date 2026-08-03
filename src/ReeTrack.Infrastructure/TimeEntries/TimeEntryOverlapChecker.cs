@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using ReeTrack.Application.Common.Exceptions;
 using ReeTrack.Application.Common.Interfaces;
+using ReeTrack.Application.Common.Models;
 
 namespace ReeTrack.Infrastructure.TimeEntries;
 
@@ -20,17 +21,19 @@ public class TimeEntryOverlapChecker : ITimeEntryOverlapChecker
         Guid? excludeEntryId,
         CancellationToken cancellationToken = default)
     {
-        var message = await FindOverlapMessageAsync(userId, startedAtUtc, endedAtUtc, excludeEntryId, cancellationToken);
-        if (message is not null)
-            throw new AppException(message, 409, ErrorCode.EntryOverlap);
+        var overlapping = await FindOverlapsAsync(userId, startedAtUtc, endedAtUtc, excludeEntryId, cancellationToken);
+        if (overlapping.Count == 0)
+            return;
+
+        throw new AppException(BuildOverlapMessage(overlapping), 409, ErrorCode.EntryOverlap);
     }
 
-    private async Task<string?> FindOverlapMessageAsync(
+    public async Task<IReadOnlyList<OverlapEntryDto>> FindOverlapsAsync(
         Guid userId,
         DateTime startedAtUtc,
         DateTime endedAtUtc,
         Guid? excludeEntryId,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken = default)
     {
         var now = DateTime.UtcNow;
         var overlapping = await _db.TimeEntries
@@ -41,12 +44,28 @@ public class TimeEntryOverlapChecker : ITimeEntryOverlapChecker
                 e.StartedAtUtc < endedAtUtc &&
                 (e.EndedAtUtc ?? now) > startedAtUtc)
             .OrderBy(e => e.StartedAtUtc)
-            .Take(3)
+            .Select(e => new
+            {
+                e.Id,
+                e.Description,
+                StartedAtUtc = e.StartedAtUtc!.Value,
+                e.EndedAtUtc
+            })
             .ToListAsync(cancellationToken);
 
-        if (overlapping.Count == 0)
-            return null;
+        return overlapping
+            .Select(e => new OverlapEntryDto
+            {
+                Id = e.Id,
+                Description = e.Description,
+                StartedAtUtc = e.StartedAtUtc,
+                EndedAtUtc = e.EndedAtUtc
+            })
+            .ToList();
+    }
 
+    internal static string BuildOverlapMessage(IReadOnlyList<OverlapEntryDto> overlapping)
+    {
         var labels = overlapping
             .Select(e => e.Description?.Trim())
             .Where(label => !string.IsNullOrWhiteSpace(label))

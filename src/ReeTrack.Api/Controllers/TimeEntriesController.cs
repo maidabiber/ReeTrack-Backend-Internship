@@ -46,13 +46,28 @@ public class TimeEntriesController : ControllerBase
     }
 
     [HttpPost("timer/stop")]
-    public async Task<ActionResult> StopTimer(
+    public async Task<ActionResult<StopTimerResponse>> StopTimer(
         [FromBody] TimeEntryRequest? request,
         CancellationToken cancellationToken)
     {
         var stopInput = ToInput(request);
-        var entry = await _timeEntryService.StopTimerAsync(stopInput, cancellationToken);
-        return Ok(MapTimeEntry(entry));
+        var result = await _timeEntryService.StopTimerAsync(stopInput, cancellationToken);
+        return Ok(new StopTimerResponse
+        {
+            Entry = MapTimeEntry(result.Entry),
+            HasOverlap = result.HasOverlap,
+            OverlapMessage = result.OverlapMessage,
+            SuggestedClipEndedAtUtc = result.SuggestedClipEndedAtUtc,
+            OverlappingEntries = result.OverlappingEntries
+                .Select(item => new OverlapEntryResponse
+                {
+                    Id = item.Id,
+                    Description = item.Description,
+                    StartedAtUtc = item.StartedAtUtc,
+                    EndedAtUtc = item.EndedAtUtc
+                })
+                .ToList()
+        });
     }
 
     [HttpPost]
@@ -74,6 +89,13 @@ public class TimeEntriesController : ControllerBase
         var input = ToInput(request);
         var entry = await _timeEntryService.UpdateAsync(id, input, cancellationToken);
         return Ok(MapTimeEntry(entry));
+    }
+
+    [HttpDelete("{id:guid}")]
+    public async Task<ActionResult> Delete(Guid id, CancellationToken cancellationToken)
+    {
+        await _timeEntryService.DeleteAsync(id, cancellationToken);
+        return NoContent();
     }
 
     [HttpPost("shared")]
