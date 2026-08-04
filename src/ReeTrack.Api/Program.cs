@@ -76,7 +76,12 @@ builder.Services.AddAuthorization();
 builder.Services.AddExceptionHandler<AppExceptionHandler>();
 builder.Services.AddProblemDetails();
 
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.Converters.Add(
+            new System.Text.Json.Serialization.JsonStringEnumConverter());
+    });
 builder.Services.AddSignalR();
 builder.Services.AddScoped<IInAppNotificationRealtimePublisher, SignalRInAppNotificationRealtimePublisher>();
 builder.Services.AddOpenApi();

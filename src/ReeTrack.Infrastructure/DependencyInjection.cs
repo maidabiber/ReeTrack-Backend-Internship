@@ -21,6 +21,7 @@ using ReeTrack.Infrastructure.Projects;
 using ReeTrack.Infrastructure.RateMultipliers;
 using ReeTrack.Infrastructure.HourTargets;
 using ReeTrack.Infrastructure.Reports;
+using ReeTrack.Infrastructure.Reports.Custom;
 using ReeTrack.Infrastructure.Reports.Writers;
 using ReeTrack.Infrastructure.Holidays;
 using ReeTrack.Infrastructure.Tags;
@@ -52,6 +53,7 @@ public static class DependencyInjection
         services.Configure<InvitationOptions>(configuration.GetSection(InvitationOptions.SectionName));
         services.Configure<AppOptions>(configuration.GetSection(AppOptions.SectionName));
         services.Configure<TimeEntryOptions>(configuration.GetSection(TimeEntryOptions.SectionName));
+        services.Configure<ReportOptions>(configuration.GetSection(ReportOptions.SectionName));
         services.Configure<LlmOptions>(configuration.GetSection(LlmOptions.SectionName));
         services.Configure<JiraOptions>(configuration.GetSection(JiraOptions.SectionName));
         services.Configure<SlackOptions>(configuration.GetSection(SlackOptions.SectionName));
@@ -145,6 +147,7 @@ public static class DependencyInjection
         services.AddScoped<IProjectCostService, ProjectCostService>();
         services.AddScoped<ReportEntryPipeline>();
         services.AddScoped<IReportService, ReportService>();
+        services.AddScoped<ICustomReportService, CustomReportService>();
         services.AddScoped<IReportFilterSetService, ReportFilterSetService>();
         services.AddScoped<IInvoiceService, Invoices.InvoiceService>();
         services.AddScoped<IReportWriter<SummaryReportDto>, CsvReportWriter>();

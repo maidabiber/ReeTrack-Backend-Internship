@@ -1,6 +1,9 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
+using ReeTrack.Application.Common.Exceptions;
 using ReeTrack.Application.Common.Interfaces;
 using ReeTrack.Application.Common.Models;
+using ReeTrack.Application.Common.Options;
 using ReeTrack.Application.Reports;
 using ReeTrack.Domain.Entities;
 using ReeTrack.Domain.Enums;
@@ -13,23 +16,46 @@ public sealed class ReportEntryPipeline
 {
     private readonly IApplicationDbContext _db;
     private readonly IRateMultiplierConfigProvider _multipliers;
+    private readonly ReportOptions _options;
 
     public ReportEntryPipeline(
         IApplicationDbContext db,
-        IRateMultiplierConfigProvider multipliers)
+        IRateMultiplierConfigProvider multipliers,
+        IOptions<ReportOptions> options)
     {
         _db = db;
         _multipliers = multipliers;
+        _options = options.Value;
     }
 
+    public Task<ReportEntryData> LoadAsync(
+        ReportQuery query,
+        CancellationToken cancellationToken = default) =>
+        LoadAsync(query, loadOvertimeContext: true, cancellationToken);
+
+    /// <param name="loadOvertimeContext">
+    /// When false, overtime week context is skipped. Callers that need cost / OT metrics
+    /// must load it later via <see cref="LoadOvertimeContextAsync"/>.
+    /// </param>
     public async Task<ReportEntryData> LoadAsync(
         ReportQuery query,
+        bool loadOvertimeContext,
         CancellationToken cancellationToken = default)
     {
         var normalized = ReportQueryRules.NormalizeAndValidate(query);
         var selectedQuery = ApplyFilters(BaseEntryQuery(), normalized);
 
+        var maxEntries = Math.Max(1, _options.MaxEntriesPerReport);
+        var entryCount = await selectedQuery.CountAsync(cancellationToken);
+        if (entryCount > maxEntries)
+        {
+            throw AppErrors.Validation(
+                $"This report matches {entryCount:N0} entries, which exceeds the limit of {maxEntries:N0}. " +
+                "Narrow the date range or add project / client / member filters.");
+        }
+
         var entries = await selectedQuery
+            .AsSplitQuery()
             .Include(entry => entry.User)
             .Include(entry => entry.Client)
             .Include(entry => entry.ProjectTask)
@@ -38,9 +64,11 @@ public sealed class ReportEntryPipeline
             .Include($"{nameof(TimeEntry.Project)}.{nameof(Project.Client)}")
             .ToListAsync(cancellationToken);
 
-        var overtimeContext = await LoadOvertimeContextAsync(entries, cancellationToken);
-        var userIds = overtimeContext
-            .Select(entry => entry.UserId)
+        var overtimeContext = loadOvertimeContext
+            ? await LoadOvertimeContextAsync(entries, cancellationToken)
+            : Array.Empty<TimeEntry>();
+
+        var userIds = (loadOvertimeContext ? overtimeContext.Select(e => e.UserId) : entries.Select(e => e.UserId))
             .Distinct()
             .ToList();
 
@@ -76,7 +104,30 @@ public sealed class ReportEntryPipeline
             overtimeContext,
             userRates,
             holidays,
-            await _multipliers.GetAsync(cancellationToken));
+            await _multipliers.GetAsync(cancellationToken),
+            OvertimeContextLoaded: loadOvertimeContext);
+    }
+
+    public async Task<IReadOnlyList<TimeEntry>> LoadOvertimeContextAsync(
+        IReadOnlyList<TimeEntry> selectedEntries,
+        CancellationToken cancellationToken = default)
+    {
+        var window = WeekWindow.Covering(selectedEntries.Select(ResolveEntryDate));
+        if (window is null)
+            return [];
+
+        var userIds = selectedEntries
+            .Select(entry => entry.UserId)
+            .Distinct()
+            .ToList();
+        var covered = window.Value;
+
+        return await BaseEntryQuery()
+            .Where(entry => userIds.Contains(entry.UserId))
+            .Where(entry =>
+                (entry.StartedAtUtc ?? entry.CreatedAtUtc) >= covered.StartUtc
+                && (entry.StartedAtUtc ?? entry.CreatedAtUtc) < covered.EndExclusiveUtc)
+            .ToListAsync(cancellationToken);
     }
 
     private IQueryable<TimeEntry> BaseEntryQuery() =>
@@ -134,28 +185,6 @@ public sealed class ReportEntryPipeline
         return entries;
     }
 
-    private async Task<IReadOnlyList<TimeEntry>> LoadOvertimeContextAsync(
-        IReadOnlyList<TimeEntry> selectedEntries,
-        CancellationToken cancellationToken)
-    {
-        var window = WeekWindow.Covering(selectedEntries.Select(ResolveEntryDate));
-        if (window is null)
-            return [];
-
-        var userIds = selectedEntries
-            .Select(entry => entry.UserId)
-            .Distinct()
-            .ToList();
-        var covered = window.Value;
-
-        return await BaseEntryQuery()
-            .Where(entry => userIds.Contains(entry.UserId))
-            .Where(entry =>
-                (entry.StartedAtUtc ?? entry.CreatedAtUtc) >= covered.StartUtc
-                && (entry.StartedAtUtc ?? entry.CreatedAtUtc) < covered.EndExclusiveUtc)
-            .ToListAsync(cancellationToken);
-    }
-
     private static DateOnly ResolveEntryDate(TimeEntry entry) =>
         DateOnly.FromDateTime(entry.StartedAtUtc ?? entry.CreatedAtUtc);
 }
@@ -166,4 +195,5 @@ public sealed record ReportEntryData(
     IReadOnlyList<TimeEntry> OvertimeContext,
     IReadOnlyList<UserHourlyRate> UserRates,
     IReadOnlySet<DateOnly> Holidays,
-    RateMultiplierConfig MultiplierConfig);
+    RateMultiplierConfig MultiplierConfig,
+    bool OvertimeContextLoaded = true);

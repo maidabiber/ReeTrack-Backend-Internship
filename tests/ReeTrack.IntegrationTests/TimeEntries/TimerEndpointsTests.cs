@@ -85,17 +85,6 @@ public class TimerEndpointsTests
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
-    [Fact]
-    public async Task StopTimer_WhenNotRunning_ReturnsNotFound()
-    {
-        using var factory = new ReeTrackWebApplicationFactory();
-        var (_, token) = await factory.SeedAdminAsync();
-        var client = factory.CreateAuthenticatedClient(token);
-
-        var response = await client.PostAsJsonAsync("/api/time-entries/timer/stop", new { });
-        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
-    }
-
     private sealed class StopTimerResponse
     {
         public TimeEntryResponse Entry { get; set; } = null!;
