@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ReeTrack.Api.Contracts;
+using ReeTrack.Application.Common.Constants;
 using ReeTrack.Application.Common.Interfaces;
 
 namespace ReeTrack.Api.Controllers;
@@ -16,7 +17,7 @@ public class InvitationsController : ControllerBase
         _invitationService = invitationService;
     }
 
-    [Authorize(Roles = "Admin")]
+    [Authorize(Policy = Permissions.Policies.InvitationsManage)]
     [HttpPost]
     public async Task<ActionResult<CreateInvitationResponse>> Create(
         [FromBody] CreateInvitationRequest request,
@@ -31,7 +32,7 @@ public class InvitationsController : ControllerBase
         });
     }
 
-    [Authorize(Roles = "Admin")]
+    [Authorize(Policy = Permissions.Policies.InvitationsManage)]
     [HttpPost("batch")]
     public async Task<ActionResult<BatchInvitationResponse>> CreateBatch(
         [FromBody] BatchInvitationRequest request,
@@ -54,7 +55,7 @@ public class InvitationsController : ControllerBase
         });
     }
 
-    [Authorize(Roles = "Admin")]
+    [Authorize(Policy = Permissions.Policies.InvitationsManage)]
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<InvitationListItemResponse>>> List(
         CancellationToken cancellationToken)
@@ -75,7 +76,7 @@ public class InvitationsController : ControllerBase
         }).ToList());
     }
 
-    [Authorize(Roles = "Admin")]
+    [Authorize(Policy = Permissions.Policies.InvitationsManage)]
     [HttpPost("{id:guid}/revoke")]
     public async Task<ActionResult<RevokeInvitationResponse>> Revoke(
         Guid id,
@@ -90,7 +91,7 @@ public class InvitationsController : ControllerBase
         });
     }
 
-    [Authorize(Roles = "Admin")]
+    [Authorize(Policy = Permissions.Policies.InvitationsManage)]
     [HttpPost("{id:guid}/resend")]
     public async Task<ActionResult<InvitationResponse>> Resend(
         Guid id,
@@ -100,7 +101,7 @@ public class InvitationsController : ControllerBase
         return Ok(MapInvitation(invitation));
     }
 
-    [Authorize(Roles = "Admin")]
+    [Authorize(Policy = Permissions.Policies.InvitationsManage)]
     [HttpGet("allowed-domains")]
     public ActionResult<AllowedDomainsResponse> AllowedDomains() =>
         Ok(new AllowedDomainsResponse { Domains = _invitationService.GetAllowedDomains() });

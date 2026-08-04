@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ReeTrack.Api.Contracts;
 using ReeTrack.Application.Common.Exceptions;
+using ReeTrack.Application.Common.Constants;
 using ReeTrack.Application.Common.Interfaces;
 using ReeTrack.Application.Notifications;
 using ReeTrack.Domain.Enums;
@@ -70,7 +71,8 @@ public class NotificationPreferencesController : ControllerBase
     }
 
     private bool CanManagePreferences(Guid userId) =>
-        _currentUser.UserId == userId || _currentUser.Roles.Contains("Admin");
+        _currentUser.UserId == userId ||
+        _currentUser.Roles.Contains(RoleNames.Admin);
 
     internal static NotificationPreferenceResponse Map(NotificationPreferenceDto preference) =>
         new()

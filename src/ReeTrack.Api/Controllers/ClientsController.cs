@@ -1,14 +1,14 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ReeTrack.Api.Contracts;
+using ReeTrack.Application.Common.Constants;
 using ReeTrack.Application.Common.Interfaces;
 using ReeTrack.Application.Common.Models;
 
 namespace ReeTrack.Api.Controllers;
 
-// Trust-based domain: every authenticated user may create/edit/delete clients
-// (no Admin role gate on mutations). Changes are captured by the audit trail
-// and deletes are soft-deletes guarded against existing projects.
+// Reads are member-accessible; mutations require manage.projects.manage
+// (ProjectManager+). Deletes are soft-deletes guarded against existing projects.
 [ApiController]
 [Route("api/clients")]
 [Authorize]
@@ -57,6 +57,7 @@ public class ClientsController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Policy = Permissions.Policies.ProjectsManage)]
     public async Task<ActionResult<ClientResponse>> Create(
         [FromBody] CreateClientRequest? request,
         CancellationToken cancellationToken)
@@ -66,6 +67,7 @@ public class ClientsController : ControllerBase
     }
 
     [HttpPatch("{id:guid}")]
+    [Authorize(Policy = Permissions.Policies.ProjectsManage)]
     public async Task<ActionResult<ClientResponse>> Update(
         Guid id,
         [FromBody] UpdateClientRequest? request,
@@ -81,6 +83,7 @@ public class ClientsController : ControllerBase
     }
 
     [HttpDelete("{id:guid}")]
+    [Authorize(Policy = Permissions.Policies.ProjectsManage)]
     public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)
     {
         await _clientService.DeleteAsync(id, cancellationToken);

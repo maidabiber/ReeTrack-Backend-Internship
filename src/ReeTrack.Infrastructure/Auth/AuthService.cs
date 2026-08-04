@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using ReeTrack.Application.Common.Authorization;
 using ReeTrack.Application.Common.Constants;
 using ReeTrack.Application.Common.Exceptions;
 using ReeTrack.Application.Common.Interfaces;
@@ -221,7 +222,8 @@ public class AuthService : IAuthService
             Email = user.Email,
             DisplayName = user.DisplayName,
             AvatarUrl = user.AvatarUrl,
-            Roles = roles
+            Roles = roles,
+            Permissions = PermissionMatrix.PermissionsForRoles(roles)
         };
     }
 }

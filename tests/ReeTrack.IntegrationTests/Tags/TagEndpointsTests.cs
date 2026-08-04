@@ -82,9 +82,8 @@ public class TagEndpointsTests
     }
 
     [Fact]
-    public async Task Mutations_AsMember_Succeed()
+    public async Task Mutations_AsMember_Returns403_ForWrites_AllowsRead()
     {
-        // Trust-based domain: members (not just admins) may create/edit/delete tags.
         using var factory = new ReeTrackWebApplicationFactory();
         var (_, adminToken) = await factory.SeedAdminAsync();
         var adminClient = factory.CreateAuthenticatedClient(adminToken);
@@ -95,18 +94,16 @@ public class TagEndpointsTests
         var memberToken = await SeedMemberTokenAsync(factory);
         var memberClient = factory.CreateAuthenticatedClient(memberToken);
 
-        var list = await memberClient.GetAsync("/api/tags");
-        Assert.Equal(HttpStatusCode.OK, list.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await memberClient.GetAsync("/api/tags")).StatusCode);
 
         var create = await memberClient.PostAsJsonAsync("/api/tags", new { name = "Billable" });
-        Assert.Equal(HttpStatusCode.OK, create.StatusCode);
-        var memberTag = await create.Content.ReadFromJsonAsync<TagResponse>();
+        Assert.Equal(HttpStatusCode.Forbidden, create.StatusCode);
 
         var patch = await memberClient.PatchAsJsonAsync($"/api/tags/{created!.Id}", new { color = "#2FBF71" });
-        Assert.Equal(HttpStatusCode.OK, patch.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, patch.StatusCode);
 
-        var delete = await memberClient.DeleteAsync($"/api/tags/{memberTag!.Id}");
-        Assert.Equal(HttpStatusCode.NoContent, delete.StatusCode);
+        var delete = await memberClient.DeleteAsync($"/api/tags/{created.Id}");
+        Assert.Equal(HttpStatusCode.Forbidden, delete.StatusCode);
     }
 
     [Fact]

@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ReeTrack.Api.Contracts;
+using ReeTrack.Application.Common.Constants;
 using ReeTrack.Application.Common.Exceptions;
 using ReeTrack.Application.Common.Interfaces;
 using ReeTrack.Application.Common.Models;
@@ -79,7 +80,7 @@ public class TimesheetsController : ControllerBase
 
     /// <summary>Admin review queue; status defaults to Submitted, "all" lists every status.</summary>
     [HttpGet("review")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Policy = Permissions.Policies.TimesheetReview)]
     public async Task<ActionResult<PagedResult<AdminTimesheetListItemResponse>>> ListForReview(
         [FromQuery] string? status,
         [FromQuery] int page = 1,
@@ -98,7 +99,7 @@ public class TimesheetsController : ControllerBase
     }
 
     [HttpGet("review/{id:guid}")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Policy = Permissions.Policies.TimesheetReview)]
     public async Task<ActionResult<AdminTimesheetDetailResponse>> GetForReview(
         Guid id,
         CancellationToken cancellationToken)
@@ -117,7 +118,7 @@ public class TimesheetsController : ControllerBase
     }
 
     [HttpPost("review/{id:guid}/approve")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Policy = Permissions.Policies.TimesheetReview)]
     public async Task<ActionResult<TimesheetResponse>> Approve(
         Guid id,
         [FromBody] ReviewDecisionRequest? request,
@@ -128,7 +129,7 @@ public class TimesheetsController : ControllerBase
     }
 
     [HttpPost("review/{id:guid}/reject")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Policy = Permissions.Policies.TimesheetReview)]
     public async Task<ActionResult<TimesheetResponse>> Reject(
         Guid id,
         [FromBody] ReviewDecisionRequest? request,

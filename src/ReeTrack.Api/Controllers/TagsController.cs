@@ -1,14 +1,14 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ReeTrack.Api.Contracts;
+using ReeTrack.Application.Common.Constants;
 using ReeTrack.Application.Common.Interfaces;
 using ReeTrack.Application.Common.Models;
 
 namespace ReeTrack.Api.Controllers;
 
-// Trust-based domain: every authenticated user may create/edit/delete tags
-// (no Admin role gate on mutations). Changes are captured by the audit trail
-// and deletes are soft-deletes that keep historical time-entry associations.
+// Reads are member-accessible; mutations require manage.projects.manage
+// (ProjectManager+). Deletes are soft-deletes that keep historical associations.
 [ApiController]
 [Route("api/tags")]
 [Authorize]
@@ -45,6 +45,7 @@ public class TagsController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Policy = Permissions.Policies.ProjectsManage)]
     public async Task<ActionResult<TagResponse>> Create(
         [FromBody] CreateTagRequest? request,
         CancellationToken cancellationToken)
@@ -54,6 +55,7 @@ public class TagsController : ControllerBase
     }
 
     [HttpPatch("{id:guid}")]
+    [Authorize(Policy = Permissions.Policies.ProjectsManage)]
     public async Task<ActionResult<TagResponse>> Update(
         Guid id,
         [FromBody] UpdateTagRequest? request,
@@ -64,6 +66,7 @@ public class TagsController : ControllerBase
     }
 
     [HttpDelete("{id:guid}")]
+    [Authorize(Policy = Permissions.Policies.ProjectsManage)]
     public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)
     {
         await _tagService.DeleteAsync(id, cancellationToken);

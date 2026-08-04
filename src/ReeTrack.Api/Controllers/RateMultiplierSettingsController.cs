@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ReeTrack.Api.Contracts;
+using ReeTrack.Application.Common.Constants;
 using ReeTrack.Application.Common.Interfaces;
 using ReeTrack.Application.Common.Models;
 
@@ -8,7 +9,7 @@ namespace ReeTrack.Api.Controllers;
 
 [ApiController]
 [Route("api/rate-multiplier-settings")]
-[Authorize(Roles = "Admin")]
+[Authorize(Policy = Permissions.Policies.RateMultipliersManage)]
 public class RateMultiplierSettingsController : ControllerBase
 {
     private readonly IRateMultiplierSettingsService _settingsService;

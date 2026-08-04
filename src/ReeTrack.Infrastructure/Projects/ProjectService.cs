@@ -1,6 +1,7 @@
 using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
+using ReeTrack.Application.Common.Constants;
 using ReeTrack.Application.Common.Exceptions;
 using ReeTrack.Application.Common.Interfaces;
 using ReeTrack.Application.Common.Models;
@@ -73,6 +74,9 @@ public class ProjectService : IProjectService
                 p.Name.ToLower().Contains(q) ||
                 p.Client.Name.ToLower().Contains(q));
         }
+
+        if (query.Mine == true)
+            filtered = filtered.Where(p => p.CreatedByUserId == _currentUser.UserId);
 
         var totalCount = await filtered.CountAsync(cancellationToken);
 
@@ -240,6 +244,10 @@ public class ProjectService : IProjectService
         var project = await _db.Projects.FirstOrDefaultAsync(p => p.Id == id, cancellationToken)
             ?? throw AppErrors.NotFound("Project");
 
+        EnsureCanManage(project);
+
+        EnsureCanManage(project);
+
         if (input.Name is not null)
         {
             var normalized = NormalizeName(input.Name);
@@ -291,9 +299,7 @@ public class ProjectService : IProjectService
         var project = await _db.Projects.FirstOrDefaultAsync(p => p.Id == id, cancellationToken)
             ?? throw AppErrors.NotFound("Project");
 
-        var isAdmin = _currentUser.Roles.Contains("Admin");
-        if (!isAdmin && project.CreatedByUserId != _currentUser.UserId)
-            throw AppErrors.Forbidden("Only the person who created this project or an admin can delete it.");
+        EnsureCanManage(project);
 
         var taskIds = await _db.ProjectTasks
             .Where(t => t.ProjectId == id)
@@ -469,6 +475,19 @@ public class ProjectService : IProjectService
 
     private static bool IsUniqueViolation(DbUpdateException ex) =>
         ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation };
+
+    /// <summary>
+    /// Admins may manage any project. All other users (ProjectManager) may only
+    /// manage projects they created.
+    /// </summary>
+    private void EnsureCanManage(Project project)
+    {
+        if (_currentUser.Roles.Contains(RoleNames.Admin, StringComparer.Ordinal))
+            return;
+
+        if (project.CreatedByUserId != _currentUser.UserId)
+            throw AppErrors.Forbidden("You can only manage projects you created.");
+    }
 
     /// <summary>
     /// Confirmed time on the project itself or on any of its tasks (same attribution

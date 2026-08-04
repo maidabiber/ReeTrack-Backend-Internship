@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ReeTrack.Api.Contracts;
+using ReeTrack.Application.Common.Constants;
 using ReeTrack.Application.Common.Interfaces;
 using ReeTrack.Application.Common.Models;
 
@@ -19,7 +20,7 @@ public class HolidaysController : ControllerBase
     }
 
     [HttpGet("calendars")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Policy = Permissions.Policies.HolidaysManage)]
     public async Task<ActionResult<IReadOnlyList<HolidayCalendarResponse>>> ListCalendars(
         CancellationToken cancellationToken)
     {
@@ -32,7 +33,7 @@ public class HolidaysController : ControllerBase
     }
 
     [HttpGet("settings")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Policy = Permissions.Policies.HolidaysManage)]
     public async Task<ActionResult<HolidayCalendarSettingsResponse>> GetSettings(
         CancellationToken cancellationToken)
     {
@@ -41,7 +42,7 @@ public class HolidaysController : ControllerBase
     }
 
     [HttpPut("settings")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Policy = Permissions.Policies.HolidaysManage)]
     public async Task<ActionResult<HolidayCalendarSettingsResponse>> UpdateSettings(
         [FromBody] UpdateHolidayCalendarSettingsRequest request,
         CancellationToken cancellationToken)
@@ -51,7 +52,7 @@ public class HolidaysController : ControllerBase
     }
 
     [HttpPost("sync")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Policy = Permissions.Policies.HolidaysManage)]
     public async Task<IActionResult> Sync(CancellationToken cancellationToken)
     {
         await _holidayService.SyncAsync(cancellationToken);
@@ -66,7 +67,7 @@ public class HolidaysController : ControllerBase
     }
 
     [HttpPost]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Policy = Permissions.Policies.HolidaysManage)]
     public async Task<ActionResult<HolidayResponse>> Create(
         [FromBody] CreateCustomHolidayRequest request,
         CancellationToken cancellationToken)
@@ -83,7 +84,7 @@ public class HolidaysController : ControllerBase
     }
 
     [HttpPatch("{id:guid}")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Policy = Permissions.Policies.HolidaysManage)]
     public async Task<ActionResult<HolidayResponse>> SetActive(
         Guid id,
         [FromBody] UpdateHolidayActiveRequest request,
@@ -94,7 +95,7 @@ public class HolidaysController : ControllerBase
     }
 
     [HttpDelete("{id:guid}")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Policy = Permissions.Policies.HolidaysManage)]
     public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)
     {
         await _holidayService.DeleteCustomAsync(id, cancellationToken);

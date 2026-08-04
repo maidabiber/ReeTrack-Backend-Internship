@@ -73,9 +73,8 @@ public class ClientEndpointsTests
     }
 
     [Fact]
-    public async Task Mutations_AsMember_Succeed()
+    public async Task Mutations_AsMember_Returns403_ForWrites_AllowsRead()
     {
-        // Trust-based domain: members (not just admins) may create/edit/delete clients.
         using var factory = new ReeTrackWebApplicationFactory();
         var (_, adminToken) = await factory.SeedAdminAsync();
         var adminClient = factory.CreateAuthenticatedClient(adminToken);
@@ -86,18 +85,16 @@ public class ClientEndpointsTests
         var memberToken = await SeedMemberTokenAsync(factory);
         var memberClient = factory.CreateAuthenticatedClient(memberToken);
 
-        var list = await memberClient.GetAsync("/api/clients");
-        Assert.Equal(HttpStatusCode.OK, list.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await memberClient.GetAsync("/api/clients")).StatusCode);
 
         var create = await memberClient.PostAsJsonAsync("/api/clients", new { name = "Globex" });
-        Assert.Equal(HttpStatusCode.OK, create.StatusCode);
-        var memberClientCreated = await create.Content.ReadFromJsonAsync<ClientResponse>();
+        Assert.Equal(HttpStatusCode.Forbidden, create.StatusCode);
 
         var patch = await memberClient.PatchAsJsonAsync($"/api/clients/{created!.Id}", new { isActive = false });
-        Assert.Equal(HttpStatusCode.OK, patch.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, patch.StatusCode);
 
-        var delete = await memberClient.DeleteAsync($"/api/clients/{memberClientCreated!.Id}");
-        Assert.Equal(HttpStatusCode.NoContent, delete.StatusCode);
+        var delete = await memberClient.DeleteAsync($"/api/clients/{created.Id}");
+        Assert.Equal(HttpStatusCode.Forbidden, delete.StatusCode);
     }
 
     [Fact]

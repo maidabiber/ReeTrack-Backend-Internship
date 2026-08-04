@@ -69,6 +69,17 @@ public class MemberListEndpointsTests
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
+    [Fact]
+    public async Task List_AsProjectManager_WithBillableRatesPermission_Succeeds()
+    {
+        using var factory = new ReeTrackWebApplicationFactory();
+        var (_, pmToken) = await factory.SeedProjectManagerAsync("pm-list@reetrack.test");
+        var pmClient = factory.CreateAuthenticatedClient(pmToken);
+
+        var response = await pmClient.GetAsync("/api/members");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
     private static async Task SeedActiveMemberAsync(
         ReeTrackWebApplicationFactory factory,
         string email,

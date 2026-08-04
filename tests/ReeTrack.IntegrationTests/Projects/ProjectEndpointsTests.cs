@@ -140,10 +140,8 @@ public class ProjectEndpointsTests
     }
 
     [Fact]
-    public async Task Mutations_AsMember_Succeed()
+    public async Task Mutations_AsMember_Returns403_ForWrites_AllowsRead()
     {
-        // Trust-based domain: members (not just admins) may create/edit projects,
-        // and may delete projects they created themselves.
         using var factory = new ReeTrackWebApplicationFactory();
         var (_, adminToken) = await factory.SeedAdminAsync();
         var adminClient = factory.CreateAuthenticatedClient(adminToken);
@@ -159,13 +157,31 @@ public class ProjectEndpointsTests
         Assert.Equal(HttpStatusCode.OK, (await memberClient.GetAsync($"/api/projects/{created!.Id}")).StatusCode);
 
         var create = await memberClient.PostAsJsonAsync("/api/projects", new { name = "Member project", clientId });
-        Assert.Equal(HttpStatusCode.OK, create.StatusCode);
-        var memberProject = await create.Content.ReadFromJsonAsync<ProjectResponse>();
+        Assert.Equal(HttpStatusCode.Forbidden, create.StatusCode);
 
         var patch = await memberClient.PatchAsJsonAsync($"/api/projects/{created.Id}", new { status = "archived" });
+        Assert.Equal(HttpStatusCode.Forbidden, patch.StatusCode);
+
+        var delete = await memberClient.DeleteAsync($"/api/projects/{created.Id}");
+        Assert.Equal(HttpStatusCode.Forbidden, delete.StatusCode);
+    }
+
+    [Fact]
+    public async Task Mutations_AsProjectManager_Succeed()
+    {
+        using var factory = new ReeTrackWebApplicationFactory();
+        var (_, pmToken) = await factory.SeedProjectManagerAsync();
+        var pmClient = factory.CreateAuthenticatedClient(pmToken);
+        var clientId = await SeedClientAsync(factory, "Acme Corp");
+
+        var create = await pmClient.PostAsJsonAsync("/api/projects", new { name = "PM project", clientId });
+        Assert.Equal(HttpStatusCode.OK, create.StatusCode);
+        var project = await create.Content.ReadFromJsonAsync<ProjectResponse>();
+
+        var patch = await pmClient.PatchAsJsonAsync($"/api/projects/{project!.Id}", new { status = "archived" });
         Assert.Equal(HttpStatusCode.OK, patch.StatusCode);
 
-        var delete = await memberClient.DeleteAsync($"/api/projects/{memberProject!.Id}");
+        var delete = await pmClient.DeleteAsync($"/api/projects/{project.Id}");
         Assert.Equal(HttpStatusCode.NoContent, delete.StatusCode);
     }
 
@@ -425,14 +441,109 @@ public class ProjectEndpointsTests
         var adminClient = factory.CreateAuthenticatedClient(adminToken);
         var clientId = await SeedClientAsync(factory, "Acme Corp");
 
-        var memberToken = await SeedMemberTokenAsync(factory);
-        var memberClient = factory.CreateAuthenticatedClient(memberToken);
-        var memberProject = await (await memberClient.PostAsJsonAsync("/api/projects", new { name = "Member project", clientId }))
+        var (_, pmToken) = await factory.SeedProjectManagerAsync();
+        var pmClient = factory.CreateAuthenticatedClient(pmToken);
+        var pmProject = await (await pmClient.PostAsJsonAsync("/api/projects", new { name = "PM project", clientId }))
             .Content.ReadFromJsonAsync<ProjectResponse>();
 
-        var response = await adminClient.DeleteAsync($"/api/projects/{memberProject!.Id}");
+        var response = await adminClient.DeleteAsync($"/api/projects/{pmProject!.Id}");
 
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Patch_AsProjectManager_OfAnotherUsersProject_Returns403()
+    {
+        using var factory = new ReeTrackWebApplicationFactory();
+        var (pm1, pm1Token) = await factory.SeedProjectManagerAsync("pm1@reetrack.test", "PM One");
+        var pm1Client = factory.CreateAuthenticatedClient(pm1Token);
+        var clientId = await SeedClientAsync(factory, "Acme Corp");
+
+        var pm1Project = await (await pm1Client.PostAsJsonAsync("/api/projects", new { name = "PM1 project", clientId }))
+            .Content.ReadFromJsonAsync<ProjectResponse>();
+
+        var (_, pm2Token) = await factory.SeedProjectManagerAsync("pm2@reetrack.test", "PM Two");
+        var pm2Client = factory.CreateAuthenticatedClient(pm2Token);
+
+        var patch = await pm2Client.PatchAsJsonAsync($"/api/projects/{pm1Project!.Id}", new { name = "Hijacked" });
+        Assert.Equal(HttpStatusCode.Forbidden, patch.StatusCode);
+
+        var fetched = await pm1Client.GetFromJsonAsync<ProjectResponse>($"/api/projects/{pm1Project.Id}");
+        Assert.Equal("PM1 project", fetched!.Name);
+    }
+
+    [Fact]
+    public async Task Delete_AsProjectManager_OfAnotherUsersProject_Returns403()
+    {
+        using var factory = new ReeTrackWebApplicationFactory();
+        var (pm1, pm1Token) = await factory.SeedProjectManagerAsync("pm1@reetrack.test", "PM One");
+        var pm1Client = factory.CreateAuthenticatedClient(pm1Token);
+        var clientId = await SeedClientAsync(factory, "Acme Corp");
+
+        var pm1Project = await (await pm1Client.PostAsJsonAsync("/api/projects", new { name = "PM1 project", clientId }))
+            .Content.ReadFromJsonAsync<ProjectResponse>();
+
+        var (_, pm2Token) = await factory.SeedProjectManagerAsync("pm2@reetrack.test", "PM Two");
+        var pm2Client = factory.CreateAuthenticatedClient(pm2Token);
+
+        var delete = await pm2Client.DeleteAsync($"/api/projects/{pm1Project!.Id}");
+        Assert.Equal(HttpStatusCode.Forbidden, delete.StatusCode);
+
+        Assert.Equal(HttpStatusCode.OK, (await pm1Client.GetAsync($"/api/projects/{pm1Project.Id}")).StatusCode);
+    }
+
+    [Fact]
+    public async Task Patch_AsAdmin_OfAnotherUsersProject_Succeeds()
+    {
+        using var factory = new ReeTrackWebApplicationFactory();
+        var (_, pmToken) = await factory.SeedProjectManagerAsync();
+        var pmClient = factory.CreateAuthenticatedClient(pmToken);
+        var clientId = await SeedClientAsync(factory, "Acme Corp");
+
+        var pmProject = await (await pmClient.PostAsJsonAsync("/api/projects", new { name = "PM project", clientId }))
+            .Content.ReadFromJsonAsync<ProjectResponse>();
+
+        var (_, adminToken) = await factory.SeedAdminAsync();
+        var adminClient = factory.CreateAuthenticatedClient(adminToken);
+
+        var patch = await adminClient.PatchAsJsonAsync($"/api/projects/{pmProject!.Id}", new { name = "Admin renamed" });
+        Assert.Equal(HttpStatusCode.OK, patch.StatusCode);
+
+        var fetched = await adminClient.GetFromJsonAsync<ProjectResponse>($"/api/projects/{pmProject.Id}");
+        Assert.Equal("Admin renamed", fetched!.Name);
+    }
+
+    [Fact]
+    public async Task List_Mine_FiltersToCallerOwnedProjects()
+    {
+        using var factory = new ReeTrackWebApplicationFactory();
+        var (_, adminToken) = await factory.SeedAdminAsync();
+        var adminClient = factory.CreateAuthenticatedClient(adminToken);
+        var clientId = await SeedClientAsync(factory, "Acme Corp");
+
+        var (pm1, pm1Token) = await factory.SeedProjectManagerAsync("pm1@reetrack.test", "PM One");
+        var pm1Client = factory.CreateAuthenticatedClient(pm1Token);
+        await (await pm1Client.PostAsJsonAsync("/api/projects", new { name = "PM1 project", clientId }))
+            .Content.ReadFromJsonAsync<ProjectResponse>();
+
+        var (pm2, pm2Token) = await factory.SeedProjectManagerAsync("pm2@reetrack.test", "PM Two");
+        var pm2Client = factory.CreateAuthenticatedClient(pm2Token);
+        await (await pm2Client.PostAsJsonAsync("/api/projects", new { name = "PM2 project", clientId }))
+            .Content.ReadFromJsonAsync<ProjectResponse>();
+
+        var pm1Mine = await pm1Client.GetFromJsonAsync<PagedResult<ProjectResponse>>("/api/projects?status=all&mine=true");
+        Assert.NotNull(pm1Mine);
+        Assert.Single(pm1Mine!.Items);
+        Assert.Equal("PM1 project", pm1Mine.Items[0].Name);
+        Assert.Equal(pm1.Id, pm1Mine.Items[0].CreatedByUserId);
+
+        var pm2Mine = await pm2Client.GetFromJsonAsync<PagedResult<ProjectResponse>>("/api/projects?status=all&mine=true");
+        Assert.NotNull(pm2Mine);
+        Assert.Single(pm2Mine!.Items);
+        Assert.Equal("PM2 project", pm2Mine.Items[0].Name);
+
+        var allAdmin = await adminClient.GetFromJsonAsync<PagedResult<ProjectResponse>>("/api/projects?status=all");
+        Assert.Equal(2, allAdmin!.TotalCount);
     }
 
     private static async Task<Guid> SeedClientAsync(ReeTrackWebApplicationFactory factory, string name)

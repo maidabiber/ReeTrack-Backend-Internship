@@ -137,6 +137,43 @@ public class ReeTrackWebApplicationFactory : WebApplicationFactory<Program>
         return (member, token);
     }
 
+    public async Task<(User ProjectManager, string AccessToken)> SeedProjectManagerAsync(
+        string email = "pm@reetrack.test",
+        string displayName = "Test Project Manager")
+    {
+        using var scope = Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var jwt = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
+
+        await EnsureReferenceDataAsync(db);
+
+        var now = DateTime.UtcNow;
+        var projectManager = new User
+        {
+            Email = email,
+            DisplayName = displayName,
+            Status = UserStatus.Active,
+            EmailVerified = true,
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now,
+            UserRoles =
+            [
+                new UserRole
+                {
+                    RoleId = RoleIds.ProjectManager,
+                    AssignedAtUtc = now
+                }
+            ]
+        };
+        projectManager.AssignInitialHourlyRate(DateOnly.FromDateTime(now));
+
+        db.Users.Add(projectManager);
+        await db.SaveChangesAsync();
+
+        var token = jwt.CreateAccessToken(projectManager, [RoleNames.ProjectManager], out _);
+        return (projectManager, token);
+    }
+
     public HttpClient CreateAuthenticatedClient(string accessToken)
     {
         var client = CreateClient();
@@ -150,13 +187,21 @@ public class ReeTrackWebApplicationFactory : WebApplicationFactory<Program>
 
         var seedTimestamp = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc);
 
-        if (!await db.Roles.AnyAsync())
+        var requiredRoles = new[]
         {
-            db.Roles.AddRange(
-                new Role { Id = RoleIds.Admin, Name = "Admin", CreatedAtUtc = seedTimestamp, UpdatedAtUtc = seedTimestamp },
-                new Role { Id = RoleIds.Member, Name = "Member", CreatedAtUtc = seedTimestamp, UpdatedAtUtc = seedTimestamp });
-            await db.SaveChangesAsync();
+            new Role { Id = RoleIds.Admin, Name = RoleNames.Admin, CreatedAtUtc = seedTimestamp, UpdatedAtUtc = seedTimestamp },
+            new Role { Id = RoleIds.Member, Name = RoleNames.Member, CreatedAtUtc = seedTimestamp, UpdatedAtUtc = seedTimestamp },
+            new Role { Id = RoleIds.ProjectManager, Name = RoleNames.ProjectManager, CreatedAtUtc = seedTimestamp, UpdatedAtUtc = seedTimestamp }
+        };
+
+        foreach (var role in requiredRoles)
+        {
+            if (!await db.Roles.AnyAsync(r => r.Id == role.Id))
+                db.Roles.Add(role);
         }
+
+        if (db.ChangeTracker.HasChanges())
+            await db.SaveChangesAsync();
 
         if (!await db.Currencies.AnyAsync(c => c.Code == "EUR"))
         {

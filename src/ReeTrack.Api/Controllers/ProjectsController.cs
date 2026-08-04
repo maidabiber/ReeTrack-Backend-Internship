@@ -1,16 +1,15 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ReeTrack.Api.Contracts;
+using ReeTrack.Application.Common.Constants;
 using ReeTrack.Application.Common.Interfaces;
 using ReeTrack.Application.Common.Models;
 
 namespace ReeTrack.Api.Controllers;
 
-// Trust-based domain: every authenticated user may create/edit projects (no
-// Admin role gate on mutations). Deleting is the exception — only the project's
-// creator or an admin may delete (enforced in ProjectService). Changes are
-// captured by the audit trail and deletes are soft-deletes guarded against
-// tracked time.
+// Every authenticated user may list and view projects. Create, update and delete
+// require manage.projects.manage (ProjectManager and Admin). Changes are captured
+// by the audit trail and deletes are soft-deletes guarded against tracked time.
 [ApiController]
 [Route("api/projects")]
 [Authorize]
@@ -28,6 +27,7 @@ public class ProjectsController : ControllerBase
         [FromQuery] string? status,
         [FromQuery] Guid? clientId,
         [FromQuery] Guid[]? clientIds,
+        [FromQuery] bool? mine,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 50,
         [FromQuery] string? q = null,
@@ -38,6 +38,7 @@ public class ProjectsController : ControllerBase
             Status = status,
             ClientId = clientId,
             ClientIds = clientIds,
+            Mine = mine,
             Page = page,
             PageSize = pageSize,
             Q = q
@@ -60,6 +61,7 @@ public class ProjectsController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Policy = Permissions.Policies.ProjectsManage)]
     public async Task<ActionResult<ProjectResponse>> Create(
         [FromBody] CreateProjectRequest? request,
         CancellationToken cancellationToken)
@@ -106,6 +108,7 @@ public class ProjectsController : ControllerBase
     }
 
     [HttpPatch("{id:guid}")]
+    [Authorize(Policy = Permissions.Policies.ProjectsManage)]
     public async Task<ActionResult<ProjectResponse>> Update(
         Guid id,
         [FromBody] UpdateProjectRequest? request,
@@ -128,6 +131,7 @@ public class ProjectsController : ControllerBase
     }
 
     [HttpDelete("{id:guid}")]
+    [Authorize(Policy = Permissions.Policies.ProjectsManage)]
     public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)
     {
         await _projectService.DeleteAsync(id, cancellationToken);

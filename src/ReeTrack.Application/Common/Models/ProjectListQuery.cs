@@ -11,4 +11,7 @@ public sealed class ProjectListQuery
 
     /// <summary>Case-insensitive filter on project name or client name.</summary>
     public string? Q { get; init; }
+
+    /// <summary>When true, only return projects created by the current user.</summary>
+    public bool? Mine { get; init; }
 }

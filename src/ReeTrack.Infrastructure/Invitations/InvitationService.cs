@@ -56,13 +56,13 @@ public class InvitationService : IInvitationService
                 $"{normalizedEmail} cannot be invited. Only addresses from these domains can sign in: " +
                 $"{string.Join(", ", _invitationOptions.AllowedDomains)}.");
 
-        if (roleId is not (RoleIds.Admin or RoleIds.Member))
-            throw new AppException("Role must be Admin or Member.", 400, ErrorCode.RoleInvalid);
+        if (roleId is not (RoleIds.Admin or RoleIds.Member or RoleIds.ProjectManager))
+            throw new AppException("Role must be Admin, Member, or Project Manager.");
 
         var role = await _db.Roles
             .AsNoTracking()
             .FirstOrDefaultAsync(r => r.Id == roleId, cancellationToken)
-            ?? throw new AppException("Role must be Admin or Member.", 400, ErrorCode.RoleInvalid);
+            ?? throw new AppException("Role must be Admin, Member, or Project Manager.");
 
         var existingUser = await _db.Users
             .Include(u => u.UserRoles)
@@ -203,8 +203,8 @@ public class InvitationService : IInvitationService
         if (emails.Count > maxBatchSize)
             throw AppErrors.Validation($"You can invite at most {maxBatchSize} emails at once.");
 
-        if (roleId is not (RoleIds.Admin or RoleIds.Member))
-            throw new AppException("Role must be Admin or Member.", 400, ErrorCode.RoleInvalid);
+        if (roleId is not (RoleIds.Admin or RoleIds.Member or RoleIds.ProjectManager))
+            throw new AppException("Role must be Admin, Member, or Project Manager.");
 
         var results = new List<BatchInvitationRowResult>(emails.Count);
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);

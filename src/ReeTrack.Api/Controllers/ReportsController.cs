@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ReeTrack.Api.Contracts;
 using ReeTrack.Api.Mapping;
+using ReeTrack.Application.Common.Constants;
 using ReeTrack.Application.Common.Exceptions;
 using ReeTrack.Application.Common.Interfaces;
 using ReeTrack.Application.Common.Models;
@@ -11,7 +12,7 @@ namespace ReeTrack.Api.Controllers;
 
 [ApiController]
 [Route("api/reports")]
-[Authorize(Roles = "Admin")]
+[Authorize(Policy = Permissions.Policies.ReportsView)]
 public class ReportsController : ControllerBase
 {
     private readonly IReportService _reports;

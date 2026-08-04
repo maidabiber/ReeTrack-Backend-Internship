@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using ReeTrack.Application.Common.Constants;
 using Microsoft.Extensions.Options;
 using ReeTrack.Application.Common.Exceptions;
 using ReeTrack.Application.Common.Interfaces;
@@ -16,16 +17,19 @@ public sealed class ReportEntryPipeline
 {
     private readonly IApplicationDbContext _db;
     private readonly IRateMultiplierConfigProvider _multipliers;
+    private readonly ICurrentUserService _currentUser;
     private readonly ReportOptions _options;
 
     public ReportEntryPipeline(
         IApplicationDbContext db,
         IRateMultiplierConfigProvider multipliers,
+        ICurrentUserService currentUser,
         IOptions<ReportOptions> options)
     {
         _db = db;
         _multipliers = multipliers;
         _options = options.Value;
+        _currentUser = currentUser;
     }
 
     public Task<ReportEntryData> LoadAsync(
@@ -44,6 +48,17 @@ public sealed class ReportEntryPipeline
     {
         var normalized = ReportQueryRules.NormalizeAndValidate(query);
         var selectedQuery = ApplyFilters(BaseEntryQuery(), normalized);
+
+        // PM ownership restriction: non-admin users can only see reports for
+        // projects they created.
+        if (!_currentUser.Roles.Contains(RoleNames.Admin, StringComparer.Ordinal))
+        {
+            var userId = _currentUser.UserId;
+            selectedQuery = selectedQuery.Where(entry =>
+                entry.ProjectId.HasValue
+                && entry.Project != null
+                && entry.Project.CreatedByUserId == userId);
+        }
 
         var maxEntries = Math.Max(1, _options.MaxEntriesPerReport);
         var entryCount = await selectedQuery.CountAsync(cancellationToken);

@@ -167,6 +167,104 @@ public class ReportFilteringEndpointsTests
         Assert.Equal(12.82m, Assert.Single(summary.Projects).CalculatedCost);
     }
 
+    [Fact]
+    public async Task GetSummary_AsProjectManager_OnlyShowsOwnProjects()
+    {
+        using var factory = new ReeTrackWebApplicationFactory();
+        var (pm, pmToken) = await factory.SeedProjectManagerAsync();
+        var pmClient = factory.CreateAuthenticatedClient(pmToken);
+        var date = DateOnly.FromDateTime(DateTime.UtcNow);
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var customer = new Client { Name = "Acme" };
+            db.Clients.Add(customer);
+            await db.SaveChangesAsync();
+
+            var pmProject = Project(customer.Id, pm.Id, "PM project");
+            var otherProject = Project(customer.Id, Guid.NewGuid(), "Other project");
+            db.Projects.AddRange(pmProject, otherProject);
+            await db.SaveChangesAsync();
+
+            db.TimeEntries.AddRange(
+                Entry(pm.Id, customer.Id, pmProject.Id, null, date, true, 3600),
+                Entry(pm.Id, customer.Id, otherProject.Id, null, date, true, 7200));
+            await db.SaveChangesAsync();
+        }
+
+        var summary = await pmClient.GetFromJsonAsync<SummaryResponse>("/api/reports/summary");
+
+        Assert.NotNull(summary);
+        Assert.Equal(1, summary.Kpis.EntryCount);
+        Assert.Equal(3600, summary.Kpis.TotalSeconds);
+        var project = Assert.Single(summary.Projects);
+        Assert.Equal("PM project", project.Name);
+    }
+
+    [Fact]
+    public async Task GetSummary_AsProjectManager_NoOwnProjects_ReturnsEmpty()
+    {
+        using var factory = new ReeTrackWebApplicationFactory();
+        var (pm, pmToken) = await factory.SeedProjectManagerAsync();
+        var pmClient = factory.CreateAuthenticatedClient(pmToken);
+        var date = DateOnly.FromDateTime(DateTime.UtcNow);
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var customer = new Client { Name = "Acme" };
+            db.Clients.Add(customer);
+            await db.SaveChangesAsync();
+
+            var otherProject = Project(customer.Id, Guid.NewGuid(), "Not mine");
+            db.Projects.Add(otherProject);
+            await db.SaveChangesAsync();
+
+            db.TimeEntries.Add(Entry(pm.Id, customer.Id, otherProject.Id, null, date, true, 3600));
+            await db.SaveChangesAsync();
+        }
+
+        var summary = await pmClient.GetFromJsonAsync<SummaryResponse>("/api/reports/summary");
+
+        Assert.NotNull(summary);
+        Assert.Equal(0, summary.Kpis.EntryCount);
+        Assert.Empty(summary.Projects);
+    }
+
+    [Fact]
+    public async Task GetSummary_AsAdmin_SeesAllProjects()
+    {
+        using var factory = new ReeTrackWebApplicationFactory();
+        var (admin, adminToken) = await factory.SeedAdminAsync();
+        var adminClient = factory.CreateAuthenticatedClient(adminToken);
+        var date = DateOnly.FromDateTime(DateTime.UtcNow);
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var customer = new Client { Name = "Acme" };
+            db.Clients.Add(customer);
+            await db.SaveChangesAsync();
+
+            var project1 = Project(customer.Id, admin.Id, "Admin project");
+            var project2 = Project(customer.Id, Guid.NewGuid(), "Other project");
+            db.Projects.AddRange(project1, project2);
+            await db.SaveChangesAsync();
+
+            db.TimeEntries.AddRange(
+                Entry(admin.Id, customer.Id, project1.Id, null, date, true, 3600),
+                Entry(admin.Id, customer.Id, project2.Id, null, date, true, 7200));
+            await db.SaveChangesAsync();
+        }
+
+        var summary = await adminClient.GetFromJsonAsync<SummaryResponse>("/api/reports/summary");
+
+        Assert.NotNull(summary);
+        Assert.Equal(2, summary.Kpis.EntryCount);
+        Assert.Equal(2, summary.Projects.Count);
+    }
+
     [Theory]
     [InlineData("/api/reports/summary?from=2026-07-02&to=2026-07-01")]
     [InlineData("/api/reports/summary?groupBy=unsupported")]

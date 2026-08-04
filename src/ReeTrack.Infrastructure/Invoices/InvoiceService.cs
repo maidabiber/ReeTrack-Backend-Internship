@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using ReeTrack.Application.Common.Constants;
 using ReeTrack.Application.Common.Exceptions;
 using ReeTrack.Application.Common.Interfaces;
 using ReeTrack.Application.Common.Models;
@@ -30,6 +31,9 @@ public sealed class InvoiceService : IInvoiceService
         _pipeline = pipeline;
     }
 
+    private bool IsAdmin =>
+        _currentUser.Roles.Contains(RoleNames.Admin, StringComparer.Ordinal);
+
     public async Task<InvoiceDto> GenerateAsync(
         GenerateInvoiceInput input,
         CancellationToken cancellationToken = default)
@@ -43,6 +47,7 @@ public sealed class InvoiceService : IInvoiceService
                 .FirstOrDefaultAsync(c => c.Id == query.ClientIds[0], cancellationToken)
             ?? throw new AppException("Client was not found.", 404);
 
+        // ReportEntryPipeline already scopes non-Admin users to projects they created.
         var data = await _pipeline.LoadAsync(query, cancellationToken);
         var entries = data.Entries;
         var ratesByUser = data.UserRates.ToLookup(rate => rate.UserId);
@@ -115,7 +120,7 @@ public sealed class InvoiceService : IInvoiceService
         page = Math.Max(1, page);
         pageSize = Math.Clamp(pageSize, 1, MaxPageSize);
 
-        var query = _db.Invoices.AsNoTracking();
+        var query = ApplyOwnershipFilter(_db.Invoices.AsNoTracking());
 
         if (clientId.HasValue)
             query = query.Where(invoice => invoice.ClientId == clientId.Value);
@@ -143,17 +148,17 @@ public sealed class InvoiceService : IInvoiceService
             .ToListAsync(cancellationToken);
 
         var clientIds = items.Select(invoice => invoice.ClientId).Distinct().ToList();
-        var clientMaxDates = await _db.Invoices
-            .AsNoTracking()
-            .Where(i => clientIds.Contains(i.ClientId))
+        var visibleInvoices = ApplyOwnershipFilter(_db.Invoices.AsNoTracking())
+            .Where(i => clientIds.Contains(i.ClientId));
+
+        var clientMaxDates = await visibleInvoices
             .GroupBy(i => i.ClientId)
             .Select(g => new { ClientId = g.Key, MaxDate = g.Max(x => x.CreatedAtUtc) })
             .ToListAsync(cancellationToken);
 
         var maxDates = clientMaxDates.Select(x => x.MaxDate).ToList();
-        var newestInvoices = await _db.Invoices
-            .AsNoTracking()
-            .Where(i => clientIds.Contains(i.ClientId) && maxDates.Contains(i.CreatedAtUtc))
+        var newestInvoices = await visibleInvoices
+            .Where(i => maxDates.Contains(i.CreatedAtUtc))
             .ToListAsync(cancellationToken);
 
         var newestInvoicesByClient = newestInvoices
@@ -184,8 +189,9 @@ public sealed class InvoiceService : IInvoiceService
                 .FirstOrDefaultAsync(i => i.Id == id, cancellationToken)
             ?? throw new AppException("Invoice was not found.", 404);
 
-        var newerInvoice = await _db.Invoices
-            .AsNoTracking()
+        await EnsureCanAccessAsync(invoice, cancellationToken);
+
+        var newerInvoice = await ApplyOwnershipFilter(_db.Invoices.AsNoTracking())
             .Where(i => i.ClientId == invoice.ClientId && i.CreatedAtUtc > invoice.CreatedAtUtc)
             .OrderBy(i => i.CreatedAtUtc)
             .FirstOrDefaultAsync(cancellationToken);
@@ -195,8 +201,12 @@ public sealed class InvoiceService : IInvoiceService
 
     public async Task<InvoiceDto> MarkPaidAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        var invoice = await _db.Invoices.FirstOrDefaultAsync(i => i.Id == id, cancellationToken)
+        var invoice = await _db.Invoices
+                .Include(i => i.LineItems)
+                .FirstOrDefaultAsync(i => i.Id == id, cancellationToken)
             ?? throw new AppException("Invoice was not found.", 404);
+
+        await EnsureCanAccessAsync(invoice, cancellationToken);
 
         if (invoice.Status != InvoiceStatus.Draft)
             throw new AppException("Only draft invoices can be marked as paid.", 409);
@@ -209,8 +219,12 @@ public sealed class InvoiceService : IInvoiceService
 
     public async Task DeleteAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        var invoice = await _db.Invoices.FirstOrDefaultAsync(i => i.Id == id, cancellationToken)
+        var invoice = await _db.Invoices
+                .Include(i => i.LineItems)
+                .FirstOrDefaultAsync(i => i.Id == id, cancellationToken)
             ?? throw new AppException("Invoice was not found.", 404);
+
+        await EnsureCanAccessAsync(invoice, cancellationToken);
 
         if (invoice.Status != InvoiceStatus.Draft)
             throw new AppException("Only draft invoices can be deleted.", 409);
@@ -224,6 +238,40 @@ public sealed class InvoiceService : IInvoiceService
     {
         var invoice = await GetAsync(id, cancellationToken);
         return new PdfInvoiceWriter().Write(invoice);
+    }
+
+    /// <summary>
+    /// Non-admins only see invoices whose every line item belongs to a project they created.
+    /// </summary>
+    private IQueryable<Invoice> ApplyOwnershipFilter(IQueryable<Invoice> query)
+    {
+        if (IsAdmin)
+            return query;
+
+        var userId = _currentUser.UserId;
+        return query.Where(invoice =>
+            invoice.LineItems.Any()
+            && invoice.LineItems.All(li =>
+                _db.Projects.Any(p => p.Id == li.ProjectId && p.CreatedByUserId == userId)));
+    }
+
+    private async Task EnsureCanAccessAsync(Invoice invoice, CancellationToken cancellationToken)
+    {
+        if (IsAdmin)
+            return;
+
+        var projectIds = invoice.LineItems.Select(li => li.ProjectId).Distinct().ToList();
+        if (projectIds.Count == 0)
+            throw AppErrors.Forbidden("You can only access invoices for projects you created.");
+
+        var userId = _currentUser.UserId;
+        var ownedCount = await _db.Projects.AsNoTracking()
+            .CountAsync(
+                p => projectIds.Contains(p.Id) && p.CreatedByUserId == userId,
+                cancellationToken);
+
+        if (ownedCount != projectIds.Count)
+            throw AppErrors.Forbidden("You can only access invoices for projects you created.");
     }
 
     private static string NewInvoiceNumber() =>

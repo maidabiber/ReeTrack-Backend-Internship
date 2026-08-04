@@ -409,6 +409,126 @@ public class InvoiceEndpointsTests
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
+    [Fact]
+    public async Task Generate_AsProjectManager_CreatesDraftForOwnProjectOnly()
+    {
+        using var factory = new ReeTrackWebApplicationFactory();
+        var (pm, pmToken) = await factory.SeedProjectManagerAsync();
+        var (otherPm, _) = await factory.SeedProjectManagerAsync("pm2@reetrack.test", "Other PM");
+        var client = factory.CreateAuthenticatedClient(pmToken);
+        var monday = CurrentWeek;
+        Guid clientId;
+        Guid ownProjectId;
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var customer = new Client { Name = "PM Client" };
+            db.Clients.Add(customer);
+            await db.SaveChangesAsync();
+            clientId = customer.Id;
+
+            var own = new Project
+            {
+                ClientId = customer.Id,
+                CreatedByUserId = pm.Id,
+                Name = "Own Project",
+                Status = ProjectStatus.Active,
+                CurrencyCode = "EUR",
+                HourlyRate = 80m
+            };
+            var other = new Project
+            {
+                ClientId = customer.Id,
+                CreatedByUserId = otherPm.Id,
+                Name = "Other Project",
+                Status = ProjectStatus.Active,
+                CurrencyCode = "EUR",
+                HourlyRate = 90m
+            };
+            db.Projects.AddRange(own, other);
+            await db.SaveChangesAsync();
+            ownProjectId = own.Id;
+
+            var started = monday.ToDateTime(new TimeOnly(9, 0), DateTimeKind.Utc);
+            db.TimeEntries.AddRange(
+                new TimeEntry
+                {
+                    UserId = pm.Id,
+                    ClientId = customer.Id,
+                    ProjectId = own.Id,
+                    IsBillable = true,
+                    Mode = TimeEntryMode.Manual,
+                    StartedAtUtc = started,
+                    EndedAtUtc = started.AddHours(1),
+                    DurationSeconds = 3600,
+                    Status = TimeEntryStatus.Confirmed
+                },
+                new TimeEntry
+                {
+                    UserId = otherPm.Id,
+                    ClientId = customer.Id,
+                    ProjectId = other.Id,
+                    IsBillable = true,
+                    Mode = TimeEntryMode.Manual,
+                    StartedAtUtc = started.AddHours(2),
+                    EndedAtUtc = started.AddHours(4),
+                    DurationSeconds = 7200,
+                    Status = TimeEntryStatus.Confirmed
+                });
+            await db.SaveChangesAsync();
+        }
+
+        var response = await client.PostAsJsonAsync("/api/invoices/generate", new
+        {
+            query = new
+            {
+                clientIds = new[] { clientId },
+                projectIds = Array.Empty<Guid>(),
+                from = monday,
+                to = monday.AddDays(6)
+            }
+        });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var invoice = await response.Content.ReadFromJsonAsync<InvoiceResponse>();
+        Assert.NotNull(invoice);
+        Assert.Equal(80m, invoice.Subtotal);
+        Assert.Single(invoice.LineItems);
+        Assert.All(invoice.LineItems, line => Assert.Equal(ownProjectId, line.ProjectId));
+    }
+
+    [Fact]
+    public async Task List_AsProjectManager_HidesInvoicesForOtherProjects()
+    {
+        using var factory = new ReeTrackWebApplicationFactory();
+        var (pm, pmToken) = await factory.SeedProjectManagerAsync();
+        var (otherPm, _) = await factory.SeedProjectManagerAsync("pm2@reetrack.test", "Other PM");
+        var client = factory.CreateAuthenticatedClient(pmToken);
+
+        var ownInvoiceId = await SeedInvoiceForProjectOwnerAsync(factory, pm.Id, "Own inv project");
+        var otherInvoiceId = await SeedInvoiceForProjectOwnerAsync(factory, otherPm.Id, "Other inv project");
+
+        var listed = await client.GetFromJsonAsync<PagedResult<InvoiceResponse>>("/api/invoices");
+        Assert.NotNull(listed);
+        Assert.Contains(listed.Items, item => item.Id == ownInvoiceId);
+        Assert.DoesNotContain(listed.Items, item => item.Id == otherInvoiceId);
+    }
+
+    [Fact]
+    public async Task Get_AsProjectManager_OfOtherProjectInvoice_ReturnsForbidden()
+    {
+        using var factory = new ReeTrackWebApplicationFactory();
+        var (_, pmToken) = await factory.SeedProjectManagerAsync();
+        var (otherPm, _) = await factory.SeedProjectManagerAsync("pm2@reetrack.test", "Other PM");
+        var client = factory.CreateAuthenticatedClient(pmToken);
+        var otherInvoiceId = await SeedInvoiceForProjectOwnerAsync(factory, otherPm.Id, "Hidden project");
+
+        var response = await client.GetAsync($"/api/invoices/{otherInvoiceId}");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
     private static async Task<(Guid ClientId, Guid InvoiceId)> SeedDraftInvoiceAsync(
         ReeTrackWebApplicationFactory factory,
         Guid adminId)
@@ -448,6 +568,59 @@ public class InvoiceEndpointsTests
         return (customer.Id, invoice.Id);
     }
 
+    private static async Task<Guid> SeedInvoiceForProjectOwnerAsync(
+        ReeTrackWebApplicationFactory factory,
+        Guid ownerUserId,
+        string projectName)
+    {
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var customer = new Client { Name = $"Client {Guid.NewGuid().ToString("N")[..8]}" };
+        db.Clients.Add(customer);
+        await db.SaveChangesAsync();
+
+        var project = new Project
+        {
+            ClientId = customer.Id,
+            CreatedByUserId = ownerUserId,
+            Name = projectName,
+            Status = ProjectStatus.Active,
+            CurrencyCode = "EUR",
+            HourlyRate = 50m
+        };
+        db.Projects.Add(project);
+        await db.SaveChangesAsync();
+
+        var invoice = new Invoice
+        {
+            Number = $"INV-{Guid.NewGuid().ToString("N")[..8].ToUpperInvariant()}",
+            ClientId = customer.Id,
+            ClientName = customer.Name,
+            CurrencyCode = "EUR",
+            PeriodFrom = CurrentWeek,
+            PeriodTo = CurrentWeek.AddDays(6),
+            Subtotal = 100m,
+            Status = InvoiceStatus.Draft,
+            GeneratedByUserId = ownerUserId,
+            LineItems =
+            [
+                new InvoiceLineItem
+                {
+                    ProjectId = project.Id,
+                    Description = "Owned line",
+                    BillingModel = InvoiceLineBillingModel.Hourly,
+                    Quantity = 2m,
+                    UnitPrice = 50m,
+                    Amount = 100m,
+                    SortOrder = 1
+                }
+            ]
+        };
+        db.Invoices.Add(invoice);
+        await db.SaveChangesAsync();
+        return invoice.Id;
+    }
+
     private sealed class InvoiceResponse
     {
         public Guid Id { get; init; }
@@ -463,6 +636,7 @@ public class InvoiceEndpointsTests
 
     private sealed class LineResponse
     {
+        public Guid? ProjectId { get; init; }
         public string Description { get; init; } = "";
         public string BillingModel { get; init; } = "";
         public decimal Amount { get; init; }

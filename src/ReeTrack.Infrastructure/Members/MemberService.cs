@@ -102,8 +102,8 @@ public class MemberService : IMemberService
 
         if (roleId is not null)
         {
-            if (roleId is not (RoleIds.Admin or RoleIds.Member))
-                throw new AppException("Role must be Admin or Member.", 400, ErrorCode.RoleInvalid);
+            if (roleId is not (RoleIds.Admin or RoleIds.Member or RoleIds.ProjectManager))
+                throw new AppException("Role must be Admin, Member, or Project Manager.");
 
             var currentRole = user.UserRoles.FirstOrDefault()
                 ?? throw new AppException($"User {user.Id} has no assigned role.", 500);

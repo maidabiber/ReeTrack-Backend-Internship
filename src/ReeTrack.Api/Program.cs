@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.IdentityModel.Tokens;
 using ReeTrack.Application.Common.Interfaces;
 using ReeTrack.Application.Common.Options;
+using ReeTrack.Api.Auth;
 using ReeTrack.Api.Middleware;
 using ReeTrack.Infrastructure;
 using ReeTrack.Infrastructure.Auditing;
@@ -71,7 +72,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         };
     });
 
-builder.Services.AddAuthorization();
+builder.Services.AddPermissionAuthorization();
 
 builder.Services.AddExceptionHandler<AppExceptionHandler>();
 builder.Services.AddProblemDetails();

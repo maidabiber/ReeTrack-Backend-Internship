@@ -55,6 +55,14 @@ public class RoleConfiguration : IEntityTypeConfiguration<Role>
                 Description = "Standard user access",
                 CreatedAtUtc = SeedTimestamp,
                 UpdatedAtUtc = SeedTimestamp
+            },
+            new Role
+            {
+                Id = 3,
+                Name = "ProjectManager",
+                Description = "Project and team oversight access",
+                CreatedAtUtc = SeedTimestamp,
+                UpdatedAtUtc = SeedTimestamp
             });
     }
 }

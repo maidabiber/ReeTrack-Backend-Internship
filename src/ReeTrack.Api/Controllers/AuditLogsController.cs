@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using ReeTrack.Application.Common.Constants;
 using ReeTrack.Application.Common.Interfaces;
 using ReeTrack.Application.Common.Models;
 
@@ -7,7 +8,7 @@ namespace ReeTrack.Api.Controllers;
 
 [ApiController]
 [Route("api/audit-logs")]
-[Authorize(Roles = "Admin")]
+[Authorize(Policy = Permissions.Policies.AuditLogsView)]
 public class AuditLogsController : ControllerBase
 {
     private readonly IAuditLogService _auditLogService;

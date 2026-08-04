@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ReeTrack.Api.Contracts;
 using ReeTrack.Application.Common.Exceptions;
+using ReeTrack.Application.Common.Constants;
 using ReeTrack.Application.Common.Interfaces;
 using ReeTrack.Application.Common.Models;
 using ReeTrack.Domain.Enums;
@@ -10,14 +11,16 @@ namespace ReeTrack.Api.Controllers;
 
 [ApiController]
 [Route("api/members")]
-[Authorize(Roles = "Admin")]
+[Authorize]
 public class MembersController : ControllerBase
 {
     private readonly IMemberService _memberService;
+    private readonly IPermissionService _permissions;
 
-    public MembersController(IMemberService memberService)
+    public MembersController(IMemberService memberService, IPermissionService permissions)
     {
         _memberService = memberService;
+        _permissions = permissions;
     }
 
     [HttpGet]
@@ -27,6 +30,9 @@ public class MembersController : ControllerBase
         [FromQuery] string? q = null,
         CancellationToken cancellationToken = default)
     {
+        if (!CanViewMembers())
+            return Forbid();
+
         var result = await _memberService.ListAsync(new MemberListQuery
         {
             Page = page,
@@ -44,10 +50,11 @@ public class MembersController : ControllerBase
     }
 
     [HttpPatch("{id:guid}")]
+    [Authorize(Policy = Permissions.Policies.MembersManage)]
     public async Task<ActionResult<MemberResponse>> Update(
         Guid id,
         [FromBody] UpdateMemberRequest request,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken = default)
     {
         UserStatus? status = null;
         if (request.Status is not null)
@@ -60,6 +67,10 @@ public class MembersController : ControllerBase
         var member = await _memberService.UpdateAsync(id, request.RoleId, status, cancellationToken);
         return Ok(MapMember(member));
     }
+
+    private bool CanViewMembers() =>
+        _permissions.HasPermission(Permissions.MembersManage) ||
+        _permissions.HasPermission(Permissions.BillableRatesManage);
 
     internal static MemberResponse MapMember(MemberDto member) =>
         new()

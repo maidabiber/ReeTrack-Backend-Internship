@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ReeTrack.Api.Contracts;
+using ReeTrack.Application.Common.Constants;
 using ReeTrack.Application.Common.Interfaces;
 using ReeTrack.Application.Common.Models;
 
@@ -13,13 +14,16 @@ public class UserHourlyRatesController : ControllerBase
 {
     private readonly IUserHourlyRateService _hourlyRateService;
     private readonly ICurrentUserService _currentUser;
+    private readonly IPermissionService _permissions;
 
     public UserHourlyRatesController(
         IUserHourlyRateService hourlyRateService,
-        ICurrentUserService currentUser)
+        ICurrentUserService currentUser,
+        IPermissionService permissions)
     {
         _hourlyRateService = hourlyRateService;
         _currentUser = currentUser;
+        _permissions = permissions;
     }
 
     [HttpGet]
@@ -48,7 +52,7 @@ public class UserHourlyRatesController : ControllerBase
     }
 
     [HttpPost]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Policy = Permissions.Policies.BillableRatesManage)]
     public async Task<ActionResult<UserHourlyRateResponse>> Change(
         Guid userId,
         [FromBody] ChangeUserHourlyRateRequest request,
@@ -66,7 +70,7 @@ public class UserHourlyRatesController : ControllerBase
     }
 
     [HttpPatch("{rateId:guid}")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Policy = Permissions.Policies.BillableRatesManage)]
     public async Task<ActionResult<UserHourlyRateResponse>> Correct(
         Guid userId,
         Guid rateId,
@@ -86,7 +90,8 @@ public class UserHourlyRatesController : ControllerBase
     }
 
     private bool CanViewHourlyRates(Guid userId) =>
-        _currentUser.UserId == userId || _currentUser.Roles.Contains("Admin");
+        _currentUser.UserId == userId ||
+        _permissions.HasPermission(Permissions.BillableRatesManage);
 
     internal static UserHourlyRateResponse Map(UserHourlyRateDto rate) =>
         new()

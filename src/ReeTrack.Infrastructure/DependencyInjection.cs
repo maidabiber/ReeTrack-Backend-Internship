@@ -112,6 +112,7 @@ public static class DependencyInjection
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<ISetupService, SetupService>();
         services.AddScoped<ICurrentUserService, CurrentUserService>();
+        services.AddScoped<IPermissionService, PermissionService>();
         services.AddScoped<AuditSaveChangesInterceptor>();
         services.AddScoped<IAuditLogService, AuditLogService>();
 
