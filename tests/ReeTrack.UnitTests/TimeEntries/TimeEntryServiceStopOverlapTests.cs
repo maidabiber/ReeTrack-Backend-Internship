@@ -114,6 +114,86 @@ public class TimeEntryServiceStopOverlapTests : IDisposable
         Assert.NotNull(result.Entry.EndedAtUtc);
     }
 
+    [Fact]
+    public async Task StopTimer_IgnoresDurationOnlyEntriesForOverlap()
+    {
+        var now = DateTime.UtcNow;
+        // Yesterday noon + null EndedAtUtc previously spanned until "now" and false-overlapped.
+        var entryDateUtc = now.Date.AddDays(-1).AddHours(12);
+
+        _db.TimeEntries.Add(TimeEntry.CreateDurationOnly(
+            _userId,
+            durationSeconds: 5400,
+            entryDateUtc,
+            "Duration without clock",
+            true,
+            now.AddHours(-1)));
+        await _db.SaveChangesAsync();
+
+        var timer = TimeEntry.CreateTimer(_userId, "Focus work", true, now.AddMinutes(-30));
+        _db.TimeEntries.Add(timer);
+        await _db.SaveChangesAsync();
+
+        var result = await _service.StopTimerAsync();
+
+        Assert.False(result.HasOverlap);
+        Assert.Null(result.OverlapMessage);
+        Assert.Empty(result.OverlappingEntries);
+        Assert.NotNull(result.Entry.EndedAtUtc);
+    }
+
+    [Fact]
+    public async Task CreateDurationOnly_DoesNotConflictWithManualOnSameDay()
+    {
+        var day = DateTime.UtcNow.Date;
+        var noon = day.AddHours(12);
+
+        await _service.CreateAsync(new TimeEntryInput
+        {
+            Description = "Manual midday block",
+            StartedAtUtc = noon,
+            EndedAtUtc = noon.AddHours(2),
+            IsBillable = true
+        });
+
+        var durationOnly = await _service.CreateAsync(new TimeEntryInput
+        {
+            Description = "Duration without clock",
+            EntryDateUtc = noon,
+            DurationSeconds = 5400,
+            IsBillable = true
+        });
+
+        Assert.Equal(TimeEntryMode.DurationOnly.ToString(), durationOnly.Mode);
+        Assert.Equal(5400, durationOnly.DurationSeconds);
+    }
+
+    [Fact]
+    public async Task CreateManual_DoesNotConflictWithDurationOnlyOnSameDay()
+    {
+        var day = DateTime.UtcNow.Date;
+        var noon = day.AddHours(12);
+
+        await _service.CreateAsync(new TimeEntryInput
+        {
+            Description = "Duration without clock",
+            EntryDateUtc = noon,
+            DurationSeconds = 5400,
+            IsBillable = true
+        });
+
+        var manual = await _service.CreateAsync(new TimeEntryInput
+        {
+            Description = "Manual midday block",
+            StartedAtUtc = noon,
+            EndedAtUtc = noon.AddHours(2),
+            IsBillable = true
+        });
+
+        Assert.Equal(TimeEntryMode.Manual.ToString(), manual.Mode);
+        Assert.Equal(7200, manual.DurationSeconds);
+    }
+
     private void SeedUser()
     {
         var now = DateTime.UtcNow;

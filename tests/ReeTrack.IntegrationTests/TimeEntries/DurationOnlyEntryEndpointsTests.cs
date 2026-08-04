@@ -128,6 +128,64 @@ public class DurationOnlyEntryEndpointsTests
         Assert.Equal(HttpStatusCode.Conflict, update.StatusCode);
     }
 
+    [Fact]
+    public async Task CreateDurationOnlyEntry_DoesNotConflictWithManualOnSameDay()
+    {
+        using var factory = new ReeTrackWebApplicationFactory();
+        var (_, token) = await factory.SeedAdminAsync();
+        var client = factory.CreateAuthenticatedClient(token);
+
+        var day = DateTime.UtcNow.Date;
+        var entryDateUtc = day.AddHours(12);
+
+        var manual = await client.PostAsJsonAsync("/api/time-entries", new
+        {
+            description = "Manual midday block",
+            startedAtUtc = entryDateUtc,
+            endedAtUtc = entryDateUtc.AddHours(2)
+        });
+        Assert.Equal(HttpStatusCode.OK, manual.StatusCode);
+
+        var durationOnly = await client.PostAsJsonAsync("/api/time-entries", new
+        {
+            description = "Duration without clock",
+            entryDateUtc,
+            durationSeconds = 5400
+        });
+        Assert.Equal(HttpStatusCode.OK, durationOnly.StatusCode);
+        var body = await durationOnly.Content.ReadFromJsonAsync<TimeEntryResponse>();
+        Assert.Equal("DurationOnly", body!.Mode);
+    }
+
+    [Fact]
+    public async Task CreateManualEntry_DoesNotConflictWithDurationOnlyOnSameDay()
+    {
+        using var factory = new ReeTrackWebApplicationFactory();
+        var (_, token) = await factory.SeedAdminAsync();
+        var client = factory.CreateAuthenticatedClient(token);
+
+        var day = DateTime.UtcNow.Date;
+        var entryDateUtc = day.AddHours(12);
+
+        var durationOnly = await client.PostAsJsonAsync("/api/time-entries", new
+        {
+            description = "Duration without clock",
+            entryDateUtc,
+            durationSeconds = 5400
+        });
+        Assert.Equal(HttpStatusCode.OK, durationOnly.StatusCode);
+
+        var manual = await client.PostAsJsonAsync("/api/time-entries", new
+        {
+            description = "Manual midday block",
+            startedAtUtc = entryDateUtc,
+            endedAtUtc = entryDateUtc.AddHours(2)
+        });
+        Assert.Equal(HttpStatusCode.OK, manual.StatusCode);
+        var body = await manual.Content.ReadFromJsonAsync<TimeEntryResponse>();
+        Assert.Equal("Manual", body!.Mode);
+    }
+
     private sealed class TimeEntryResponse
     {
         public Guid Id { get; set; }

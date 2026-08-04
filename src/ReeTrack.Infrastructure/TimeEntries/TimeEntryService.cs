@@ -127,8 +127,11 @@ public class TimeEntryService : ITimeEntryService
 
         await _entryGuard.EnsureEditableAsync(userId, entry.StartedAtUtc!.Value, cancellationToken);
 
-        var effectiveEnd = entry.EndedAtUtc ?? entry.StartedAtUtc!.Value.AddSeconds(entry.DurationSeconds);
-        await _overlap.EnsureNoOverlapAsync(userId, entry.StartedAtUtc!.Value, effectiveEnd, null, cancellationToken);
+        if (entry.Mode != TimeEntryMode.DurationOnly)
+        {
+            var effectiveEnd = entry.EndedAtUtc ?? entry.StartedAtUtc!.Value.AddSeconds(entry.DurationSeconds);
+            await _overlap.EnsureNoOverlapAsync(userId, entry.StartedAtUtc!.Value, effectiveEnd, null, cancellationToken);
+        }
 
         var entryDate = entry.GetEntryDate();
         await _dailyBudget.EnsureWithinBudgetAsync(userId, entryDate, entry.DurationSeconds, null, cancellationToken);

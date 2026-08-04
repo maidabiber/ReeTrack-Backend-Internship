@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using ReeTrack.Application.Common.Exceptions;
 using ReeTrack.Application.Common.Interfaces;
 using ReeTrack.Application.Common.Models;
+using ReeTrack.Domain.Enums;
 
 namespace ReeTrack.Infrastructure.TimeEntries;
 
@@ -39,6 +40,7 @@ public class TimeEntryOverlapChecker : ITimeEntryOverlapChecker
         var overlapping = await _db.TimeEntries
             .AsNoTracking()
             .Where(e => e.UserId == userId && e.StartedAtUtc != null)
+            .Where(e => e.Mode != TimeEntryMode.DurationOnly)
             .Where(e => excludeEntryId == null || e.Id != excludeEntryId)
             .Where(e =>
                 e.StartedAtUtc < endedAtUtc &&
