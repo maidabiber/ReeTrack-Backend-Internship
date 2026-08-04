@@ -241,23 +241,6 @@ public class TimeEntryService : ITimeEntryService
         foreach (var assignee in resolvedAssignees)
             await _entryGuard.EnsureEditableAsync(assignee.Id, source.StartedAtUtc.Value, cancellationToken);
 
-        if (source.Mode != TimeEntryMode.DurationOnly && source.EndedAtUtc is not null)
-        {
-            foreach (var assignee in resolvedAssignees)
-            {
-                var overlapMsg = await TimeEntryHelpers.FindOverlapMessageAsync(
-                    _db, assignee.Id, source.StartedAtUtc.Value, source.EndedAtUtc.Value, null, cancellationToken);
-                if (overlapMsg is not null)
-                    throw new AppException(overlapMsg, 409, ErrorCode.EntryOverlap);
-            }
-        }
-
-        foreach (var assignee in resolvedAssignees)
-        {
-            await _dailyBudget.EnsureWithinBudgetAsync(
-                assignee.Id, source.GetEntryDate(), source.DurationSeconds, null, cancellationToken);
-        }
-
         var shareGroupId = source.ShareGroupId ?? Guid.NewGuid();
         var now = DateTime.UtcNow;
 
@@ -316,8 +299,12 @@ public class TimeEntryService : ITimeEntryService
 
     public async Task<TimeEntryDto> ApprovePendingEntryAsync(
         Guid entryId,
+        TimeEntryInput? input = null,
         CancellationToken cancellationToken = default)
     {
+        if (input is not null)
+            await UpdateAsync(entryId, input, cancellationToken);
+
         var userId = _currentUser.UserId;
         var entry = await _db.TimeEntries
             .Include(e => e.SubmittedByUser)
@@ -330,6 +317,25 @@ public class TimeEntryService : ITimeEntryService
         if (entry.StartedAtUtc is not null)
             await _entryGuard.EnsureEditableAsync(entry.UserId, entry.StartedAtUtc.Value, cancellationToken);
 
+        if (entry.Mode != TimeEntryMode.DurationOnly &&
+            entry.StartedAtUtc is not null &&
+            entry.EndedAtUtc is not null)
+        {
+            await _overlap.EnsureNoOverlapAsync(
+                userId,
+                entry.StartedAtUtc.Value,
+                entry.EndedAtUtc.Value,
+                entry.Id,
+                cancellationToken);
+        }
+
+        await _dailyBudget.EnsureWithinBudgetAsync(
+            userId,
+            entry.GetEntryDate(),
+            entry.DurationSeconds,
+            entry.Id,
+            cancellationToken);
+
         entry.Status = TimeEntryStatus.Confirmed;
         entry.UpdatedAtUtc = DateTime.UtcNow;
 
@@ -339,6 +345,24 @@ public class TimeEntryService : ITimeEntryService
             entry,
             entry.SubmittedByUser?.DisplayName ?? entry.SubmittedByUser?.Email,
             entry.User.DisplayName ?? entry.User.Email);
+    }
+
+    public async Task RejectPendingEntryAsync(
+        Guid entryId,
+        CancellationToken cancellationToken = default)
+    {
+        var userId = _currentUser.UserId;
+        var entry = await _db.TimeEntries
+            .FirstOrDefaultAsync(
+                e => e.Id == entryId && e.UserId == userId && e.Status == TimeEntryStatus.Pending,
+                cancellationToken)
+            ?? throw AppErrors.NotFound("Pending time entry");
+
+        var now = DateTime.UtcNow;
+        entry.DeletedAtUtc = now;
+        entry.UpdatedAtUtc = now;
+
+        await _db.SaveChangesAsync(cancellationToken);
     }
 
     public async Task<IReadOnlyList<TimeEntryDto>> ListAsync(CancellationToken cancellationToken = default)

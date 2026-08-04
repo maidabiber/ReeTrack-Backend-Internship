@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 using ReeTrack.Api.Contracts;
 using ReeTrack.Application.Common.Interfaces;
 using ReeTrack.Application.Common.Models;
@@ -147,10 +148,21 @@ public class TimeEntriesController : ControllerBase
     [HttpPost("pending/{id:guid}/approve")]
     public async Task<ActionResult<TimeEntryResponse>> ApprovePending(
         Guid id,
+        [FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] TimeEntryRequest? request,
         CancellationToken cancellationToken)
     {
-        var entry = await _timeEntryService.ApprovePendingEntryAsync(id, cancellationToken);
+        var input = request is null ? null : ToInput(request);
+        var entry = await _timeEntryService.ApprovePendingEntryAsync(id, input, cancellationToken);
         return Ok(MapTimeEntry(entry));
+    }
+
+    [HttpPost("pending/{id:guid}/reject")]
+    public async Task<IActionResult> RejectPending(
+        Guid id,
+        CancellationToken cancellationToken)
+    {
+        await _timeEntryService.RejectPendingEntryAsync(id, cancellationToken);
+        return NoContent();
     }
 
     private static IReadOnlyList<Guid> ResolveAssigneeUserIds(TimeEntryRequest? request)

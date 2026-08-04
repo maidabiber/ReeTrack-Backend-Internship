@@ -33,6 +33,11 @@ public interface ITimeEntryService
 
     Task<TimeEntryDto> ApprovePendingEntryAsync(
         Guid entryId,
+        TimeEntryInput? input = null,
+        CancellationToken cancellationToken = default);
+
+    Task RejectPendingEntryAsync(
+        Guid entryId,
         CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<TimeEntryDto>> ListAsync(CancellationToken cancellationToken = default);

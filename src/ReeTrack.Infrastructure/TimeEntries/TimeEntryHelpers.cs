@@ -8,41 +8,6 @@ internal static class TimeEntryHelpers
 {
     public const int MaxDurationSeconds = 24 * 60 * 60;
 
-    public static async Task<string?> FindOverlapMessageAsync(
-        IApplicationDbContext db,
-        Guid userId,
-        DateTime startedAtUtc,
-        DateTime endedAtUtc,
-        Guid? excludeEntryId,
-        CancellationToken cancellationToken)
-    {
-        var now = DateTime.UtcNow;
-        var overlapping = await db.TimeEntries
-            .AsNoTracking()
-            .Where(e => e.UserId == userId && e.StartedAtUtc != null)
-            .Where(e => excludeEntryId == null || e.Id != excludeEntryId)
-            .Where(e =>
-                e.StartedAtUtc < endedAtUtc &&
-                (e.EndedAtUtc ?? now) > startedAtUtc)
-            .OrderBy(e => e.StartedAtUtc)
-            .Take(3)
-            .ToListAsync(cancellationToken);
-
-        if (overlapping.Count == 0)
-            return null;
-
-        var labels = overlapping
-            .Select(e => e.Description?.Trim())
-            .Where(label => !string.IsNullOrWhiteSpace(label))
-            .Take(2)
-            .ToList();
-
-        if (labels.Count > 0)
-            return $"This entry overlaps with: {string.Join(", ", labels)}.";
-
-        return "This entry overlaps with an existing time entry.";
-    }
-
     public static async Task<IReadOnlyDictionary<Guid, List<TimeEntry>>> LoadShareGroupsAsync(
         IApplicationDbContext db,
         IReadOnlyList<TimeEntry> entries,
