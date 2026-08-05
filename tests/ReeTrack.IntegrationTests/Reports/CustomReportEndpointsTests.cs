@@ -152,6 +152,43 @@ public class CustomReportEndpointsTests
     }
 
     [Fact]
+    public async Task Run_AsProjectManager_OnlyShowsOwnProjects()
+    {
+        using var factory = new ReeTrackWebApplicationFactory();
+        var (pm, pmToken) = await factory.SeedProjectManagerAsync();
+        var client = factory.CreateAuthenticatedClient(pmToken);
+
+        var clientId = await SeedClientAsync(factory, "PmAcme");
+        var pmProjectId = await SeedProjectAsync(factory, clientId, "PmOwned", hourlyRate: 50m, createdByUserId: pm.Id);
+        var otherProjectId = await SeedProjectAsync(factory, clientId, "NotPmOwned", hourlyRate: 50m, createdByUserId: Guid.NewGuid());
+
+        var monday = CurrentWeek.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+        await SeedEntryAsync(factory, pm.Id, pmProjectId, monday.AddHours(9), 3600, isBillable: true);
+        await SeedEntryAsync(factory, pm.Id, otherProjectId, monday.AddHours(13), 7200, isBillable: true);
+
+        var body = new
+        {
+            spec = new
+            {
+                version = 1,
+                query = new { },
+                blocks = new object[]
+                {
+                    new { type = "kpi", id = "b1", metrics = new[] { "totalHours", "entryCount" } }
+                }
+            }
+        };
+
+        var response = await client.PostAsJsonAsync("/api/reports/custom/run", body, JsonOptions);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var kpis = doc.RootElement.GetProperty("kpis");
+        Assert.Equal(3600, kpis.GetProperty("totalSeconds").GetInt64());
+        Assert.Equal(1, kpis.GetProperty("entryCount").GetInt32());
+    }
+
+    [Fact]
     public async Task Run_IncompatibleMetric_ReturnsValidation()
     {
         using var factory = new ReeTrackWebApplicationFactory();
@@ -178,6 +215,101 @@ public class CustomReportEndpointsTests
         };
 
         var response = await client.PostAsJsonAsync("/api/reports/custom/run", body, JsonOptions);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Theory]
+    [InlineData("csv", "text/csv", new byte[] { 0xEF, 0xBB, 0xBF })]
+    [InlineData("xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", new byte[] { (byte)'P', (byte)'K' })]
+    [InlineData("pdf", "application/pdf", new byte[] { (byte)'%', (byte)'P', (byte)'D', (byte)'F' })]
+    public async Task Export_AsAdmin_ReturnsFile(
+        string format,
+        string contentType,
+        byte[] magic)
+    {
+        using var factory = new ReeTrackWebApplicationFactory();
+        var (admin, token) = await factory.SeedAdminAsync();
+        var client = factory.CreateAuthenticatedClient(token);
+
+        var clientId = await SeedClientAsync(factory, "ExportAcme");
+        var projectId = await SeedProjectAsync(factory, clientId, "ExportAlpha", hourlyRate: 50m);
+        var monday = CurrentWeek.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+        await SeedEntryAsync(factory, admin.Id, projectId, monday.AddHours(9), 3600, isBillable: true);
+
+        var body = new
+        {
+            spec = new
+            {
+                version = 1,
+                query = new { },
+                blocks = new object[]
+                {
+                    new { type = "kpi", id = "b1", metrics = new[] { "totalHours", "entryCount" } },
+                    new
+                    {
+                        type = "breakdown",
+                        id = "b2",
+                        title = "By client",
+                        dimensions = new[] { "client" },
+                        metrics = new[] { "totalHours" },
+                        showTotals = true
+                    }
+                }
+            }
+        };
+
+        var response = await client.PostAsJsonAsync(
+            $"/api/reports/custom/export?format={format}",
+            body,
+            JsonOptions);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(contentType, response.Content.Headers.ContentType?.MediaType);
+        Assert.StartsWith("reetrack-custom_", response.Content.Headers.ContentDisposition?.FileName?.Trim('"'));
+        var bytes = await response.Content.ReadAsByteArrayAsync();
+        Assert.Equal(magic, bytes.Take(magic.Length).ToArray());
+    }
+
+    [Fact]
+    public async Task Export_InvalidFormat_ReturnsBadRequest()
+    {
+        using var factory = new ReeTrackWebApplicationFactory();
+        var (_, token) = await factory.SeedAdminAsync();
+        var client = factory.CreateAuthenticatedClient(token);
+
+        var body = new
+        {
+            spec = new
+            {
+                version = 1,
+                query = new { },
+                blocks = new object[]
+                {
+                    new { type = "kpi", id = "b1", metrics = new[] { "totalHours" } }
+                }
+            }
+        };
+
+        var response = await client.PostAsJsonAsync(
+            "/api/reports/custom/export?format=docx",
+            body,
+            JsonOptions);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Export_NullBody_ReturnsBadRequestNotServerError()
+    {
+        using var factory = new ReeTrackWebApplicationFactory();
+        var (_, token) = await factory.SeedAdminAsync();
+        var client = factory.CreateAuthenticatedClient(token);
+
+        var response = await client.PostAsJsonAsync<object?>(
+            "/api/reports/custom/export?format=csv",
+            null,
+            JsonOptions);
+
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
@@ -237,7 +369,8 @@ public class CustomReportEndpointsTests
         ReeTrackWebApplicationFactory factory,
         Guid clientId,
         string name,
-        decimal hourlyRate)
+        decimal hourlyRate,
+        Guid? createdByUserId = null)
     {
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -247,7 +380,8 @@ public class CustomReportEndpointsTests
             Name = name,
             Status = ProjectStatus.Active,
             HourlyRate = hourlyRate,
-            CurrencyCode = "EUR"
+            CurrencyCode = "EUR",
+            CreatedByUserId = createdByUserId ?? Guid.NewGuid()
         };
         db.Projects.Add(project);
         await db.SaveChangesAsync();

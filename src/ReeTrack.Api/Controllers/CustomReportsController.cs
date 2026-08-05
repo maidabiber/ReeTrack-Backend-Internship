@@ -1,22 +1,28 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ReeTrack.Api.Contracts;
+using ReeTrack.Application.Common.Constants;
 using ReeTrack.Application.Common.Exceptions;
 using ReeTrack.Application.Common.Interfaces;
+using ReeTrack.Application.Common.Models;
 using ReeTrack.Application.Common.Models.CustomReports;
 
 namespace ReeTrack.Api.Controllers;
 
 [ApiController]
 [Route("api/reports/custom")]
-[Authorize(Roles = "Admin")]
+[Authorize(Policy = Permissions.Policies.ReportsView)]
 public sealed class CustomReportsController : ControllerBase
 {
     private readonly ICustomReportService _customReports;
+    private readonly ICustomReportDefinitionService _definitions;
 
-    public CustomReportsController(ICustomReportService customReports)
+    public CustomReportsController(
+        ICustomReportService customReports,
+        ICustomReportDefinitionService definitions)
     {
         _customReports = customReports;
+        _definitions = definitions;
     }
 
     [HttpGet("catalogue")]
@@ -44,6 +50,150 @@ public sealed class CustomReportsController : ControllerBase
 
         var report = await _customReports.RunAsync(request.Spec, cancellationToken);
         return Ok(Map(report));
+    }
+
+    [HttpPost("export")]
+    public async Task<IActionResult> Export(
+        [FromQuery] string format,
+        [FromBody] CustomReportRunRequest? request,
+        CancellationToken cancellationToken)
+    {
+        if (!TryParseFormat(format, out var parsed))
+            throw new AppException("format must be csv, xlsx, or pdf.", 400, ErrorCode.ExportFormatInvalid);
+
+        // Matches /run: an absent body binds to null before `required` validation runs, which
+        // would otherwise be a 500.
+        if (request?.Spec is null)
+            throw AppErrors.Validation("Custom report spec is required.");
+
+        var file = await _customReports.ExportAsync(request.Spec, parsed, cancellationToken);
+        return File(file.Bytes, file.ContentType, file.FileName);
+    }
+
+    [HttpGet("definitions")]
+    public async Task<ActionResult<PagedResult<CustomReportDefinitionResponse>>> ListDefinitions(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 50,
+        [FromQuery] string? owner = null,
+        CancellationToken cancellationToken = default)
+    {
+        var ownerFilter = ParseOwnerFilter(owner);
+        var result = await _definitions.ListAsync(page, pageSize, ownerFilter, cancellationToken);
+        return Ok(new PagedResult<CustomReportDefinitionResponse>
+        {
+            Items = result.Items.Select(MapDefinition).ToList(),
+            TotalCount = result.TotalCount,
+            Page = result.Page,
+            PageSize = result.PageSize
+        });
+    }
+
+    [HttpGet("definitions/{id:guid}")]
+    public async Task<ActionResult<CustomReportDefinitionResponse>> GetDefinition(
+        Guid id,
+        CancellationToken cancellationToken)
+    {
+        var definition = await _definitions.GetByIdAsync(id, cancellationToken);
+        return Ok(MapDefinition(definition));
+    }
+
+    [HttpPost("definitions")]
+    public async Task<ActionResult<CustomReportDefinitionResponse>> CreateDefinition(
+        [FromBody] SaveCustomReportDefinitionRequest? request,
+        CancellationToken cancellationToken)
+    {
+        if (request?.Spec is null)
+            throw AppErrors.Validation("Custom report spec is required.");
+
+        var definition = await _definitions.CreateAsync(
+            request.Name,
+            request.Description,
+            request.Spec,
+            request.Visibility,
+            cancellationToken);
+
+        return Ok(MapDefinition(definition));
+    }
+
+    [HttpPut("definitions/{id:guid}")]
+    public async Task<ActionResult<CustomReportDefinitionResponse>> UpdateDefinition(
+        Guid id,
+        [FromBody] SaveCustomReportDefinitionRequest? request,
+        CancellationToken cancellationToken)
+    {
+        if (request?.Spec is null)
+            throw AppErrors.Validation("Custom report spec is required.");
+
+        var definition = await _definitions.UpdateAsync(
+            id,
+            request.Name,
+            request.Description,
+            request.Spec,
+            request.Visibility,
+            cancellationToken);
+
+        return Ok(MapDefinition(definition));
+    }
+
+    [HttpPost("definitions/{id:guid}/duplicate")]
+    public async Task<ActionResult<CustomReportDefinitionResponse>> DuplicateDefinition(
+        Guid id,
+        CancellationToken cancellationToken)
+    {
+        var definition = await _definitions.DuplicateAsync(id, cancellationToken);
+        return Ok(MapDefinition(definition));
+    }
+
+    [HttpDelete("definitions/{id:guid}")]
+    public async Task<IActionResult> DeleteDefinition(Guid id, CancellationToken cancellationToken)
+    {
+        await _definitions.DeleteAsync(id, cancellationToken);
+        return NoContent();
+    }
+
+    private static CustomReportOwnerFilter? ParseOwnerFilter(string? owner) => owner?.Trim().ToLowerInvariant() switch
+    {
+        "mine" => CustomReportOwnerFilter.Mine,
+        "shared" => CustomReportOwnerFilter.Shared,
+        _ => null
+    };
+
+    private static CustomReportDefinitionResponse MapDefinition(CustomReportDefinitionDto definition) =>
+        new()
+        {
+            Id = definition.Id,
+            Name = definition.Name,
+            Description = definition.Description,
+            Spec = definition.Spec,
+            SchemaVersion = definition.SchemaVersion,
+            CreatedByUserId = definition.CreatedByUserId,
+            Visibility = definition.Visibility,
+            CreatedAtUtc = definition.CreatedAtUtc,
+            UpdatedAtUtc = definition.UpdatedAtUtc,
+            CanEdit = definition.CanEdit
+        };
+
+    private static bool TryParseFormat(string? format, out ReportExportFormat parsed)
+    {
+        parsed = default;
+        if (string.IsNullOrWhiteSpace(format))
+            return false;
+
+        switch (format.Trim().ToLowerInvariant())
+        {
+            case "csv":
+                parsed = ReportExportFormat.Csv;
+                return true;
+            case "xlsx":
+            case "excel":
+                parsed = ReportExportFormat.Xlsx;
+                return true;
+            case "pdf":
+                parsed = ReportExportFormat.Pdf;
+                return true;
+            default:
+                return false;
+        }
     }
 
     private static CustomReportRunResponse Map(CustomReportDto dto) =>

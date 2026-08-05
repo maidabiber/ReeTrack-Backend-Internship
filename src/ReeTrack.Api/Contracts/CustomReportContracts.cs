@@ -1,4 +1,5 @@
 using ReeTrack.Application.Common.Models.CustomReports;
+using ReeTrack.Domain.Enums;
 
 namespace ReeTrack.Api.Contracts;
 
@@ -32,4 +33,26 @@ public sealed class CustomReportCatalogueResponse
     public required IReadOnlyList<BlockTypeCatalogueItemDto> BlockTypes { get; init; }
     public required IReadOnlyList<EntryColumnCatalogueItemDto> EntryColumns { get; init; }
     public required IReadOnlyList<string> Operators { get; init; }
+}
+
+public sealed class SaveCustomReportDefinitionRequest
+{
+    public string? Name { get; init; }
+    public string? Description { get; init; }
+    public required CustomReportSpec Spec { get; init; }
+    public CustomReportVisibility Visibility { get; init; } = CustomReportVisibility.Shared;
+}
+
+public sealed class CustomReportDefinitionResponse
+{
+    public required Guid Id { get; init; }
+    public required string Name { get; init; }
+    public string? Description { get; init; }
+    public required CustomReportSpec Spec { get; init; }
+    public required int SchemaVersion { get; init; }
+    public required Guid CreatedByUserId { get; init; }
+    public required CustomReportVisibility Visibility { get; init; }
+    public required DateTime CreatedAtUtc { get; init; }
+    public required DateTime UpdatedAtUtc { get; init; }
+    public bool CanEdit { get; init; }
 }

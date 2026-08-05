@@ -16,6 +16,9 @@ internal static class ReportFileNames
     public static string ForProfitability(ReportExportFormat format, DateTime generatedAtUtc) =>
         For("profitability", format, generatedAtUtc);
 
+    public static string ForCustom(ReportExportFormat format, DateTime generatedAtUtc) =>
+        For("custom", format, generatedAtUtc);
+
     private static string For(string kind, ReportExportFormat format, DateTime generatedAtUtc)
     {
         var date = generatedAtUtc.ToString("yyyyMMdd");

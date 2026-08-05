@@ -1,3 +1,4 @@
+using ReeTrack.Application.Common.Exceptions;
 using ReeTrack.Application.Common.Interfaces;
 using ReeTrack.Application.Common.Models;
 using ReeTrack.Application.Common.Models.CustomReports;
@@ -13,17 +14,23 @@ public sealed class CustomReportService : ICustomReportService
     private readonly IProjectCostCalculator _calculator;
     private readonly IApplicationDbContext _db;
     private readonly ICurrentUserService _currentUser;
+    private readonly IReadOnlyDictionary<ReportExportFormat, IReportWriter<CustomReportDto>> _writers;
+    private readonly CustomReportRunCache _runCache;
 
     public CustomReportService(
         ReportEntryPipeline pipeline,
         IProjectCostCalculator calculator,
         IApplicationDbContext db,
-        ICurrentUserService currentUser)
+        ICurrentUserService currentUser,
+        IEnumerable<IReportWriter<CustomReportDto>> writers,
+        CustomReportRunCache runCache)
     {
         _pipeline = pipeline;
         _calculator = calculator;
         _db = db;
         _currentUser = currentUser;
+        _writers = writers.ToDictionary(w => w.Format);
+        _runCache = runCache;
     }
 
     public CustomReportCatalogueDto GetCatalogue() =>
@@ -100,7 +107,7 @@ public sealed class CustomReportService : ICustomReportService
         var schedule = ComputeScheduleHours(context.Rows, costLoaded: needsCost || needsProjects);
         var generatedAt = DateTime.UtcNow;
 
-        return new CustomReportDto
+        var report = new CustomReportDto
         {
             Kpis = new ReportKpisDto
             {
@@ -131,6 +138,31 @@ public sealed class CustomReportService : ICustomReportService
             Blocks = blocks,
             Warnings = []
         };
+
+        _runCache.Set(_currentUser.UserId, CustomReportFingerprint.ComputeCacheKey(spec), report);
+        return report;
+    }
+
+    public async Task<CustomReportDto> GetOrRunAsync(
+        CustomReportSpec spec,
+        CancellationToken cancellationToken = default)
+    {
+        if (_runCache.TryGet(_currentUser.UserId, CustomReportFingerprint.ComputeCacheKey(spec), out var cached))
+            return cached;
+
+        return await RunAsync(spec, cancellationToken);
+    }
+
+    public async Task<ReportFile> ExportAsync(
+        CustomReportSpec spec,
+        ReportExportFormat format,
+        CancellationToken cancellationToken = default)
+    {
+        if (!_writers.TryGetValue(format, out var writer))
+            throw new AppException($"Unsupported export format '{format}'.", 400, ErrorCode.ExportFormatInvalid);
+
+        var model = await GetOrRunAsync(spec, cancellationToken);
+        return writer.Write(model);
     }
 
     private static IReadOnlyList<ReportBlockResult> ApplyPctOfTotal(

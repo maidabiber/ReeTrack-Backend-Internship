@@ -37,6 +37,7 @@ public class AppDbContext : DbContext, IApplicationDbContext
     public DbSet<WeeklyTargetCheckInRun> WeeklyTargetCheckInRuns => Set<WeeklyTargetCheckInRun>();
     public DbSet<NotificationPreference> NotificationPreferences => Set<NotificationPreference>();
     public DbSet<ReportFilterSet> ReportFilterSets => Set<ReportFilterSet>();
+    public DbSet<CustomReportDefinition> CustomReportDefinitions => Set<CustomReportDefinition>();
     public DbSet<InAppNotification> InAppNotifications => Set<InAppNotification>();
     public DbSet<Invoice> Invoices => Set<Invoice>();
     public DbSet<InvoiceLineItem> InvoiceLineItems => Set<InvoiceLineItem>();

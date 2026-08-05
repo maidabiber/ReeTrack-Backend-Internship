@@ -1,5 +1,6 @@
 using System.Globalization;
 using ReeTrack.Application.Common.Models;
+using ReeTrack.Application.Common.Models.CustomReports;
 using ReeTrack.Application.Reports;
 
 namespace ReeTrack.Infrastructure.Reports.Writers;
@@ -80,6 +81,12 @@ public static class ReportFormat
 
     public static string PeriodLabel(ProfitabilityReportDto model) =>
         PeriodLabel(model.FilterFromDate, model.FilterToDate, model.FirstEntryDate, model.GeneratedAtUtc);
+
+    public static string PeriodLabel(CustomReportDto model) =>
+        PeriodLabel(model.FilterFromDate, model.FilterToDate, model.FirstEntryDate, model.GeneratedAtUtc);
+
+    public static IReadOnlyList<string> CustomBasisLines(ReportBasisDto basis) =>
+        SummaryBasisLines(basis);
 
     public static string PeriodLabel(
         DateOnly? filterFrom,

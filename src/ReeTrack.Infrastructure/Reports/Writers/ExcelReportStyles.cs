@@ -50,4 +50,18 @@ internal static class ExcelReportStyles
 
     public static void Zebra(IXLRange range) =>
         range.Style.Fill.BackgroundColor = XLColor.FromHtml(ReportColors.SurfaceMuted);
+
+    /// <summary>A grouped table's section header row — bold, no fill, so it reads as a label, not data.</summary>
+    public static void StyleGroupHeader(IXLRange range)
+    {
+        range.Style.Font.Bold = true;
+        range.Style.Font.FontColor = XLColor.FromHtml(ReportColors.Navy);
+    }
+
+    /// <summary>A grouped table's subtotal row — bold and shaded, distinct from the zebra stripe on detail rows.</summary>
+    public static void StyleGroupSubtotal(IXLRange range)
+    {
+        range.Style.Font.Bold = true;
+        range.Style.Fill.BackgroundColor = XLColor.FromHtml(ReportColors.HeaderGrayBg);
+    }
 }

@@ -31,6 +31,7 @@ public interface IApplicationDbContext
     DbSet<WeeklyTargetCheckInRun> WeeklyTargetCheckInRuns { get; }
     DbSet<NotificationPreference> NotificationPreferences { get; }
     DbSet<ReportFilterSet> ReportFilterSets { get; }
+    DbSet<CustomReportDefinition> CustomReportDefinitions { get; }
     DbSet<InAppNotification> InAppNotifications { get; }
     DbSet<Invoice> Invoices { get; }
     DbSet<InvoiceLineItem> InvoiceLineItems { get; }

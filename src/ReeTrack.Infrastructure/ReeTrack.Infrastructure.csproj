@@ -12,6 +12,10 @@
 
   <ItemGroup>
     <PackageReference Include="ClosedXML" Version="0.105.0" />
+    <!-- ClosedXML depends on this transitively to read/write .xlsx packages; pinned
+         explicitly because ExcelChartInjector opens the saved package with it directly
+         to inject native charts, so a future ClosedXML bump cannot silently move it. -->
+    <PackageReference Include="DocumentFormat.OpenXml" Version="3.1.1" />
     <PackageReference Include="Google.Apis.Auth" Version="1.73.0" />
     <PackageReference Include="MailKit" Version="4.17.0" />
     <PackageReference Include="Google.Apis.Calendar.v3" Version="1.68.0.3536" />
