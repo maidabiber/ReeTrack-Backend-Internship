@@ -85,6 +85,7 @@ builder.Services.AddControllers()
     });
 builder.Services.AddSignalR();
 builder.Services.AddScoped<IInAppNotificationRealtimePublisher, SignalRInAppNotificationRealtimePublisher>();
+builder.Services.AddScoped<ReeTrack.Application.Overview.IOverviewRealtimePublisher, SignalROverviewRealtimePublisher>();
 builder.Services.AddOpenApi();
 
 var frontendOrigin = builder.Configuration["Frontend:Origin"] ?? "http://localhost:5173";
@@ -117,6 +118,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 app.MapHub<NotificationHub>("/hubs/notifications");
+app.MapHub<OverviewHub>("/hubs/overview");
 app.MapGet("/api/health", () => Results.Ok(new { status = "ok" }));
 
 app.Run();

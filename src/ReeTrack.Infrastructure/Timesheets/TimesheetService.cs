@@ -15,7 +15,9 @@ public class TimesheetService : ITimesheetService
     private readonly IApplicationDbContext _db;
     private readonly ICurrentUserService _currentUser;
 
-    public TimesheetService(IApplicationDbContext db, ICurrentUserService currentUser)
+    public TimesheetService(
+        IApplicationDbContext db,
+        ICurrentUserService currentUser)
     {
         _db = db;
         _currentUser = currentUser;

@@ -155,6 +155,7 @@ public static class DependencyInjection
         services.AddScoped<IProjectThresholdDeliveryService, ProjectThresholdDeliveryService>();
         services.AddScoped<IProjectThresholdRecipientResolver, ProjectThresholdRecipientResolver>();
         services.AddScoped<IReportService, ReportService>();
+        services.AddScoped<IOverviewService, Overview.OverviewService>();
         services.AddSingleton<CustomReportRunCache>();
         services.AddScoped<ICustomReportService, CustomReportService>();
         services.AddScoped<ICustomReportDefinitionService, CustomReportDefinitionService>();

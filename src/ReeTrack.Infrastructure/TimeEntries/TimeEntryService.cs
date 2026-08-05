@@ -4,6 +4,7 @@ using ReeTrack.Application.Common.Interfaces;
 using ReeTrack.Application.Common.Models;
 using ReeTrack.Application.Notifications;
 using ReeTrack.Application.Notifications.Events;
+using ReeTrack.Application.Overview.Events;
 using ReeTrack.Domain.Entities;
 using ReeTrack.Domain.Enums;
 using ReeTrack.Domain.ValueObjects;
@@ -63,6 +64,14 @@ public class TimeEntryService : ITimeEntryService
 
         entry.UpdatedAtUtc = DateTime.UtcNow;
         await _db.SaveChangesAsync(cancellationToken);
+
+        var addedSeconds = (long)(entry.EndedAtUtc!.Value - entry.StartedAtUtc!.Value).TotalSeconds;
+        _ = _eventPublisher.PublishAsync(new TimeEntryTimerStopped
+        {
+            TimeEntryId = entry.Id,
+            UserId = userId,
+            AddedSeconds = addedSeconds
+        });
 
         var overlapping = await _overlap.FindOverlapsAsync(
             userId,
@@ -146,6 +155,16 @@ public class TimeEntryService : ITimeEntryService
         catch (DbUpdateException)
         {
             throw new AppException("A timer is already running.", 409, ErrorCode.AlreadyRunning);
+        }
+
+        if (entry.Mode == TimeEntryMode.Timer)
+        {
+            _ = _eventPublisher.PublishAsync(new TimeEntryTimerStarted
+            {
+                TimeEntryId = entry.Id,
+                UserId = userId,
+                StartedAtUtc = entry.StartedAtUtc ?? now
+            });
         }
 
         return MapEntity(entry);
