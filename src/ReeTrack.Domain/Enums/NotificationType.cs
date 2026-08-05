@@ -5,7 +5,7 @@ namespace ReeTrack.Domain.Enums;
 /// </summary>
 public enum NotificationType : short
 {
-    ProjectCostAlert = 0,
+    ProjectThresholdAlert = 0,
     TimeGoalMissed = 1,
     TimeEntryShared = 2,
     TimesheetDecision = 3,

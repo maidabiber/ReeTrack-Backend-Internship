@@ -35,6 +35,8 @@ public interface IApplicationDbContext
     DbSet<InAppNotification> InAppNotifications { get; }
     DbSet<Invoice> Invoices { get; }
     DbSet<InvoiceLineItem> InvoiceLineItems { get; }
+    DbSet<ProjectThreshold> ProjectThresholds { get; }
+    DbSet<PendingProjectAlert> PendingProjectAlerts { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

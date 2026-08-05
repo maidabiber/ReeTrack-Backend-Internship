@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using ReeTrack.Infrastructure.Persistence;
@@ -11,9 +12,11 @@ using ReeTrack.Infrastructure.Persistence;
 namespace ReeTrack.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260804113329_AddProjectThresholds")]
+    partial class AddProjectThresholds
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -112,76 +115,6 @@ namespace ReeTrack.Infrastructure.Persistence.Migrations
                             Name = "Euro",
                             UpdatedAtUtc = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         });
-                });
-
-            modelBuilder.Entity("ReeTrack.Domain.Entities.CustomReportDefinition", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id")
-                        .HasDefaultValueSql("gen_random_uuid()");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at_utc");
-
-                    b.Property<Guid>("CreatedByUserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("created_by_user_id");
-
-                    b.Property<DateTime?>("DeletedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("deleted_at_utc");
-
-                    b.Property<Guid?>("DeletedByUserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("deleted_by_user_id");
-
-                    b.Property<string>("Description")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)")
-                        .HasColumnName("description");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(120)
-                        .HasColumnType("character varying(120)")
-                        .HasColumnName("name");
-
-                    b.Property<string>("NormalizedName")
-                        .IsRequired()
-                        .HasMaxLength(120)
-                        .HasColumnType("character varying(120)")
-                        .HasColumnName("normalized_name");
-
-                    b.Property<int>("SchemaVersion")
-                        .HasColumnType("integer")
-                        .HasColumnName("schema_version");
-
-                    b.Property<string>("SpecJson")
-                        .IsRequired()
-                        .HasColumnType("jsonb")
-                        .HasColumnName("spec_json");
-
-                    b.Property<DateTime>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at_utc");
-
-                    b.Property<string>("Visibility")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasColumnName("visibility");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CreatedByUserId", "NormalizedName")
-                        .IsUnique()
-                        .HasDatabaseName("ux_custom_report_definitions_owner_normalized_name")
-                        .HasFilter("deleted_at_utc IS NULL");
-
-                    b.ToTable("custom_report_definitions", (string)null);
                 });
 
             modelBuilder.Entity("ReeTrack.Domain.Entities.Holiday", b =>
@@ -1930,17 +1863,6 @@ namespace ReeTrack.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_audit_logs_entity");
 
                     b.ToTable("audit_logs", (string)null);
-                });
-
-            modelBuilder.Entity("ReeTrack.Domain.Entities.CustomReportDefinition", b =>
-                {
-                    b.HasOne("ReeTrack.Domain.Entities.User", "CreatedByUser")
-                        .WithMany()
-                        .HasForeignKey("CreatedByUserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("CreatedByUser");
                 });
 
             modelBuilder.Entity("ReeTrack.Domain.Entities.InAppNotification", b =>

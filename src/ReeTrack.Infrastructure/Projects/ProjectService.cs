@@ -101,7 +101,8 @@ public class ProjectService : IProjectService
                 p.CreatedAtUtc))
             .ToListAsync(cancellationToken);
 
-        var actualByProject = await GetActualHoursByProjectAsync(
+        var actualByProject = await ProjectActualHoursCalculator.GetActualHoursByProjectAsync(
+            _db,
             rows.Select(r => r.Id).ToList(),
             cancellationToken);
 
@@ -495,55 +496,12 @@ public class ProjectService : IProjectService
     /// </summary>
     private async Task<decimal> GetActualHoursAsync(Guid projectId, CancellationToken cancellationToken)
     {
-        var byProject = await GetActualHoursByProjectAsync([projectId], cancellationToken);
+        var byProject = await ProjectActualHoursCalculator.GetActualHoursByProjectAsync(
+            _db,
+            [projectId],
+            cancellationToken);
         return byProject.GetValueOrDefault(projectId);
     }
-
-    private async Task<IReadOnlyDictionary<Guid, decimal>> GetActualHoursByProjectAsync(
-        IReadOnlyList<Guid> projectIds,
-        CancellationToken cancellationToken)
-    {
-        if (projectIds.Count == 0)
-            return new Dictionary<Guid, decimal>();
-
-        var tasks = await _db.ProjectTasks.AsNoTracking()
-            .Where(t => projectIds.Contains(t.ProjectId))
-            .Select(t => new { t.Id, t.ProjectId })
-            .ToListAsync(cancellationToken);
-
-        var taskToProject = tasks.ToDictionary(t => t.Id, t => t.ProjectId);
-        var taskIds = taskToProject.Keys.ToList();
-
-        var entries = await _db.TimeEntries.AsNoTracking()
-            .Where(e => e.Status == TimeEntryStatus.Confirmed)
-            .Where(e =>
-                (e.ProjectId != null && projectIds.Contains(e.ProjectId.Value)) ||
-                (e.ProjectTaskId != null && taskIds.Contains(e.ProjectTaskId.Value)))
-            .Select(e => new { e.ProjectId, e.ProjectTaskId, e.DurationSeconds })
-            .ToListAsync(cancellationToken);
-
-        var secondsByProject = projectIds.ToDictionary(id => id, _ => 0L);
-        foreach (var entry in entries)
-        {
-            Guid? attributedProjectId = entry.ProjectId;
-            if (attributedProjectId is null &&
-                entry.ProjectTaskId is Guid taskId &&
-                taskToProject.TryGetValue(taskId, out var fromTask))
-            {
-                attributedProjectId = fromTask;
-            }
-
-            if (attributedProjectId is Guid pid && secondsByProject.ContainsKey(pid))
-                secondsByProject[pid] += entry.DurationSeconds;
-        }
-
-        return secondsByProject.ToDictionary(
-            pair => pair.Key,
-            pair => SecondsToHours(pair.Value));
-    }
-
-    private static decimal SecondsToHours(long totalSeconds) =>
-        Math.Round(totalSeconds / 3600m, 2, MidpointRounding.AwayFromZero);
 
     private static ProjectDto MapEntity(Project project, string clientName, int taskCount, decimal actualHours) =>
         new()

@@ -1,13 +1,13 @@
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
 using ReeTrack.Application.Common.Interfaces;
 using ReeTrack.Domain.Enums;
 
 namespace ReeTrack.Application.Notifications;
 
 /// <summary>
-/// Loads user preferences, filters registered channel providers, and sends concurrently.
-/// Workflow types always include InApp; some channels default on when unset and honor explicit opt-out.
+/// Loads user preferences, filters registered channel providers, and sends sequentially.
+/// Channels share a scoped DbContext, so they must not run concurrently.
+/// Workflow types always include InApp; Email defaults on when unset and honors explicit opt-out.
 /// </summary>
 public sealed class NotificationDispatcher : INotificationDispatcher
 {
@@ -43,15 +43,6 @@ public sealed class NotificationDispatcher : INotificationDispatcher
         if (NotificationTypeRules.IsInAppMandatory(notificationType))
             enabledChannels.Add(DeliveryChannel.InApp);
 
-        foreach (DeliveryChannel channel in Enum.GetValues<DeliveryChannel>())
-        {
-            if (!NotificationTypeRules.IsDefaultEnabledWhenUnset(notificationType, channel))
-                continue;
-
-            if (!preferences.Any(p => p.DeliveryChannel == channel))
-                enabledChannels.Add(channel);
-        }
-
         if (enabledChannels.Count == 0)
         {
             // Could be logged
@@ -69,8 +60,6 @@ public sealed class NotificationDispatcher : INotificationDispatcher
         }
 
         foreach (var provider in providers)
-        {
             await provider.SendAsync(userId, payload, cancellationToken);
-        }
     }
 }

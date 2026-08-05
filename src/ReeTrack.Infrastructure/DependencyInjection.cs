@@ -85,6 +85,7 @@ public static class DependencyInjection
         services.AddHttpContextAccessor();
         services.Configure<CalendarSyncOptions>(configuration.GetSection(CalendarSyncOptions.SectionName));
         services.Configure<WeeklyTargetCheckInOptions>(configuration.GetSection(WeeklyTargetCheckInOptions.SectionName));
+        services.Configure<ProjectThresholdOptions>(configuration.GetSection(ProjectThresholdOptions.SectionName));
 
         services.AddHttpClient<IGoogleCodeExchanger, GoogleCodeExchanger>();
         services.AddHttpClient<GoogleCalendarProvider>();
@@ -149,6 +150,10 @@ public static class DependencyInjection
         services.AddScoped<IProjectService, ProjectService>();
         services.AddScoped<IProjectCostService, ProjectCostService>();
         services.AddScoped<ReportEntryPipeline>();
+        services.AddScoped<IProjectThresholdService, ProjectThresholdService>();
+        services.AddScoped<IProjectThresholdEvaluationService, ProjectThresholdEvaluationService>();
+        services.AddScoped<IProjectThresholdDeliveryService, ProjectThresholdDeliveryService>();
+        services.AddScoped<IProjectThresholdRecipientResolver, ProjectThresholdRecipientResolver>();
         services.AddScoped<IReportService, ReportService>();
         services.AddSingleton<CustomReportRunCache>();
         services.AddScoped<ICustomReportService, CustomReportService>();
@@ -196,6 +201,7 @@ public static class DependencyInjection
         services.AddScoped<ICalendarViewService, CalendarViewService>();
         services.AddHostedService<CalendarSyncBackgroundService>();
         services.AddHostedService<WeeklyTargetCheckInBackgroundService>();
+        services.AddHostedService<ProjectThresholdBackgroundService>();
         services.AddScoped<IJiraIntegrationService, JiraIntegrationService>();
 
         return services;

@@ -26,4 +26,5 @@ public class Project : BaseEntity, ISoftDeletable, IAuditable
     public Client Client { get; set; } = null!;
     public ICollection<ProjectTask> Tasks { get; set; } = [];
     public ICollection<ProjectCostSnapshot> CostSnapshots { get; set; } = [];
+    public ICollection<ProjectThreshold> Thresholds { get; set; } = [];
 }
