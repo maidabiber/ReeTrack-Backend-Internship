@@ -17,10 +17,12 @@ public class CustomReportFingerprintTests
 {
     private static CustomReportSpec Spec(
         DateOnly? from = null,
+        ComparisonMode comparison = ComparisonMode.None,
         NarrativeBlockSpec? narrative = null) =>
         new()
         {
             Query = new ReportQuery { From = from ?? new DateOnly(2026, 7, 1), To = new DateOnly(2026, 7, 31) },
+            Comparison = comparison,
             Blocks =
             [
                 new KpiBlockSpec { Id = "k1", Metrics = ["totalHours"] },
@@ -64,6 +66,44 @@ public class CustomReportFingerprintTests
         Assert.NotEqual(
             CustomReportFingerprint.Compute(Spec()),
             CustomReportFingerprint.Compute(Spec(from: new DateOnly(2026, 6, 1))));
+    }
+
+    [Fact]
+    public void Compute_ChangesWithTheComparisonMode()
+    {
+        // Commentary written without a baseline reads differently from commentary with one.
+        Assert.NotEqual(
+            CustomReportFingerprint.Compute(Spec()),
+            CustomReportFingerprint.Compute(Spec(comparison: ComparisonMode.PreviousPeriod)));
+    }
+
+    [Fact]
+    public void Compute_IgnoresTheGeneratedTextItself()
+    {
+        // Storing a summary must not invalidate the fingerprint it was stored against.
+        var before = CustomReportFingerprint.Compute(Spec());
+        var after = CustomReportFingerprint.Compute(Spec(narrative: new NarrativeBlockSpec
+        {
+            Id = "n1",
+            CachedText = "Acme grew.",
+            GeneratedAtUtc = DateTime.UtcNow,
+            GeneratedForFingerprint = before
+        }));
+
+        Assert.Equal(before, after);
+    }
+
+    [Fact]
+    public void Compute_ChangesWithTheNarrativeFocus()
+    {
+        // Focus steers what the model writes about, so old text no longer answers the question.
+        Assert.NotEqual(
+            CustomReportFingerprint.Compute(Spec()),
+            CustomReportFingerprint.Compute(Spec(narrative: new NarrativeBlockSpec
+            {
+                Id = "n1",
+                Focus = "margin by client"
+            })));
     }
 
     [Fact]

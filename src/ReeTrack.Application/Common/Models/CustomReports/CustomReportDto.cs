@@ -11,6 +11,17 @@ public sealed class CustomReportDto
     public DateOnly? FilterToDate { get; init; }
     public required IReadOnlyList<ReportBlockResult> Blocks { get; init; }
     public IReadOnlyList<string> Warnings { get; init; } = [];
+
+    /// <summary>The window every Previous* figure was measured over. Null when none ran.</summary>
+    public ComparisonPeriodDto? Comparison { get; init; }
+}
+
+public sealed class ComparisonPeriodDto
+{
+    public required ComparisonMode Mode { get; init; }
+    public required DateOnly From { get; init; }
+    public required DateOnly To { get; init; }
+    public required ReportKpisDto Kpis { get; init; }
 }
 
 public sealed class CustomReportCatalogueDto

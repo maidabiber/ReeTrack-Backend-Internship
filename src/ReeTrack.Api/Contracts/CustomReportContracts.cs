@@ -24,6 +24,7 @@ public sealed class CustomReportRunResponse
     public DateOnly? FilterToDate { get; init; }
     public required IReadOnlyList<ReportBlockResult> Blocks { get; init; }
     public required IReadOnlyList<string> Warnings { get; init; }
+    public ComparisonPeriodDto? Comparison { get; init; }
 }
 
 public sealed class CustomReportCatalogueResponse
@@ -55,4 +56,20 @@ public sealed class CustomReportDefinitionResponse
     public required DateTime CreatedAtUtc { get; init; }
     public required DateTime UpdatedAtUtc { get; init; }
     public bool CanEdit { get; init; }
+}
+
+public sealed class CustomReportInsightsRequest
+{
+    public required CustomReportSpec Spec { get; init; }
+
+    /// <summary>Id of the narrative block to write commentary for.</summary>
+    public required string BlockId { get; init; }
+}
+
+public sealed class CustomReportInsightsResponse
+{
+    public required string BlockId { get; init; }
+    public required IReadOnlyList<string> Paragraphs { get; init; }
+    public required DateTime GeneratedAtUtc { get; init; }
+    public required string Fingerprint { get; init; }
 }

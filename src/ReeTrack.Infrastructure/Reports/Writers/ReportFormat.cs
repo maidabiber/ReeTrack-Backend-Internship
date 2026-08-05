@@ -88,6 +88,27 @@ public static class ReportFormat
     public static IReadOnlyList<string> CustomBasisLines(ReportBasisDto basis) =>
         SummaryBasisLines(basis);
 
+    /// <summary>
+    /// "(was 12.50 USD)" for a table cell's comparison baseline, formatted the same way the
+    /// column formats its own value. Empty when there is no baseline to show.
+    /// </summary>
+    public static string PreviousCellSuffix(decimal? previousNumber, TableColumnType columnType, string? currencyCode)
+    {
+        if (previousNumber is not { } value)
+            return "";
+
+        var formatted = columnType switch
+        {
+            TableColumnType.Money => Money(value, currencyCode ?? ""),
+            TableColumnType.Percent => Percent(value),
+            TableColumnType.Hours => Hours2(value),
+            TableColumnType.Integer => value.ToString("0", CultureInfo.InvariantCulture),
+            _ => value.ToString("0.##", CultureInfo.InvariantCulture)
+        };
+
+        return $" (was {formatted})";
+    }
+
     public static string PeriodLabel(
         DateOnly? filterFrom,
         DateOnly? filterTo,

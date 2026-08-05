@@ -20,7 +20,7 @@ internal static class BlockEvaluators
             ChartBlockSpec chart => EvaluateChart(chart, context),
             EntriesBlockSpec entries => EvaluateEntries(entries, context),
             NoteBlockSpec note => EvaluateNote(note),
-            NarrativeBlockSpec narrative => EvaluateNarrative(narrative),
+            NarrativeBlockSpec narrative => EvaluateNarrative(narrative, context),
             _ => throw Application.Common.Exceptions.AppErrors.Validation(
                 $"Unsupported block type '{block.GetType().Name}'.")
         };
@@ -558,29 +558,45 @@ internal static class BlockEvaluators
         };
     }
 
-    private static ProseResult EvaluateNarrative(NarrativeBlockSpec block)
+    private static ProseResult EvaluateNarrative(NarrativeBlockSpec block, CustomReportContext context)
     {
-        if (!string.IsNullOrWhiteSpace(block.CachedText))
+        var title = block.Title ?? "AI insights";
+
+        if (string.IsNullOrWhiteSpace(block.CachedText))
         {
             return new ProseResult
             {
                 Id = block.Id,
-                Title = block.Title ?? "Narrative summary",
-                Paragraphs = block.CachedText
-                    .Replace("\r\n", "\n", StringComparison.Ordinal)
-                    .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-                    .ToList()
+                Title = title,
+                Paragraphs = ["No insights yet — generate them from the builder."]
             };
         }
+
+        // Text generated against a different filter or block layout describes other data.
+        var stale = context.SpecFingerprint is { } fingerprint
+            && block.GeneratedForFingerprint is { } generatedFor
+            && !string.Equals(fingerprint, generatedFor, StringComparison.Ordinal);
+
+        var generatedNote = block.GeneratedAtUtc is { } generatedAt
+            ? $"Generated {generatedAt:yyyy-MM-dd HH:mm} UTC."
+            : null;
 
         return new ProseResult
         {
             Id = block.Id,
-            Title = block.Title ?? "Narrative summary",
-            Paragraphs = ["Narrative summaries aren't configured — generate one from the builder."],
-            Footnote = "Cached narrative text is empty."
+            Title = title,
+            Paragraphs = SplitParagraphs(block.CachedText),
+            Footnote = JoinFootnotes(
+                generatedNote,
+                stale ? "The report has changed since these insights were written." : null)
         };
     }
+
+    private static List<string> SplitParagraphs(string text) =>
+        text
+            .Replace("\r\n", "\n", StringComparison.Ordinal)
+            .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .ToList();
 
     private static TableCell TextCell(string display) => new() { Display = display };
 

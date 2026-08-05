@@ -97,6 +97,27 @@ public sealed class CustomExcelReportWriter : IReportWriter<CustomReportDto>
         Kpi("Members", model.Kpis.ActiveMembers);
         Kpi("Projects", model.Kpis.ActiveProjects);
 
+        if (model.Comparison is { } comparison)
+        {
+            row++;
+            Kpi("Comparison period", $"{comparison.From:yyyy-MM-dd} to {comparison.To:yyyy-MM-dd}");
+        }
+
+        if (model.Warnings.Count > 0)
+        {
+            row++;
+            ws.Cell(row, 1).Value = "Warnings";
+            StyleHeaderBand(ws.Range(row, 1, row, 2));
+            row++;
+            foreach (var warning in model.Warnings)
+            {
+                ws.Cell(row, 1).Value = warning;
+                ws.Range(row, 1, row, 2).Merge();
+                StyleMuted(ws.Cell(row, 1));
+                row++;
+            }
+        }
+
         row++;
         ws.Cell(row, 1).Value = "Basis";
         StyleHeaderBand(ws.Range(row, 1, row, 2));
@@ -117,9 +138,14 @@ public sealed class CustomExcelReportWriter : IReportWriter<CustomReportDto>
     {
         var ws = workbook.Worksheets.Add(name);
         ws.TabColor = XLColor.FromHtml(ReportColors.BrandHi);
+        var hasComparison = kpi.Cells.Any(c => c.PreviousValue is not null || c.PreviousDisplay is not null);
+        var lastColumn = hasComparison ? 3 : 2;
+
         ws.Cell(1, 1).Value = "Metric";
         ws.Cell(1, 2).Value = "Value";
-        StyleHeaderBand(ws.Range(1, 1, 1, 2));
+        if (hasComparison)
+            ws.Cell(1, 3).Value = "Previous";
+        StyleHeaderBand(ws.Range(1, 1, 1, lastColumn));
 
         var row = 2;
         foreach (var cell in kpi.Cells)
@@ -127,21 +153,30 @@ public sealed class CustomExcelReportWriter : IReportWriter<CustomReportDto>
             ws.Cell(row, 1).Value = cell.Label;
             if (cell.Value is { } number)
             {
-                ws.Cell(row, 2).Value = (double)number;
-                ws.Cell(row, 2).Style.NumberFormat.Format = cell.Unit switch
+                var format = cell.Unit switch
                 {
                     MetricUnit.Percent => "0.00",
                     MetricUnit.Hours or MetricUnit.Money or MetricUnit.Rate => "0.00",
                     _ => "0"
                 };
+                ws.Cell(row, 2).Value = (double)number;
+                ws.Cell(row, 2).Style.NumberFormat.Format = format;
+
+                if (hasComparison && cell.PreviousValue is { } previous)
+                {
+                    ws.Cell(row, 3).Value = (double)previous;
+                    ws.Cell(row, 3).Style.NumberFormat.Format = format;
+                }
             }
             else
             {
                 ws.Cell(row, 2).Value = cell.Display;
+                if (hasComparison && cell.PreviousDisplay is { } previousDisplay)
+                    ws.Cell(row, 3).Value = previousDisplay;
             }
 
             if (row % 2 == 0)
-                Zebra(ws.Range(row, 1, row, 2));
+                Zebra(ws.Range(row, 1, row, lastColumn));
             row++;
         }
 
@@ -247,13 +282,19 @@ public sealed class CustomExcelReportWriter : IReportWriter<CustomReportDto>
     {
         for (var c = 0; c < columns.Count; c++)
         {
-            var cell = dataRow.Cells.GetValueOrDefault(columns[c].Key);
-            if (cell?.Number is { } number
-                && columns[c].ColumnType is TableColumnType.Hours or TableColumnType.Money
+            var column = columns[c];
+            var cell = dataRow.Cells.GetValueOrDefault(column.Key);
+            var suffix = ReportFormat.PreviousCellSuffix(cell?.PreviousNumber, column.ColumnType, column.CurrencyCode);
+
+            // A cell carrying a comparison delta renders as text ("12.50 (was 10.00)") since a
+            // single Excel cell can't hold both a formatted number and appended text.
+            if (suffix.Length == 0
+                && cell?.Number is { } number
+                && column.ColumnType is TableColumnType.Hours or TableColumnType.Money
                     or TableColumnType.Percent or TableColumnType.Integer)
             {
                 ws.Cell(row, c + 1).Value = (double)number;
-                ws.Cell(row, c + 1).Style.NumberFormat.Format = columns[c].ColumnType switch
+                ws.Cell(row, c + 1).Style.NumberFormat.Format = column.ColumnType switch
                 {
                     TableColumnType.Percent => "0.00",
                     TableColumnType.Integer => "0",
@@ -262,7 +303,7 @@ public sealed class CustomExcelReportWriter : IReportWriter<CustomReportDto>
             }
             else
             {
-                ws.Cell(row, c + 1).Value = cell?.Display ?? "";
+                ws.Cell(row, c + 1).Value = (cell?.Display ?? "") + suffix;
             }
         }
     }

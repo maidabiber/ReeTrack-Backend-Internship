@@ -33,10 +33,22 @@ public sealed class CustomPdfReportWriter : IReportWriter<CustomReportDto>
                             $"{model.Kpis.EntryCount} entries · " +
                             $"{ReportFormat.Percent(model.Kpis.BillablePct)} billable")
                         .FontSize(8).FontColor(ReportColors.NavyMuted);
+                    if (model.Comparison is { } comparison)
+                    {
+                        col.Item().PaddingTop(2).Text(
+                                $"Compared to {comparison.From:yyyy-MM-dd} – {comparison.To:yyyy-MM-dd}")
+                            .FontSize(8).FontColor(ReportColors.NavyMuted);
+                    }
                 });
 
                 page.Content().PaddingTop(12).Column(col =>
                 {
+                    if (model.Warnings.Count > 0)
+                    {
+                        col.Item().PaddingBottom(14).Element(c =>
+                            PdfBasisBlock.Compose(c, model.Warnings, title: "Warnings"));
+                    }
+
                     foreach (var block in model.Blocks)
                         col.Item().PaddingBottom(14).Element(c => ComposeBlock(c, block));
 
@@ -83,6 +95,11 @@ public sealed class CustomPdfReportWriter : IReportWriter<CustomReportDto>
                                 {
                                     tile.Item().Text(cell.Label).FontSize(7).FontColor(ReportColors.NavyMuted);
                                     tile.Item().PaddingTop(2).Text(cell.Display).SemiBold().FontSize(11);
+                                    if (cell.PreviousDisplay is { } previous)
+                                    {
+                                        tile.Item().PaddingTop(1).Text($"was {previous}")
+                                            .FontSize(7).FontColor(ReportColors.NavyMuted);
+                                    }
                                 });
                             }
 
@@ -118,16 +135,18 @@ public sealed class CustomPdfReportWriter : IReportWriter<CustomReportDto>
                             {
                                 var cell = dataRow.Cells.GetValueOrDefault(column.Key);
                                 var indent = columnIndex == 0 ? dataRow.Depth : 0;
+                                var text = (cell?.Display ?? "")
+                                    + ReportFormat.PreviousCellSuffix(cell?.PreviousNumber, column.ColumnType, column.CurrencyCode);
                                 switch (dataRow.Kind)
                                 {
                                     case TableRowKind.GroupHeader:
-                                        Body(t, cell?.Display ?? "", zebra: false, boldOnly: true, indent: indent);
+                                        Body(t, text, zebra: false, boldOnly: true, indent: indent);
                                         break;
                                     case TableRowKind.GroupSubtotal:
-                                        Body(t, cell?.Display ?? "", zebra: false, bold: true, indent: indent);
+                                        Body(t, text, zebra: false, bold: true, indent: indent);
                                         break;
                                     default:
-                                        Body(t, cell?.Display ?? "", zebra, indent: indent);
+                                        Body(t, text, zebra, indent: indent);
                                         break;
                                 }
                                 columnIndex++;
@@ -139,7 +158,9 @@ public sealed class CustomPdfReportWriter : IReportWriter<CustomReportDto>
                             foreach (var column in table.Columns)
                             {
                                 var cell = totals.Cells.GetValueOrDefault(column.Key);
-                                Body(t, cell?.Display ?? "", zebra: false, bold: true);
+                                var text = (cell?.Display ?? "")
+                                    + ReportFormat.PreviousCellSuffix(cell?.PreviousNumber, column.ColumnType, column.CurrencyCode);
+                                Body(t, text, zebra: false, bold: true);
                             }
                         }
                     });

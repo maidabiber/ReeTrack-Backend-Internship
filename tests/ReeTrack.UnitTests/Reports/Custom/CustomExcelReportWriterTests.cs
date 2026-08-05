@@ -239,6 +239,96 @@ public class CustomExcelReportWriterTests
         Assert.NotEmpty(ws.ConditionalFormats);
     }
 
+    [Fact]
+    public void Write_KpiWithComparison_AddsPreviousColumn()
+    {
+        var model = MinimalReportWithBlocks(
+        [
+            new KpiGroupResult
+            {
+                Id = "b1",
+                Title = "KPIs",
+                Cells =
+                [
+                    new KpiCell
+                    {
+                        Key = "totalHours",
+                        Label = "Total hours",
+                        Value = 12m,
+                        Unit = MetricUnit.Hours,
+                        Display = "12h",
+                        PreviousValue = 8m,
+                        PreviousDisplay = "8h"
+                    }
+                ]
+            }
+        ]);
+
+        var file = new CustomExcelReportWriter().Write(model);
+
+        using var stream = new MemoryStream(file.Bytes);
+        using var workbook = new XLWorkbook(stream);
+        var ws = workbook.Worksheet("KPIs");
+
+        Assert.Equal("Previous", ws.Cell(1, 3).GetString());
+        Assert.Equal(8d, ws.Cell(2, 3).GetDouble());
+    }
+
+    [Fact]
+    public void Write_TableCellWithComparison_RendersAsTextWithPreviousValue()
+    {
+        var model = MinimalReportWithBlocks(
+        [
+            new TableResult
+            {
+                Id = "b1",
+                Title = "By client",
+                Columns =
+                [
+                    new TableColumn { Key = "client", Label = "Client", ColumnType = TableColumnType.Text },
+                    new TableColumn { Key = "hours", Label = "Hours", ColumnType = TableColumnType.Hours }
+                ],
+                Rows =
+                [
+                    new TableRow
+                    {
+                        Key = "acme",
+                        Cells = new Dictionary<string, TableCell>
+                        {
+                            ["client"] = new TableCell { Display = "Acme" },
+                            ["hours"] = new TableCell { Number = 12m, Display = "12h", PreviousNumber = 8m }
+                        }
+                    }
+                ]
+            }
+        ]);
+
+        var file = new CustomExcelReportWriter().Write(model);
+
+        using var stream = new MemoryStream(file.Bytes);
+        using var workbook = new XLWorkbook(stream);
+        var ws = workbook.Worksheet("By client");
+
+        Assert.Contains("was", ws.Cell(2, 2).GetString(), StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Write_WithWarnings_ListsThemOnTheCoverSheet()
+    {
+        var model = MinimalReportWithBlocks(
+            [new ProseResult { Id = "b1", Paragraphs = ["Note"] }],
+            warnings: ["Comparison was skipped."]);
+
+        var file = new CustomExcelReportWriter().Write(model);
+
+        using var stream = new MemoryStream(file.Bytes);
+        using var workbook = new XLWorkbook(stream);
+        var ws = workbook.Worksheet("Cover");
+
+        var found = ws.CellsUsed().Any(c => c.GetString().Contains("Comparison was skipped", StringComparison.Ordinal));
+        Assert.True(found);
+    }
+
     private static SeriesResult SeriesBlock(
         string id,
         string title,
@@ -273,7 +363,9 @@ public class CustomExcelReportWriterTests
         Assert.Empty(errors);
     }
 
-    private static CustomReportDto MinimalReportWithBlocks(IReadOnlyList<ReportBlockResult> blocks) =>
+    private static CustomReportDto MinimalReportWithBlocks(
+        IReadOnlyList<ReportBlockResult> blocks,
+        IReadOnlyList<string>? warnings = null) =>
         new()
         {
             Kpis = new ReportKpisDto
@@ -298,6 +390,7 @@ public class CustomExcelReportWriterTests
                 WeeklyOvertimeThresholdHours = 40m
             },
             GeneratedAtUtc = new DateTime(2026, 7, 31, 12, 0, 0, DateTimeKind.Utc),
-            Blocks = blocks
+            Blocks = blocks,
+            Warnings = warnings ?? []
         };
 }

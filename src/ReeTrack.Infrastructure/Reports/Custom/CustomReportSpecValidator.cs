@@ -23,6 +23,9 @@ internal static class CustomReportSpecValidator
         if (spec.Version != 1)
             throw AppErrors.Validation("Unsupported custom report schema version.");
 
+        if (!Enum.IsDefined(spec.Comparison))
+            throw AppErrors.Validation("The report uses an unsupported comparison mode.");
+
         if (spec.Blocks.Count == 0)
             throw AppErrors.Validation("A custom report needs at least one block.");
 

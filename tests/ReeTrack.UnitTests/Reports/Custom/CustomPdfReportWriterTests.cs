@@ -91,4 +91,103 @@ public class CustomPdfReportWriterTests
         Assert.Equal((byte)'D', file.Bytes[2]);
         Assert.Equal((byte)'F', file.Bytes[3]);
     }
+
+    [Fact]
+    public void Write_WithComparisonAndWarnings_ProducesAValidPdf()
+    {
+        var model = new CustomReportDto
+        {
+            Kpis = new ReportKpisDto
+            {
+                TotalSeconds = 3600,
+                BillableSeconds = 3600,
+                NonBillableSeconds = 0,
+                BillablePct = 100m,
+                EntryCount = 1,
+                ActiveMembers = 1,
+                ActiveProjects = 1,
+                OvertimeHours = 0,
+                WeekendHours = 0,
+                HolidayHours = 0,
+                UnassignedSeconds = 0
+            },
+            Basis = new ReportBasisDto
+            {
+                WeekendPremium = 0.5m,
+                HolidayPremium = 1m,
+                OvertimePremium = 0.5m,
+                WeeklyOvertimeThresholdHours = 40m
+            },
+            GeneratedAtUtc = new DateTime(2026, 7, 31, 12, 0, 0, DateTimeKind.Utc),
+            Warnings = ["Comparison was skipped: it needs an explicit start and end date on the report filter."],
+            Comparison = new ComparisonPeriodDto
+            {
+                Mode = ComparisonMode.PreviousPeriod,
+                From = new DateOnly(2026, 6, 1),
+                To = new DateOnly(2026, 6, 30),
+                Kpis = new ReportKpisDto
+                {
+                    TotalSeconds = 3000,
+                    BillableSeconds = 3000,
+                    NonBillableSeconds = 0,
+                    BillablePct = 100m,
+                    EntryCount = 1,
+                    ActiveMembers = 1,
+                    ActiveProjects = 1,
+                    OvertimeHours = 0,
+                    WeekendHours = 0,
+                    HolidayHours = 0,
+                    UnassignedSeconds = 0
+                }
+            },
+            Blocks =
+            [
+                new KpiGroupResult
+                {
+                    Id = "b1",
+                    Title = "KPIs",
+                    Cells =
+                    [
+                        new KpiCell
+                        {
+                            Key = "totalHours",
+                            Label = "Total hours",
+                            Value = 12m,
+                            Unit = MetricUnit.Hours,
+                            Display = "12h",
+                            PreviousValue = 8m,
+                            PreviousDisplay = "8h"
+                        }
+                    ]
+                },
+                new TableResult
+                {
+                    Id = "b2",
+                    Title = "By client",
+                    Columns =
+                    [
+                        new TableColumn { Key = "client", Label = "Client", ColumnType = TableColumnType.Text },
+                        new TableColumn { Key = "hours", Label = "Hours", ColumnType = TableColumnType.Hours }
+                    ],
+                    Rows =
+                    [
+                        new TableRow
+                        {
+                            Key = "acme",
+                            Cells = new Dictionary<string, TableCell>
+                            {
+                                ["client"] = new TableCell { Display = "Acme" },
+                                ["hours"] = new TableCell { Number = 12m, Display = "12h", PreviousNumber = 8m }
+                            }
+                        }
+                    ]
+                }
+            ]
+        };
+
+        var file = new CustomPdfReportWriter().Write(model);
+
+        Assert.Equal("application/pdf", file.ContentType);
+        Assert.Equal((byte)'%', file.Bytes[0]);
+    }
 }

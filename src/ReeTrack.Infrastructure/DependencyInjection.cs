@@ -22,6 +22,7 @@ using ReeTrack.Infrastructure.RateMultipliers;
 using ReeTrack.Infrastructure.HourTargets;
 using ReeTrack.Infrastructure.Reports;
 using ReeTrack.Infrastructure.Reports.Custom;
+using ReeTrack.Infrastructure.Reports.Custom.Insights;
 using ReeTrack.Infrastructure.Reports.Writers;
 using ReeTrack.Infrastructure.Reports.Writers.Custom;
 using ReeTrack.Infrastructure.Holidays;
@@ -152,6 +153,7 @@ public static class DependencyInjection
         services.AddSingleton<CustomReportRunCache>();
         services.AddScoped<ICustomReportService, CustomReportService>();
         services.AddScoped<ICustomReportDefinitionService, CustomReportDefinitionService>();
+        services.AddScoped<ICustomReportInsightService, CustomReportInsightService>();
         services.AddScoped<IReportWriter<Application.Common.Models.CustomReports.CustomReportDto>, CustomCsvReportWriter>();
         services.AddScoped<IReportWriter<Application.Common.Models.CustomReports.CustomReportDto>, CustomExcelReportWriter>();
         services.AddScoped<IReportWriter<Application.Common.Models.CustomReports.CustomReportDto>, CustomPdfReportWriter>();

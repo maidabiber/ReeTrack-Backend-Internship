@@ -27,6 +27,12 @@ public sealed class KpiCell
     public required MetricUnit Unit { get; init; }
     public string? CurrencyCode { get; init; }
     public required string Display { get; init; }
+
+    /// <summary>Same metric over the comparison window. Null when no comparison ran.</summary>
+    public decimal? PreviousValue { get; init; }
+
+    /// <summary>Pre-rendered previous value, so clients never re-implement formatting.</summary>
+    public string? PreviousDisplay { get; init; }
 }
 
 public sealed class TableResult : ReportBlockResult
@@ -79,6 +85,9 @@ public sealed class TableCell
 {
     public decimal? Number { get; init; }
     public required string Display { get; init; }
+
+    /// <summary>Same cell over the comparison window, matched by row key. Null when absent.</summary>
+    public decimal? PreviousNumber { get; init; }
 }
 
 public sealed class SeriesResult : ReportBlockResult

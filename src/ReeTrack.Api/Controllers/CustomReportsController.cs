@@ -16,13 +16,16 @@ public sealed class CustomReportsController : ControllerBase
 {
     private readonly ICustomReportService _customReports;
     private readonly ICustomReportDefinitionService _definitions;
+    private readonly ICustomReportInsightService _insights;
 
     public CustomReportsController(
         ICustomReportService customReports,
-        ICustomReportDefinitionService definitions)
+        ICustomReportDefinitionService definitions,
+        ICustomReportInsightService insights)
     {
         _customReports = customReports;
         _definitions = definitions;
+        _insights = insights;
     }
 
     [HttpGet("catalogue")]
@@ -50,6 +53,29 @@ public sealed class CustomReportsController : ControllerBase
 
         var report = await _customReports.RunAsync(request.Spec, cancellationToken);
         return Ok(Map(report));
+    }
+
+    /// <summary>
+    /// Writes commentary for one narrative block. Separate from /run so a report stays fast,
+    /// free, and reproducible; the caller stores the result on the block.
+    /// </summary>
+    [HttpPost("insights")]
+    public async Task<ActionResult<CustomReportInsightsResponse>> GenerateInsights(
+        [FromBody] CustomReportInsightsRequest? request,
+        CancellationToken cancellationToken)
+    {
+        if (request?.Spec is null || string.IsNullOrWhiteSpace(request.BlockId))
+            throw AppErrors.Validation("A custom report spec and block id are required.");
+
+        var insights = await _insights.GenerateAsync(request.Spec, request.BlockId, cancellationToken);
+
+        return Ok(new CustomReportInsightsResponse
+        {
+            BlockId = insights.BlockId,
+            Paragraphs = insights.Paragraphs,
+            GeneratedAtUtc = insights.GeneratedAtUtc,
+            Fingerprint = insights.Fingerprint
+        });
     }
 
     [HttpPost("export")]
@@ -226,6 +252,7 @@ public sealed class CustomReportsController : ControllerBase
             FilterFromDate = dto.FilterFromDate,
             FilterToDate = dto.FilterToDate,
             Blocks = dto.Blocks,
-            Warnings = dto.Warnings
+            Warnings = dto.Warnings,
+            Comparison = dto.Comparison
         };
 }

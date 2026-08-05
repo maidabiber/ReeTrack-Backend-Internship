@@ -133,7 +133,88 @@ public class CustomCsvReportWriterTests
         Assert.Contains("Subtotal — Acme,1", text);
     }
 
-    private static CustomReportDto MinimalReportWithBlocks(IReadOnlyList<ReportBlockResult> blocks) =>
+    [Fact]
+    public void Write_KpiWithComparison_ShowsPreviousValue()
+    {
+        var model = MinimalReportWithBlocks(
+        [
+            new KpiGroupResult
+            {
+                Id = "b1",
+                Title = "KPIs",
+                Cells =
+                [
+                    new KpiCell
+                    {
+                        Key = "totalHours",
+                        Label = "Total hours",
+                        Value = 12m,
+                        Unit = MetricUnit.Hours,
+                        Display = "12h",
+                        PreviousValue = 8m,
+                        PreviousDisplay = "8h"
+                    }
+                ]
+            }
+        ]);
+
+        var file = new CustomCsvReportWriter().Write(model);
+        var text = System.Text.Encoding.UTF8.GetString(file.Bytes);
+
+        Assert.Contains("was 8h", text);
+    }
+
+    [Fact]
+    public void Write_TableCellWithComparison_ShowsPreviousNumber()
+    {
+        var model = MinimalReportWithBlocks(
+        [
+            new TableResult
+            {
+                Id = "b1",
+                Title = "By client",
+                Columns =
+                [
+                    new TableColumn { Key = "client", Label = "Client", ColumnType = TableColumnType.Text },
+                    new TableColumn { Key = "hours", Label = "Hours", ColumnType = TableColumnType.Hours }
+                ],
+                Rows =
+                [
+                    new TableRow
+                    {
+                        Key = "acme",
+                        Cells = new Dictionary<string, TableCell>
+                        {
+                            ["client"] = new TableCell { Display = "Acme" },
+                            ["hours"] = new TableCell { Number = 12m, Display = "12h", PreviousNumber = 8m }
+                        }
+                    }
+                ]
+            }
+        ]);
+
+        var file = new CustomCsvReportWriter().Write(model);
+        var text = System.Text.Encoding.UTF8.GetString(file.Bytes);
+
+        Assert.Contains("was 8", text);
+    }
+
+    [Fact]
+    public void Write_WithWarnings_ListsThemInTheOverview()
+    {
+        var model = MinimalReportWithBlocks(
+            [new ProseResult { Id = "b1", Paragraphs = ["Note"] }],
+            warnings: ["Comparison was skipped: it needs an explicit start and end date on the report filter."]);
+
+        var file = new CustomCsvReportWriter().Write(model);
+        var text = System.Text.Encoding.UTF8.GetString(file.Bytes);
+
+        Assert.Contains("Comparison was skipped", text);
+    }
+
+    private static CustomReportDto MinimalReportWithBlocks(
+        IReadOnlyList<ReportBlockResult> blocks,
+        IReadOnlyList<string>? warnings = null) =>
         new()
         {
             Kpis = new ReportKpisDto
@@ -158,6 +239,7 @@ public class CustomCsvReportWriterTests
                 WeeklyOvertimeThresholdHours = 40m
             },
             GeneratedAtUtc = new DateTime(2026, 7, 31, 12, 0, 0, DateTimeKind.Utc),
-            Blocks = blocks
+            Blocks = blocks,
+            Warnings = warnings ?? []
         };
 }

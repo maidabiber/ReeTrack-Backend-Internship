@@ -20,8 +20,8 @@ internal static class CustomReportFingerprint
     };
 
     /// <summary>
-    /// Identifies the shape of a report — filters and block configuration — for staleness
-    /// detection. Narrative <see cref="NarrativeBlockSpec.CachedText"/> /
+    /// Identifies the shape of a report — filters, comparison mode, and block configuration —
+    /// for staleness detection. Narrative <see cref="NarrativeBlockSpec.CachedText"/> /
     /// <see cref="NarrativeBlockSpec.GeneratedAtUtc"/> are stripped first, otherwise storing
     /// generated commentary would immediately invalidate the fingerprint it was stored
     /// against.
@@ -34,6 +34,7 @@ internal static class CustomReportFingerprint
         {
             Version = spec.Version,
             Query = spec.Query,
+            Comparison = spec.Comparison,
             Blocks = spec.Blocks.Select(Strip).ToList()
         };
 
@@ -56,7 +57,7 @@ internal static class CustomReportFingerprint
     private static string Hash(CustomReportSpec spec)
     {
         var json = JsonSerializer.Serialize(spec, FingerprintJson);
-        return Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(json)));
+        return Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(json)))[..16];
     }
 
     /// <summary>Removes the generated payload so a narrative block hashes by its config alone.</summary>

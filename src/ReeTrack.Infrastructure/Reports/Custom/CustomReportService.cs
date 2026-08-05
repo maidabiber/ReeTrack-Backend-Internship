@@ -77,22 +77,78 @@ public sealed class CustomReportService : ICustomReportService
         CancellationToken cancellationToken = default)
     {
         CustomReportSpecValidator.Validate(spec);
-        var (needsCost, needsProjects, needsHourTargets) = CustomReportSpecValidator.AnalyzeNeeds(spec);
+        var needs = CustomReportSpecValidator.AnalyzeNeeds(spec);
 
+        var current = await RunWindowAsync(spec, spec.Query, needs, cancellationToken);
+        var warnings = new List<string>();
+        ComparisonPeriodDto? comparison = null;
+
+        if (spec.Comparison != ComparisonMode.None)
+        {
+            if (ComparisonWindow.TryResolve(spec.Query, spec.Comparison, out var baselineQuery))
+            {
+                var baseline = await RunWindowAsync(spec, baselineQuery, needs, cancellationToken);
+                current = current with { Blocks = MergeComparison(current.Blocks, baseline.Blocks) };
+                comparison = new ComparisonPeriodDto
+                {
+                    Mode = spec.Comparison,
+                    From = baselineQuery.From!.Value,
+                    To = baselineQuery.To!.Value,
+                    Kpis = baseline.Kpis
+                };
+            }
+            else
+            {
+                warnings.Add(
+                    "Comparison was skipped: it needs an explicit start and end date on the report filter.");
+            }
+        }
+
+        var report = new CustomReportDto
+        {
+            Kpis = current.Kpis,
+            Basis = current.Basis,
+            GeneratedAtUtc = DateTime.UtcNow,
+            GeneratedByName = await ReportMetadataResolver.ResolveGeneratedByAsync(_db, _currentUser, cancellationToken),
+            FirstEntryDate = current.FirstEntryDate,
+            FilterFromDate = spec.Query.From,
+            FilterToDate = spec.Query.To,
+            Blocks = current.Blocks,
+            Warnings = warnings,
+            Comparison = comparison
+        };
+
+        _runCache.Set(_currentUser.UserId, CustomReportFingerprint.ComputeCacheKey(spec), report);
+        return report;
+    }
+
+    private sealed record WindowResult(
+        IReadOnlyList<ReportBlockResult> Blocks,
+        ReportKpisDto Kpis,
+        ReportBasisDto Basis,
+        DateOnly? FirstEntryDate);
+
+    /// <summary>Evaluates the whole spec over one date window. Runs twice when comparing.</summary>
+    private async Task<WindowResult> RunWindowAsync(
+        CustomReportSpec spec,
+        ReportQuery query,
+        (bool NeedsCost, bool NeedsProjects, bool NeedsHourTargets) needs,
+        CancellationToken cancellationToken)
+    {
         // Skip overtime context until a cost / project metric asks for it.
-        var data = await _pipeline.LoadAsync(
-            spec.Query,
-            loadOvertimeContext: false,
-            cancellationToken);
+        var data = await _pipeline.LoadAsync(query, loadOvertimeContext: false, cancellationToken);
 
         var context = new CustomReportContext(
             _pipeline,
             _calculator,
             _db,
             data,
-            needsCost,
-            needsProjects,
-            needsHourTargets);
+            needs.NeedsCost,
+            needs.NeedsProjects,
+            needs.NeedsHourTargets)
+        {
+            SpecFingerprint = CustomReportFingerprint.Compute(spec)
+        };
 
         await context.EnsureReadyAsync(cancellationToken);
 
@@ -104,12 +160,11 @@ public sealed class CustomReportService : ICustomReportService
         blocks = ApplyPctOfTotal(spec, blocks);
 
         var basics = ComputeBasicKpis(context.Rows);
-        var schedule = ComputeScheduleHours(context.Rows, costLoaded: needsCost || needsProjects);
-        var generatedAt = DateTime.UtcNow;
+        var schedule = ComputeScheduleHours(context.Rows, costLoaded: needs.NeedsCost || needs.NeedsProjects);
 
-        var report = new CustomReportDto
-        {
-            Kpis = new ReportKpisDto
+        return new WindowResult(
+            blocks,
+            new ReportKpisDto
             {
                 TotalSeconds = basics.TotalSeconds,
                 BillableSeconds = basics.BillableSeconds,
@@ -123,24 +178,67 @@ public sealed class CustomReportService : ICustomReportService
                 HolidayHours = schedule.HolidayHours,
                 UnassignedSeconds = basics.UnassignedSeconds
             },
-            Basis = new ReportBasisDto
+            new ReportBasisDto
             {
                 WeekendPremium = data.MultiplierConfig.WeekendPremium,
                 HolidayPremium = data.MultiplierConfig.HolidayPremium,
                 OvertimePremium = data.MultiplierConfig.OvertimePremium,
                 WeeklyOvertimeThresholdHours = data.MultiplierConfig.WeeklyOvertimeThresholdHours
             },
-            GeneratedAtUtc = generatedAt,
-            GeneratedByName = await ReportMetadataResolver.ResolveGeneratedByAsync(_db, _currentUser, cancellationToken),
-            FirstEntryDate = context.Rows.Count == 0 ? null : context.Rows.Min(r => r.Date),
-            FilterFromDate = data.Query.From,
-            FilterToDate = data.Query.To,
-            Blocks = blocks,
-            Warnings = []
-        };
+            context.Rows.Count == 0 ? null : context.Rows.Min(r => r.Date));
+    }
 
-        _runCache.Set(_currentUser.UserId, CustomReportFingerprint.ComputeCacheKey(spec), report);
-        return report;
+    /// <summary>
+    /// Copies baseline figures onto the current blocks. Blocks pair by id and rows by key, so a
+    /// row present in only one window simply has no counterpart rather than a shifted one.
+    /// </summary>
+    private static IReadOnlyList<ReportBlockResult> MergeComparison(
+        IReadOnlyList<ReportBlockResult> current,
+        IReadOnlyList<ReportBlockResult> baseline)
+    {
+        var baselineById = baseline.ToDictionary(block => block.Id, StringComparer.Ordinal);
+
+        return current.Select(block =>
+        {
+            if (!baselineById.TryGetValue(block.Id, out var previous))
+                return block;
+
+            return (block, previous) switch
+            {
+                (KpiGroupResult kpi, KpiGroupResult previousKpi) => MergeKpis(kpi, previousKpi),
+                (TableResult table, TableResult previousTable) => MergeTable(table, previousTable),
+                _ => block
+            };
+        }).ToList();
+    }
+
+    private static KpiGroupResult MergeKpis(KpiGroupResult current, KpiGroupResult baseline)
+    {
+        var baselineByKey = baseline.Cells.ToDictionary(cell => cell.Key, StringComparer.OrdinalIgnoreCase);
+
+        return new KpiGroupResult
+        {
+            Id = current.Id,
+            Title = current.Title,
+            Footnote = current.Footnote,
+            Cells = current.Cells.Select(cell =>
+            {
+                if (!baselineByKey.TryGetValue(cell.Key, out var previous))
+                    return cell;
+
+                return new KpiCell
+                {
+                    Key = cell.Key,
+                    Label = cell.Label,
+                    Value = cell.Value,
+                    Unit = cell.Unit,
+                    CurrencyCode = cell.CurrencyCode,
+                    Display = cell.Display,
+                    PreviousValue = previous.Value,
+                    PreviousDisplay = previous.Display
+                };
+            }).ToList()
+        };
     }
 
     public async Task<CustomReportDto> GetOrRunAsync(
@@ -151,6 +249,48 @@ public sealed class CustomReportService : ICustomReportService
             return cached;
 
         return await RunAsync(spec, cancellationToken);
+    }
+
+    private static TableResult MergeTable(TableResult current, TableResult baseline)
+    {
+        var baselineByRow = baseline.Rows.ToDictionary(row => row.Key, StringComparer.Ordinal);
+
+        return new TableResult
+        {
+            Id = current.Id,
+            Title = current.Title,
+            Footnote = current.Footnote,
+            Columns = current.Columns,
+            Rows = current.Rows
+                .Select(row => baselineByRow.TryGetValue(row.Key, out var previous)
+                    ? MergeRow(row, previous)
+                    : row)
+                .ToList(),
+            Totals = current.Totals is { } totals && baseline.Totals is { } previousTotals
+                ? MergeRow(totals, previousTotals)
+                : current.Totals
+        };
+    }
+
+    private static TableRow MergeRow(TableRow current, TableRow baseline)
+    {
+        var cells = new Dictionary<string, TableCell>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (key, cell) in current.Cells)
+        {
+            var previousNumber = baseline.Cells.GetValueOrDefault(key)?.Number;
+            cells[key] = previousNumber is null
+                ? cell
+                : new TableCell
+                {
+                    Number = cell.Number,
+                    Display = cell.Display,
+                    PreviousNumber = previousNumber
+                };
+        }
+
+        // Kind/Depth identify a grouping row, not a comparison figure — carry them through
+        // unchanged so a report that both groups and compares still renders its group structure.
+        return new TableRow { Key = current.Key, Cells = cells, Kind = current.Kind, Depth = current.Depth };
     }
 
     public async Task<ReportFile> ExportAsync(

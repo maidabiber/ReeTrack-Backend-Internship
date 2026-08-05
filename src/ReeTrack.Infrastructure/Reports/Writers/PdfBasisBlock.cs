@@ -12,13 +12,13 @@ namespace ReeTrack.Infrastructure.Reports.Writers;
 /// </summary>
 internal static class PdfBasisBlock
 {
-    public static void Compose(IContainer container, IReadOnlyList<string> lines)
+    public static void Compose(IContainer container, IReadOnlyList<string> lines, string title = "Basis & assumptions")
     {
         if (lines.Count == 0) return;
 
         container.Column(col =>
         {
-            col.Item().Text("Basis & assumptions").SemiBold().FontSize(11);
+            col.Item().Text(title).SemiBold().FontSize(11);
             col.Item().PaddingTop(4).PaddingBottom(8)
                 .Height(1).Width(36).Background(ReportColors.Brand);
 

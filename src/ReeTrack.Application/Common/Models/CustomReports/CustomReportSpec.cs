@@ -8,6 +8,21 @@ public sealed class CustomReportSpec
     public int Version { get; init; } = 1;
     public ReportQuery Query { get; init; } = new();
     public IReadOnlyList<ReportBlockSpec> Blocks { get; init; } = [];
+
+    /// <summary>Baseline the report is measured against. Doubles the query cost when set.</summary>
+    public ComparisonMode Comparison { get; init; } = ComparisonMode.None;
+}
+
+[JsonConverter(typeof(JsonStringEnumConverter))]
+public enum ComparisonMode
+{
+    None,
+
+    /// <summary>The equal-length window immediately before the report's own range.</summary>
+    PreviousPeriod,
+
+    /// <summary>The same range one year earlier — for seasonal work.</summary>
+    SamePeriodLastYear
 }
 
 [JsonPolymorphic(TypeDiscriminatorPropertyName = "type")]
@@ -62,9 +77,17 @@ public sealed class NoteBlockSpec : ReportBlockSpec
 
 public sealed class NarrativeBlockSpec : ReportBlockSpec
 {
+    /// <summary>What the reader cares about, steering which findings are surfaced.</summary>
     public string? Focus { get; init; }
+
     public string? CachedText { get; init; }
     public DateTime? GeneratedAtUtc { get; init; }
+
+    /// <summary>
+    /// Report fingerprint the cached text was written against. When it no longer matches the
+    /// spec being run, the text describes different data and the block says so.
+    /// </summary>
+    public string? GeneratedForFingerprint { get; init; }
 }
 
 /// <param name="Right">Id of another metric on the same block. Null when <paramref name="RightValue"/> is used.</param>

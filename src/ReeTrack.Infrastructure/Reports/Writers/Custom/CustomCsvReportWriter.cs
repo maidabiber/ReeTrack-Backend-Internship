@@ -20,6 +20,13 @@ public sealed class CustomCsvReportWriter : IReportWriter<CustomReportDto>
         CsvWriterSupport.AppendOverview(sb, "GeneratedAtUtc", ReportFormat.FriendlyDateTime(model.GeneratedAtUtc));
         if (!string.IsNullOrWhiteSpace(model.GeneratedByName))
             CsvWriterSupport.AppendOverview(sb, "GeneratedBy", model.GeneratedByName);
+        if (model.Comparison is { } comparison)
+        {
+            CsvWriterSupport.AppendOverview(
+                sb, "ComparisonPeriod", $"{comparison.From:yyyy-MM-dd} to {comparison.To:yyyy-MM-dd}");
+        }
+        foreach (var warning in model.Warnings)
+            CsvWriterSupport.AppendOverview(sb, "Warning", warning);
         foreach (var line in ReportFormat.CustomBasisLines(model.Basis))
             CsvWriterSupport.AppendOverview(sb, "Basis", line);
 
@@ -34,10 +41,11 @@ public sealed class CustomCsvReportWriter : IReportWriter<CustomReportDto>
                     foreach (var cell in kpi.Cells)
                     {
                         sb.Append(CsvWriterSupport.Escape(cell.Label)).Append(',');
-                        if (cell.Value is { } number)
-                            sb.AppendLine(CsvWriterSupport.FormatDecimal(number));
-                        else
-                            sb.AppendLine(CsvWriterSupport.Escape(cell.Display));
+                        var value = cell.Value is { } number
+                            ? CsvWriterSupport.FormatDecimal(number)
+                            : cell.Display;
+                        var suffix = cell.PreviousDisplay is { } previous ? $" (was {previous})" : "";
+                        sb.AppendLine(CsvWriterSupport.Escape(value + suffix));
                     }
                     break;
 
@@ -92,17 +100,15 @@ public sealed class CustomCsvReportWriter : IReportWriter<CustomReportDto>
             if (i > 0)
                 sb.Append(',');
 
-            var cell = row.Cells.GetValueOrDefault(columns[i].Key);
-            if (cell?.Number is { } number
-                && columns[i].ColumnType is TableColumnType.Hours or TableColumnType.Money
-                    or TableColumnType.Percent or TableColumnType.Integer)
-            {
-                sb.Append(CsvWriterSupport.FormatDecimal(number));
-            }
-            else
-            {
-                sb.Append(CsvWriterSupport.Escape(cell?.Display ?? ""));
-            }
+            var column = columns[i];
+            var cell = row.Cells.GetValueOrDefault(column.Key);
+            var value = cell?.Number is { } number
+                && column.ColumnType is TableColumnType.Hours or TableColumnType.Money
+                    or TableColumnType.Percent or TableColumnType.Integer
+                ? CsvWriterSupport.FormatDecimal(number)
+                : cell?.Display ?? "";
+            var suffix = ReportFormat.PreviousCellSuffix(cell?.PreviousNumber, column.ColumnType, column.CurrencyCode);
+            sb.Append(CsvWriterSupport.Escape(value + suffix));
         }
 
         sb.AppendLine();

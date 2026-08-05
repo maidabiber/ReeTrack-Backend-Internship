@@ -20,6 +20,9 @@ internal sealed class CustomReportContext
     private readonly bool _needsProjects;
     private readonly bool _needsHourTargets;
 
+    /// <summary>Fingerprint of the spec being evaluated; used to age-check cached narrative text.</summary>
+    public string? SpecFingerprint { get; init; }
+
     private IReadOnlyList<TimeEntry>? _overtimeContext;
     private IReadOnlyList<EntryCostLine>? _costLines;
     private IReadOnlyList<EntryRow>? _rows;
