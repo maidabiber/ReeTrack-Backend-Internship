@@ -19,10 +19,10 @@ public class DailyTimeBudget : IDailyTimeBudget
         DateTime dateUtc,
         int newDurationSeconds,
         Guid? excludeEntryId,
+        int utcOffsetMinutes = 0,
         CancellationToken cancellationToken = default)
     {
-        var dayStart = new DateTime(dateUtc.Year, dateUtc.Month, dateUtc.Day, 0, 0, 0, DateTimeKind.Utc);
-        var dayEnd = dayStart.AddDays(1);
+        var (dayStart, dayEnd) = TimeEntryHelpers.GetLocalDayUtcRange(dateUtc, utcOffsetMinutes);
 
         var existingSeconds = await _db.TimeEntries
             .AsNoTracking()

@@ -256,7 +256,8 @@ public class TimeEntriesController : ControllerBase
         DurationSeconds = request?.DurationSeconds,
         ProjectId = request?.ProjectId,
         ProjectTaskId = request?.ProjectTaskId,
-        TagIds = request?.TagIds
+        TagIds = request?.TagIds,
+        UtcOffsetMinutes = request?.UtcOffsetMinutes
     };
 
     /// <summary>

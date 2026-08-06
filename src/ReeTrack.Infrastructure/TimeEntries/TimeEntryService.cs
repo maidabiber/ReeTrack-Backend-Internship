@@ -159,7 +159,8 @@ public class TimeEntryService : ITimeEntryService
         }
 
         var entryDate = entry.GetEntryDate();
-        await _dailyBudget.EnsureWithinBudgetAsync(userId, entryDate, entry.DurationSeconds, null, cancellationToken);
+        await _dailyBudget.EnsureWithinBudgetAsync(
+            userId, entryDate, entry.DurationSeconds, null, input.UtcOffsetMinutes ?? 0, cancellationToken);
 
         await _associations.ApplyForCreateAsync(entry, input, cancellationToken);
         _db.TimeEntries.Add(entry);
@@ -301,7 +302,12 @@ public class TimeEntryService : ITimeEntryService
                 entry.UpdateDetails(input.Description, input.IsBillable);
 
                 await _dailyBudget.EnsureWithinBudgetAsync(
-                    userId, entry.StartedAtUtc.Value.Date, entry.DurationSeconds, entry.Id, cancellationToken);
+                    userId,
+                    entry.StartedAtUtc.Value.Date,
+                    entry.DurationSeconds,
+                    entry.Id,
+                    input.UtcOffsetMinutes ?? 0,
+                    cancellationToken);
 
                 await _associations.ApplyForUpdateAsync(entry, input, cancellationToken);
                 entry.UpdatedAtUtc = DateTime.UtcNow;
@@ -332,7 +338,8 @@ public class TimeEntryService : ITimeEntryService
             userId, range.StartedAtUtc, range.EndedAtUtc, entry.Id, cancellationToken);
 
         var entryDate = entry.GetEntryDate();
-        await _dailyBudget.EnsureWithinBudgetAsync(userId, entryDate, entry.DurationSeconds, entry.Id, cancellationToken);
+        await _dailyBudget.EnsureWithinBudgetAsync(
+            userId, entryDate, entry.DurationSeconds, entry.Id, input.UtcOffsetMinutes ?? 0, cancellationToken);
 
         await _associations.ApplyForUpdateAsync(entry, input, cancellationToken);
         entry.UpdatedAtUtc = DateTime.UtcNow;
@@ -457,6 +464,7 @@ public class TimeEntryService : ITimeEntryService
             entry.GetEntryDate(),
             entry.DurationSeconds,
             entry.Id,
+            input?.UtcOffsetMinutes ?? 0,
             cancellationToken);
 
         entry.Status = TimeEntryStatus.Confirmed;
@@ -513,9 +521,7 @@ public class TimeEntryService : ITimeEntryService
         {
             // Client sends getTimezoneOffset() so the selected local calendar day
             // maps to the correct UTC [start, end) window.
-            var offset = utcOffsetMinutes ?? 0;
-            var fromUtc = day.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc).AddMinutes(offset);
-            var toUtc = day.AddDays(1).ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc).AddMinutes(offset);
+            var (fromUtc, toUtc) = TimeEntryHelpers.GetLocalDayUtcRange(day, utcOffsetMinutes ?? 0);
             query = query.Where(e =>
                 (e.StartedAtUtc ?? e.CreatedAtUtc) >= fromUtc &&
                 (e.StartedAtUtc ?? e.CreatedAtUtc) < toUtc);

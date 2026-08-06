@@ -12,4 +12,9 @@ public class TimeEntryInput
     public Guid? ProjectTaskId { get; init; }
     public IReadOnlyList<Guid>? TagIds { get; init; }
     public IReadOnlyList<Guid>? AssigneeUserIds { get; init; }
+
+    /// <summary>
+    /// Client <c>Date#getTimezoneOffset()</c> for local-day daily budget.
+    /// </summary>
+    public int? UtcOffsetMinutes { get; init; }
 }

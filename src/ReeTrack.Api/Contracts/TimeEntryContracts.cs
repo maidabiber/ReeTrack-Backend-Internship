@@ -13,6 +13,11 @@ public sealed class TimeEntryRequest
     public List<Guid>? TagIds { get; set; }
     public Guid? AssigneeUserId { get; set; }
     public List<Guid>? AssigneeUserIds { get; set; }
+
+    /// <summary>
+    /// Client <c>Date#getTimezoneOffset()</c> so daily budget uses the local calendar day.
+    /// </summary>
+    public int? UtcOffsetMinutes { get; set; }
 }
 
 public sealed class CreateTimeEntriesBatchRequest

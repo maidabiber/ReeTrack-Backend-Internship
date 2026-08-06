@@ -8,6 +8,31 @@ internal static class TimeEntryHelpers
 {
     public const int MaxDurationSeconds = 24 * 60 * 60;
 
+    /// <summary>
+    /// UTC [start, end) for a local calendar day. <paramref name="utcOffsetMinutes"/> is
+    /// <c>Date#getTimezoneOffset()</c>: minutes to add to local wall time to get UTC.
+    /// </summary>
+    public static (DateTime FromUtc, DateTime ToUtc) GetLocalDayUtcRange(
+        DateOnly day,
+        int utcOffsetMinutes)
+    {
+        var fromUtc = day.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc).AddMinutes(utcOffsetMinutes);
+        var toUtc = day.AddDays(1).ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc).AddMinutes(utcOffsetMinutes);
+        return (fromUtc, toUtc);
+    }
+
+    /// <summary>
+    /// UTC [start, end) for the local calendar day that contains <paramref name="instantUtc"/>.
+    /// </summary>
+    public static (DateTime FromUtc, DateTime ToUtc) GetLocalDayUtcRange(
+        DateTime instantUtc,
+        int utcOffsetMinutes)
+    {
+        var local = instantUtc.AddMinutes(-utcOffsetMinutes);
+        var day = DateOnly.FromDateTime(local);
+        return GetLocalDayUtcRange(day, utcOffsetMinutes);
+    }
+
     public static async Task<IReadOnlyDictionary<Guid, List<TimeEntry>>> LoadShareGroupsAsync(
         IApplicationDbContext db,
         IReadOnlyList<TimeEntry> entries,
