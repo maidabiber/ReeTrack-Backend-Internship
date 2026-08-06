@@ -488,27 +488,64 @@ public class TimeEntryService : ITimeEntryService
         await _db.SaveChangesAsync(cancellationToken);
     }
 
-    public async Task<IReadOnlyList<TimeEntryDto>> ListAsync(CancellationToken cancellationToken = default)
+    public async Task<PagedResult<TimeEntryDto>> ListAsync(
+        int page = 1,
+        int pageSize = 50,
+        string? date = null,
+        string sort = "newest",
+        int? utcOffsetMinutes = null,
+        CancellationToken cancellationToken = default)
     {
         var userId = _currentUser.UserId;
-        var entries = await BaseQuery()
+        page = Math.Max(1, page);
+        pageSize = Math.Clamp(pageSize, 1, 200);
+        var newestFirst = !string.Equals(sort, "oldest", StringComparison.OrdinalIgnoreCase);
+
+        var query = BaseQuery()
             .Where(e =>
                 e.UserId == userId &&
                 (
                     (e.Mode == TimeEntryMode.DurationOnly && e.DurationSeconds > 0) ||
                     (e.Mode != TimeEntryMode.DurationOnly && e.EndedAtUtc != null)
-                ))
-            .OrderByDescending(e => e.StartedAtUtc ?? e.CreatedAtUtc)
+                ));
+
+        if (!string.IsNullOrWhiteSpace(date) && DateOnly.TryParse(date, out var day))
+        {
+            // Client sends getTimezoneOffset() so the selected local calendar day
+            // maps to the correct UTC [start, end) window.
+            var offset = utcOffsetMinutes ?? 0;
+            var fromUtc = day.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc).AddMinutes(offset);
+            var toUtc = day.AddDays(1).ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc).AddMinutes(offset);
+            query = query.Where(e =>
+                (e.StartedAtUtc ?? e.CreatedAtUtc) >= fromUtc &&
+                (e.StartedAtUtc ?? e.CreatedAtUtc) < toUtc);
+        }
+
+        var totalCount = await query.CountAsync(cancellationToken);
+
+        query = newestFirst
+            ? query.OrderByDescending(e => e.StartedAtUtc ?? e.CreatedAtUtc)
+            : query.OrderBy(e => e.StartedAtUtc ?? e.CreatedAtUtc);
+
+        var entries = await query
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
             .ToListAsync(cancellationToken);
 
         var shareGroups = await TimeEntryHelpers.LoadShareGroupsAsync(_db, entries, cancellationToken);
 
-        return entries
-            .Select(e => MapEntity(
-                e,
-                assigneeDisplayName: e.User.DisplayName ?? e.User.Email,
-                shareGroups: shareGroups))
-            .ToList();
+        return new PagedResult<TimeEntryDto>
+        {
+            Items = entries
+                .Select(e => MapEntity(
+                    e,
+                    assigneeDisplayName: e.User.DisplayName ?? e.User.Email,
+                    shareGroups: shareGroups))
+                .ToList(),
+            TotalCount = totalCount,
+            Page = page,
+            PageSize = pageSize
+        };
     }
 
     public async Task<IReadOnlyList<TimeEntryDto>> ListByDateRangeAsync(

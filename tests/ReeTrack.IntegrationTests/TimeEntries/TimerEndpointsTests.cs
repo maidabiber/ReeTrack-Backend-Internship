@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using ReeTrack.Application.Common.Models;
 using ReeTrack.IntegrationTests.Support;
 using Xunit;
 
@@ -55,9 +56,9 @@ public class TimerEndpointsTests
 
         var list = await client.GetAsync("/api/time-entries");
         Assert.Equal(HttpStatusCode.OK, list.StatusCode);
-        var entries = await list.Content.ReadFromJsonAsync<List<TimeEntryResponse>>();
-        Assert.Single(entries!);
-        Assert.Equal(completed.Id, entries![0].Id);
+        var page = await list.Content.ReadFromJsonAsync<PagedResult<TimeEntryResponse>>();
+        Assert.Single(page!.Items);
+        Assert.Equal(completed.Id, page.Items[0].Id);
     }
 
     [Fact]

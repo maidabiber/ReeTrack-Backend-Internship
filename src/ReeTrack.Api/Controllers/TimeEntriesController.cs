@@ -21,10 +21,23 @@ public class TimeEntriesController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<ActionResult<IReadOnlyList<TimeEntryResponse>>> List(CancellationToken cancellationToken)
+    public async Task<ActionResult<PagedResult<TimeEntryResponse>>> List(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 50,
+        [FromQuery] string? date = null,
+        [FromQuery] string sort = "newest",
+        [FromQuery] int? utcOffsetMinutes = null,
+        CancellationToken cancellationToken = default)
     {
-        var entries = await _timeEntryService.ListAsync(cancellationToken);
-        return Ok(entries.Select(MapTimeEntry).ToList());
+        var result = await _timeEntryService.ListAsync(
+            page, pageSize, date, sort, utcOffsetMinutes, cancellationToken);
+        return Ok(new PagedResult<TimeEntryResponse>
+        {
+            Items = result.Items.Select(MapTimeEntry).ToList(),
+            TotalCount = result.TotalCount,
+            Page = result.Page,
+            PageSize = result.PageSize
+        });
     }
 
     [HttpGet("timer/active")]

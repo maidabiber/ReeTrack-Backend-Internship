@@ -52,7 +52,13 @@ public interface ITimeEntryService
         Guid entryId,
         CancellationToken cancellationToken = default);
 
-    Task<IReadOnlyList<TimeEntryDto>> ListAsync(CancellationToken cancellationToken = default);
+    Task<PagedResult<TimeEntryDto>> ListAsync(
+        int page = 1,
+        int pageSize = 50,
+        string? date = null,
+        string sort = "newest",
+        int? utcOffsetMinutes = null,
+        CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<TimeEntryDto>> ListByDateRangeAsync(
         DateTime fromUtc,
