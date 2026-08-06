@@ -32,6 +32,7 @@ public class AppDbContext : DbContext, IApplicationDbContext
     public DbSet<Holiday> Holidays => Set<Holiday>();
     public DbSet<HolidayCalendarSettings> HolidayCalendarSettings => Set<HolidayCalendarSettings>();
     public DbSet<RateMultiplierSettings> RateMultiplierSettings => Set<RateMultiplierSettings>();
+    public DbSet<JiraWebhookSettings> JiraWebhookSettings => Set<JiraWebhookSettings>();
     public DbSet<HourTargetSettings> HourTargetSettings => Set<HourTargetSettings>();
     public DbSet<UserHourTarget> UserHourTargets => Set<UserHourTarget>();
     public DbSet<WeeklyTargetCheckInRun> WeeklyTargetCheckInRuns => Set<WeeklyTargetCheckInRun>();

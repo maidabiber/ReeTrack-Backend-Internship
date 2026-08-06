@@ -117,6 +117,8 @@ All business routes are under `/api/...` and most require `[Authorize]`. Admin-o
 | `/api/teammates` | Teammate picker for sharing |
 | `/api/calendar` | Calendar view / events |
 | `/api/integrations/calendar` | Google Calendar OAuth + sync |
+| `/api/integrations/jira` | Jira import / pull sync |
+| `/api/webhooks/jira/events` | Inbound Jira webhooks (anonymous, HMAC) |
 | `/api/audit-logs` | Audit trail (Admin) |
 | `/api/health` | Liveness |
 

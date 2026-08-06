@@ -16,4 +16,14 @@ public interface IJiraIntegrationService
     Task<IntegrateJiraProjectResult> SyncProjectAsync(
         Guid reeTrackProjectId,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Upserts a single Jira issue into an already-integrated project.
+    /// Returns false when no matching local project exists.
+    /// </summary>
+    Task<bool> ApplyRemoteIssueAsync(
+        string jiraProjectId,
+        string jiraProjectKey,
+        JiraApiIssue issue,
+        CancellationToken cancellationToken = default);
 }

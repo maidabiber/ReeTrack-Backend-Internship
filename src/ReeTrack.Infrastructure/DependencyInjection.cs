@@ -205,6 +205,8 @@ public static class DependencyInjection
         services.AddHostedService<WeeklyTargetCheckInBackgroundService>();
         services.AddHostedService<ProjectThresholdBackgroundService>();
         services.AddScoped<IJiraIntegrationService, JiraIntegrationService>();
+        services.AddScoped<IJiraWebhookSubscriptionService, JiraWebhookSubscriptionService>();
+        services.AddScoped<IJiraWebhookEventProcessor, JiraWebhookEventProcessor>();
 
         return services;
     }

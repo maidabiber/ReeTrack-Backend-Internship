@@ -26,6 +26,7 @@ public interface IApplicationDbContext
     DbSet<Holiday> Holidays { get; }
     DbSet<HolidayCalendarSettings> HolidayCalendarSettings { get; }
     DbSet<RateMultiplierSettings> RateMultiplierSettings { get; }
+    DbSet<JiraWebhookSettings> JiraWebhookSettings { get; }
     DbSet<HourTargetSettings> HourTargetSettings { get; }
     DbSet<UserHourTarget> UserHourTargets { get; }
     DbSet<WeeklyTargetCheckInRun> WeeklyTargetCheckInRuns { get; }

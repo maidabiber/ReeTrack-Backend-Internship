@@ -167,6 +167,48 @@ public sealed class JiraIntegrationService : IJiraIntegrationService
         }
     }
 
+    public async Task<bool> ApplyRemoteIssueAsync(
+        string jiraProjectId,
+        string jiraProjectKey,
+        JiraApiIssue issue,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(issue.Id) || string.IsNullOrWhiteSpace(issue.Key))
+            return false;
+
+        var projectId = jiraProjectId?.Trim() ?? string.Empty;
+        var projectKey = jiraProjectKey?.Trim() ?? string.Empty;
+
+        var project = await _db.Projects
+            .FirstOrDefaultAsync(
+                p => p.ExternalProvider == ExternalProvider.Jira
+                     && ((projectId.Length > 0 && p.ExternalId == projectId)
+                         || (projectKey.Length > 0 && p.ExternalKey == projectKey)),
+                cancellationToken);
+
+        if (project is null)
+            return false;
+
+        var emailMap = await LoadAssigneeEmailMapAsync(cancellationToken);
+        var usedNames = await _db.ProjectTasks
+            .Where(t => t.ProjectId == project.Id)
+            .Select(t => t.Name)
+            .ToListAsync(cancellationToken);
+        var nameSet = new HashSet<string>(usedNames, StringComparer.OrdinalIgnoreCase);
+
+        var existing = await _db.ProjectTasks
+            .FirstOrDefaultAsync(
+                t => t.ProjectId == project.Id
+                     && t.ExternalProvider == ExternalProvider.Jira
+                     && t.ExternalId == issue.Id,
+                cancellationToken);
+
+        UpsertIssueIntoProject(project, issue, existing, emailMap, nameSet, DateTime.UtcNow);
+        project.UpdatedAtUtc = DateTime.UtcNow;
+        await _db.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
     private async Task<int> SyncIssuesIntoProjectAsync(
         Project project,
         string projectKey,
@@ -185,16 +227,7 @@ public sealed class JiraIntegrationService : IJiraIntegrationService
             .Where(t => t.ExternalId is not null)
             .ToDictionary(t => t.ExternalId!, StringComparer.Ordinal);
 
-        var usersByEmail = await _db.Users
-            .AsNoTracking()
-            .Where(u => u.Email != null)
-            .Select(u => new { u.Id, u.Email })
-            .ToListAsync(cancellationToken);
-
-        var emailMap = usersByEmail
-            .Where(u => !string.IsNullOrWhiteSpace(u.Email))
-            .GroupBy(u => u.Email!, StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(g => g.Key, g => g.First().Id, StringComparer.OrdinalIgnoreCase);
+        var emailMap = await LoadAssigneeEmailMapAsync(cancellationToken);
 
         var usedNames = await _db.ProjectTasks
             .Where(t => t.ProjectId == project.Id)
@@ -207,49 +240,75 @@ public sealed class JiraIntegrationService : IJiraIntegrationService
 
         foreach (var issue in issues)
         {
-            Guid? assigneeId = null;
-            if (!string.IsNullOrWhiteSpace(issue.AssigneeEmail)
-                && emailMap.TryGetValue(issue.AssigneeEmail, out var userId))
-            {
-                assigneeId = userId;
-            }
-
-            var desiredName = BuildTaskName(issue.Key, issue.Summary);
-
-            if (byExternalId.TryGetValue(issue.Id, out var task))
-            {
-                task.Name = EnsureUniqueName(desiredName, nameSet, task.Name);
-                task.Status = issue.IsDone ? ProjectTaskStatus.Done : ProjectTaskStatus.Open;
-                task.AssignedToUserId = assigneeId;
-                task.TimeEstimateHours = issue.OriginalEstimateHours;
-                task.ExternalKey = issue.Key;
-                task.UpdatedAtUtc = now;
-                touched++;
-                continue;
-            }
-
-            var uniqueName = EnsureUniqueName(desiredName, nameSet, null);
-            var created = new ProjectTask
-            {
-                Id = Guid.NewGuid(),
-                ProjectId = project.Id,
-                Name = uniqueName,
-                Status = issue.IsDone ? ProjectTaskStatus.Done : ProjectTaskStatus.Open,
-                AssignedToUserId = assigneeId,
-                TimeEstimateHours = issue.OriginalEstimateHours,
-                ExternalProvider = ExternalProvider.Jira,
-                ExternalId = issue.Id,
-                ExternalKey = issue.Key,
-                CreatedAtUtc = now,
-                UpdatedAtUtc = now
-            };
-            _db.ProjectTasks.Add(created);
-            byExternalId[issue.Id] = created;
+            byExternalId.TryGetValue(issue.Id, out var task);
+            var upserted = UpsertIssueIntoProject(project, issue, task, emailMap, nameSet, now);
+            byExternalId[issue.Id] = upserted;
             touched++;
         }
 
         await _db.SaveChangesAsync(cancellationToken);
         return touched;
+    }
+
+    private ProjectTask UpsertIssueIntoProject(
+        Project project,
+        JiraApiIssue issue,
+        ProjectTask? existing,
+        IReadOnlyDictionary<string, Guid> emailMap,
+        HashSet<string> nameSet,
+        DateTime now)
+    {
+        Guid? assigneeId = null;
+        if (!string.IsNullOrWhiteSpace(issue.AssigneeEmail)
+            && emailMap.TryGetValue(issue.AssigneeEmail, out var userId))
+        {
+            assigneeId = userId;
+        }
+
+        var desiredName = BuildTaskName(issue.Key, issue.Summary);
+
+        if (existing is not null)
+        {
+            existing.Name = EnsureUniqueName(desiredName, nameSet, existing.Name);
+            existing.Status = issue.IsDone ? ProjectTaskStatus.Done : ProjectTaskStatus.Open;
+            existing.AssignedToUserId = assigneeId;
+            existing.TimeEstimateHours = issue.OriginalEstimateHours;
+            existing.ExternalKey = issue.Key;
+            existing.UpdatedAtUtc = now;
+            return existing;
+        }
+
+        var uniqueName = EnsureUniqueName(desiredName, nameSet, null);
+        var created = new ProjectTask
+        {
+            Id = Guid.NewGuid(),
+            ProjectId = project.Id,
+            Name = uniqueName,
+            Status = issue.IsDone ? ProjectTaskStatus.Done : ProjectTaskStatus.Open,
+            AssignedToUserId = assigneeId,
+            TimeEstimateHours = issue.OriginalEstimateHours,
+            ExternalProvider = ExternalProvider.Jira,
+            ExternalId = issue.Id,
+            ExternalKey = issue.Key,
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now
+        };
+        _db.ProjectTasks.Add(created);
+        return created;
+    }
+
+    private async Task<Dictionary<string, Guid>> LoadAssigneeEmailMapAsync(CancellationToken cancellationToken)
+    {
+        var usersByEmail = await _db.Users
+            .AsNoTracking()
+            .Where(u => u.Email != null)
+            .Select(u => new { u.Id, u.Email })
+            .ToListAsync(cancellationToken);
+
+        return usersByEmail
+            .Where(u => !string.IsNullOrWhiteSpace(u.Email))
+            .GroupBy(u => u.Email!, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.First().Id, StringComparer.OrdinalIgnoreCase);
     }
 
     private (string SiteUrl, string Email, string ApiToken) GetCredentials()

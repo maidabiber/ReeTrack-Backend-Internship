@@ -112,7 +112,11 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseExceptionHandler();
-app.UseHttpsRedirection();
+// Skip in Development so ngrok (and other HTTP tunnels to :5042) are not redirected to :7231.
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
 app.UseCors("frontend");
 app.UseAuthentication();
 app.UseAuthorization();
