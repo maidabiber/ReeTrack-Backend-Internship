@@ -9,7 +9,7 @@ namespace ReeTrack.Api.Controllers;
 
 [ApiController]
 [Route("api/projects/{projectId:guid}/thresholds")]
-[Authorize(Roles = "Admin")]
+[Authorize(Roles = "Admin,ProjectManager")]
 public class ProjectThresholdsController : ControllerBase
 {
     private readonly IProjectThresholdService _thresholdService;

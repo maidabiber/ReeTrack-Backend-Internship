@@ -37,18 +37,26 @@ public sealed class ProjectThresholdDeliveryService : IProjectThresholdDeliveryS
         if (pending.Count == 0)
             return 0;
 
-        var recipients = await _recipientResolver.GetRecipientsAsync(cancellationToken);
-        if (recipients.Count == 0)
-        {
-            _logger.LogWarning(
-                "Found {PendingCount} pending project threshold alerts, but no Admin recipients were resolved.",
-                pending.Count);
-        }
-
         var notificationsDelivered = 0;
+        var recipientCache = new Dictionary<Guid, IReadOnlyList<ProjectThresholdRecipient>>();
 
         foreach (var alert in pending)
         {
+            if (!recipientCache.TryGetValue(alert.ProjectId, out var recipients))
+            {
+                recipients = await _recipientResolver.GetRecipientsForProjectAsync(
+                    alert.ProjectId,
+                    cancellationToken);
+                recipientCache[alert.ProjectId] = recipients;
+            }
+
+            if (recipients.Count == 0)
+            {
+                _logger.LogWarning(
+                    "Pending threshold alert for project {ProjectId} has no recipients (no active Admin or creator).",
+                    alert.ProjectId);
+            }
+
             foreach (var recipient in recipients)
             {
                 await _eventPublisher.PublishAsync(

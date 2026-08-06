@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using ReeTrack.Application.Common.Constants;
 using ReeTrack.Application.Common.Exceptions;
 using ReeTrack.Application.Common.Interfaces;
 using ReeTrack.Application.Common.Models;
@@ -10,10 +11,12 @@ namespace ReeTrack.Infrastructure.Projects;
 public sealed class ProjectThresholdService : IProjectThresholdService
 {
     private readonly IApplicationDbContext _db;
+    private readonly ICurrentUserService _currentUser;
 
-    public ProjectThresholdService(IApplicationDbContext db)
+    public ProjectThresholdService(IApplicationDbContext db, ICurrentUserService currentUser)
     {
         _db = db;
+        _currentUser = currentUser;
     }
 
     public async Task<IReadOnlyList<ProjectThresholdDto>> ListAsync(
@@ -21,7 +24,7 @@ public sealed class ProjectThresholdService : IProjectThresholdService
         ProjectThresholdMetricType? metricType = null,
         CancellationToken cancellationToken = default)
     {
-        await EnsureProjectExistsAsync(projectId, cancellationToken);
+        await EnsureCanManageProjectAsync(projectId, cancellationToken);
 
         var query = _db.ProjectThresholds
             .AsNoTracking()
@@ -43,7 +46,7 @@ public sealed class ProjectThresholdService : IProjectThresholdService
         CreateProjectThresholdInput input,
         CancellationToken cancellationToken = default)
     {
-        await EnsureProjectExistsAsync(projectId, cancellationToken);
+        await EnsureCanManageProjectAsync(projectId, cancellationToken);
         ValidatePercentage(input.ThresholdPercentage);
         ValidateMetricType(input.MetricType);
 
@@ -80,7 +83,7 @@ public sealed class ProjectThresholdService : IProjectThresholdService
         UpdateProjectThresholdInput input,
         CancellationToken cancellationToken = default)
     {
-        await EnsureProjectExistsAsync(projectId, cancellationToken);
+        await EnsureCanManageProjectAsync(projectId, cancellationToken);
         ValidatePercentage(input.ThresholdPercentage);
 
         var entity = await _db.ProjectThresholds
@@ -114,7 +117,7 @@ public sealed class ProjectThresholdService : IProjectThresholdService
         Guid thresholdId,
         CancellationToken cancellationToken = default)
     {
-        await EnsureProjectExistsAsync(projectId, cancellationToken);
+        await EnsureCanManageProjectAsync(projectId, cancellationToken);
 
         var entity = await _db.ProjectThresholds
             .FirstOrDefaultAsync(t => t.Id == thresholdId && t.ProjectId == projectId, cancellationToken)
@@ -129,14 +132,24 @@ public sealed class ProjectThresholdService : IProjectThresholdService
         await _db.SaveChangesAsync(cancellationToken);
     }
 
-    private async Task EnsureProjectExistsAsync(Guid projectId, CancellationToken cancellationToken)
+    /// <summary>
+    /// Admins may manage thresholds on any project. Project Managers may only
+    /// manage thresholds on projects they created.
+    /// </summary>
+    private async Task EnsureCanManageProjectAsync(Guid projectId, CancellationToken cancellationToken)
     {
-        var exists = await _db.Projects
+        var project = await _db.Projects
             .AsNoTracking()
-            .AnyAsync(p => p.Id == projectId, cancellationToken);
+            .Where(p => p.Id == projectId)
+            .Select(p => new { p.Id, p.CreatedByUserId })
+            .FirstOrDefaultAsync(cancellationToken)
+            ?? throw new AppException("Project not found.", 404);
 
-        if (!exists)
-            throw new AppException("Project not found.", 404);
+        if (_currentUser.Roles.Contains(RoleNames.Admin, StringComparer.Ordinal))
+            return;
+
+        if (project.CreatedByUserId != _currentUser.UserId)
+            throw AppErrors.Forbidden("You can only manage thresholds on projects you created.");
     }
 
     private static void ValidatePercentage(decimal percentage)

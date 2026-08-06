@@ -14,16 +14,22 @@ public sealed class ProjectThresholdRecipientResolver : IProjectThresholdRecipie
         _db = db;
     }
 
-    public async Task<IReadOnlyList<ProjectThresholdRecipient>> GetRecipientsAsync(
+    public async Task<IReadOnlyList<ProjectThresholdRecipient>> GetRecipientsForProjectAsync(
+        Guid projectId,
         CancellationToken cancellationToken = default)
     {
-        // Admins receive threshold alerts today.
-        // When a Project Manager role is introduced, include those users here as well.
+        var createdByUserId = await _db.Projects
+            .AsNoTracking()
+            .Where(p => p.Id == projectId)
+            .Select(p => (Guid?)p.CreatedByUserId)
+            .FirstOrDefaultAsync(cancellationToken);
+
         var recipients = await _db.Users
             .AsNoTracking()
             .Where(u =>
                 u.Status == UserStatus.Active &&
-                u.UserRoles.Any(ur => ur.RoleId == RoleIds.Admin))
+                (u.UserRoles.Any(ur => ur.RoleId == RoleIds.Admin) ||
+                 (createdByUserId != null && u.Id == createdByUserId)))
             .Select(u => new ProjectThresholdRecipient
             {
                 UserId = u.Id,

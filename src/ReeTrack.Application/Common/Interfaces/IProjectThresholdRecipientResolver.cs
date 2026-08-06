@@ -3,10 +3,11 @@ namespace ReeTrack.Application.Common.Interfaces;
 public interface IProjectThresholdRecipientResolver
 {
     /// <summary>
-    /// Resolves users who should receive project threshold alerts (Admins today;
-    /// Project Managers can be added when that role exists).
+    /// Resolves users who should receive threshold alerts for a project:
+    /// all active Admins, plus the project's creator when active.
     /// </summary>
-    Task<IReadOnlyList<ProjectThresholdRecipient>> GetRecipientsAsync(
+    Task<IReadOnlyList<ProjectThresholdRecipient>> GetRecipientsForProjectAsync(
+        Guid projectId,
         CancellationToken cancellationToken = default);
 }
 
