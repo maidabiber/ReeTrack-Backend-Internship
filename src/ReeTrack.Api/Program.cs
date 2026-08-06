@@ -1,5 +1,7 @@
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.IdentityModel.Tokens;
@@ -42,7 +44,19 @@ builder.Services.AddScoped<IApplicationDbContext>(provider => provider.GetRequir
 
 builder.Services.AddInfrastructure(builder.Configuration);
 
-builder.Services.AddDataProtection();
+// Persist Data Protection keys to a mounted volume with a stable application name.
+// Without this, keys live on the ephemeral container filesystem and are regenerated on every
+// redeploy — which makes previously-encrypted Google Calendar OAuth tokens undecryptable.
+// The key ring path can be overridden with DataProtection__KeyRingPath (defaults to /keys in
+// the container; falls back to the framework default when unset and the directory is absent).
+var dataProtection = builder.Services.AddDataProtection().SetApplicationName("ReeTrack");
+var keyRingPath = builder.Configuration["DataProtection:KeyRingPath"]
+    ?? (builder.Environment.IsDevelopment() ? null : "/keys");
+if (!string.IsNullOrWhiteSpace(keyRingPath))
+{
+    Directory.CreateDirectory(keyRingPath);
+    dataProtection.PersistKeysToFileSystem(new DirectoryInfo(keyRingPath));
+}
 
 var jwtOptions = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>()
     ?? new JwtOptions();
@@ -112,6 +126,19 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseExceptionHandler();
+// Behind the Caddy reverse proxy, TLS is terminated at the edge and requests reach Kestrel over
+// plain HTTP with X-Forwarded-Proto/For set. Honour those headers so Request.IsHttps is correct
+// (Secure cookies, correct client IP) and UseHttpsRedirection() below does not redirect-loop.
+// Only the reverse proxy on the internal Docker network can reach the app, so we trust the headers
+// from any peer (KnownNetworks/KnownProxies cleared).
+var forwardedHeaders = new ForwardedHeadersOptions
+{
+    ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
+};
+forwardedHeaders.KnownIPNetworks.Clear();
+forwardedHeaders.KnownProxies.Clear();
+app.UseForwardedHeaders(forwardedHeaders);
+
 // Skip in Development so ngrok (and other HTTP tunnels to :5042) are not redirected to :7231.
 if (!app.Environment.IsDevelopment())
 {

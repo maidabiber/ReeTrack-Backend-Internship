@@ -1,0 +1,23 @@
+{
+	# Global options. Uncomment the next line to issue certificates from Let's Encrypt STAGING
+	# while validating the setup — this avoids burning production rate limits on a misconfig.
+	# Switch it back (comment out) and `docker compose restart caddy` for a real, trusted cert.
+	# acme_ca https://acme-staging-v02.api.letsencrypt.org/directory
+}
+
+# The domain comes from the DUCKDNS_DOMAIN env var (set in /opt/reetrack/.env).
+{$DUCKDNS_DOMAIN} {
+	encode zstd gzip
+
+	# API + SignalR hub -> backend. reverse_proxy upgrades WebSockets transparently, so the
+	# /hubs/notifications SignalR connection and any future Jira webhook POST both work as-is.
+	@backend path /api/* /hubs/*
+	handle @backend {
+		reverse_proxy api:8080
+	}
+
+	# Everything else -> the SPA (nginx handles the /index.html fallback internally).
+	handle {
+		reverse_proxy web:80
+	}
+}

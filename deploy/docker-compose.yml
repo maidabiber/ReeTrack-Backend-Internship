@@ -1,0 +1,87 @@
+# Production stack for ReeTrack — runs on the EC2 box at /opt/reetrack/.
+# Single origin: Caddy terminates TLS (Let's Encrypt) and reverse-proxies
+#   /api/* and /hubs/*  -> api  (SignalR WebSocket upgrade is transparent)
+#   everything else     -> web  (nginx serving the built SPA)
+# PostgreSQL runs here as the `db` service (data persisted in the pgdata volume) — there is no
+# external managed database.
+#
+# Usage:  docker compose pull && docker compose up -d
+# Reads /opt/reetrack/.env for both compose interpolation and the container env_file.
+
+services:
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"      # HTTP/3
+    environment:
+      DUCKDNS_DOMAIN: ${DUCKDNS_DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data     # persists issued certs across redeploys (avoids LE rate limits)
+      - caddy_config:/config
+    depends_on:
+      - web
+      - api
+
+  web:
+    image: ghcr.io/reeinvent/reetrack-web:latest
+    restart: unless-stopped
+    expose:
+      - "80"
+
+  # PostgreSQL on the box. Only reachable over the internal compose network (no published port),
+  # so it needs no firewall rule. Data lives in the pgdata volume and survives redeploys.
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    image: ghcr.io/reeinvent/reetrack-api:latest
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: http://+:8080
+      DataProtection__KeyRingPath: /keys
+    volumes:
+      - dpkeys:/keys         # stable Data Protection keys -> calendar tokens survive redeploys
+    expose:
+      - "8080"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  # One-shot: applies EF Core migrations against the db container, then exits. The API waits for it
+  # to complete successfully before starting. Uses the same image (which ships ./efbundle).
+  migrate:
+    image: ghcr.io/reeinvent/reetrack-api:latest
+    restart: "no"
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+    # $$ escapes compose interpolation so the container shell expands ConnectionStrings__Default
+    # from the env_file at run time (the secret never lands in the compose-rendered command).
+    entrypoint: ["/bin/sh", "-c", "./efbundle --connection \"$$ConnectionStrings__Default\""]
+
+volumes:
+  caddy_data:
+  caddy_config:
+  dpkeys:
+  pgdata:

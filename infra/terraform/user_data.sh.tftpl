@@ -1,0 +1,67 @@
+#!/usr/bin/env bash
+# Cloud-init bootstrap for the ReeTrack app box. Runs once on first boot as root.
+# NOTE: xtrace is intentionally OFF so GHCR tokens / secrets are not echoed to cloud-init logs.
+set -euo pipefail
+export DEBIAN_FRONTEND=noninteractive
+
+# --- Docker Engine + compose plugin ----------------------------------------
+curl -fsSL https://get.docker.com | sh
+systemctl enable --now docker
+
+# --- DuckDNS: point the subdomain at the (static) Elastic IP, once -----------
+# The box has an Elastic IP, so its address never changes — there is nothing to poll for. We pass
+# the exact IP to DuckDNS (ip=${elastic_ip}) instead of letting it infer the request source, which
+# also removes the first-boot EIP-association timing problem: DNS is correct regardless of whatever
+# temporary IP the box has before the association completes. The loop only retries transient
+# network/DuckDNS errors during boot; DuckDNS returns the literal text "OK" on success.
+for i in $(seq 1 10); do
+  if curl -fsS "https://www.duckdns.org/update?domains=${duckdns_subdomain}&token=${duckdns_token}&ip=${elastic_ip}" | grep -q OK; then
+    echo "duckdns: ${duckdns_subdomain}.duckdns.org -> ${elastic_ip}"
+    break
+  fi
+  echo "duckdns: attempt $i failed, retrying in 15s"; sleep 15
+done
+
+# --- Deploy stack files -----------------------------------------------------
+mkdir -p /opt/reetrack
+
+cat > /opt/reetrack/docker-compose.yml <<'COMPOSE'
+${compose_file}
+COMPOSE
+
+cat > /opt/reetrack/Caddyfile <<'CADDY'
+${caddyfile}
+CADDY
+
+cat > /opt/reetrack/.env <<'ENVFILE'
+${env_file}
+ENVFILE
+chmod 600 /opt/reetrack/.env
+
+# --- Authenticate to GHCR --------------------------------------------------
+echo "${ghcr_read_token}" | docker login ghcr.io -u "${ghcr_username}" --password-stdin
+
+# --- Deploy helper (invoked by CI via SSM, no polling) ----------------------
+# CI (GitHub Actions) builds and pushes the :latest images to GHCR, then triggers this script on
+# the box via SSM send-command — GitHub authenticates to AWS with a short-lived OIDC token, so
+# there's no self-hosted runner, no SSH, no open port 22, and no long-lived deploy secret.
+# `up -d` only recreates containers whose image digest changed; the one-shot `migrate` service
+# re-runs (idempotently) whenever the api image updates, applying new EF migrations before the
+# api starts. `set -euo pipefail` makes any failure surface back to the CI job, and the flock
+# serialises the two repos' deploys if they land at the same moment.
+cat > /opt/reetrack/update.sh <<'UPDATE'
+#!/usr/bin/env bash
+set -euo pipefail
+exec 9>/opt/reetrack/.deploy.lock
+flock 9
+cd /opt/reetrack
+docker compose pull --quiet
+docker compose up -d
+docker image prune -f >/dev/null 2>&1 || true
+UPDATE
+chmod +x /opt/reetrack/update.sh
+
+# Run once now to self-heal first boot (best-effort — the images may not be pushed yet, in which
+# case the first CI deploy brings the stack up; containers use restart:unless-stopped so they
+# resume by themselves after a reboot).
+/opt/reetrack/update.sh || echo "initial compose up deferred — the first CI deploy will bring the stack up"

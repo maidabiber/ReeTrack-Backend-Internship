@@ -1,0 +1,43 @@
+# Copy to terraform.tfvars and fill in. terraform.tfvars is gitignored (contains secrets).
+
+# --- Core (optional overrides) ---
+region        = "eu-central-1"
+instance_type = "t3.small"
+
+# --- Database ---
+db_password = "CHANGE-ME-strong-db-password"
+
+# --- DuckDNS ---
+duckdns_subdomain = "your-subdomain"          # -> your-subdomain.duckdns.org
+duckdns_token     = "your-duckdns-token"
+
+# --- GHCR (box pulls private images) ---
+ghcr_username   = "your-github-username"
+ghcr_read_token = "ghp_xxx_read_packages_PAT"
+
+# --- SSH (admin + CI deploy) ---
+# Generate a keypair locally:  ssh-keygen -t ed25519 -f reetrack_deploy -C reetrack
+# Paste the PUBLIC key (contents of reetrack_deploy.pub) here; keep the private key for SSH + CI.
+ssh_public_key = "ssh-ed25519 AAAA... reetrack"
+# Optional: restrict SSH. Leave default (anywhere) for automated CI-over-SSH deploys.
+# ssh_ingress_cidr = ["0.0.0.0/0"]
+
+# --- Google OAuth ---
+google_client_id     = "xxxx.apps.googleusercontent.com"
+google_client_secret = "GOCSPX-xxxx"
+# google_admin_email = "you@reeinvent.com"
+
+# --- JWT (>= 32 chars) ---
+jwt_signing_key = "generate-a-long-random-value-at-least-32-chars"
+
+# --- Optional integrations (uncomment to enable) ---
+# jira_site_url       = "https://your-domain.atlassian.net"
+# jira_email          = "you@reeinvent.com"
+# jira_api_token      = "xxx"
+# jira_webhook_secret = "long-random-token"
+# llm_api_key         = "gsk_xxx"
+# slack_bot_token     = "xoxb-xxx"
+# smtp_host           = "mail.smtp2go.com"
+# smtp_username       = "xxx"
+# smtp_password       = "xxx"
+# smtp_from           = "ReeTrack <verified@yourdomain>"

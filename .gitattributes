@@ -1,1 +1,11 @@
 *.Designer.cs linguist-generated=true
+
+# Deployment scripts/configs are consumed on Linux (cloud-init user_data, Docker RUN, Caddy).
+# Force LF so a Windows checkout can't inject CRLF and break them.
+*.sh          text eol=lf
+*.tftpl       text eol=lf
+Dockerfile    text eol=lf
+*.yml         text eol=lf
+*.yaml        text eol=lf
+Caddyfile     text eol=lf
+.dockerignore text eol=lf

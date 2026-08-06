@@ -1,0 +1,26 @@
+# Build outputs
+**/bin/
+**/obj/
+**/out/
+
+# Tests are not needed in the runtime image
+tests/
+
+# Local env / secrets — must never enter the image
+.env
+**/*.user
+
+# VCS / IDE / tooling
+.git/
+.gitignore
+.gitattributes
+.github/
+.vs/
+.cursor/
+.vscode/
+.idea/
+
+# Docs / infra (not part of the app build)
+README.md
+deploy/
+infra/

@@ -1,0 +1,67 @@
+name: Build & Publish API image
+
+on:
+  push:
+    branches: [ "master" ]
+  workflow_dispatch:
+
+concurrency:
+  group: publish-backend
+  cancel-in-progress: false
+
+env:
+  IMAGE: ghcr.io/reeinvent/reetrack-api
+
+jobs:
+  # Build the image on a GitHub-hosted runner and push it to GHCR.
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:latest
+            ${{ env.IMAGE }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # Deploy: SSH into the box and run the update script (docker compose pull + up -d). No AWS
+  # credentials involved. Requires (in this repo, Settings -> Secrets and variables -> Actions):
+  #   Variable  DEPLOY_HOST     = the elastic_ip terraform output (the box's public IP)
+  #   Secret    DEPLOY_SSH_KEY  = the PRIVATE key matching terraform's ssh_public_key
+  # update.sh runs with `set -euo pipefail`, so a failed deploy makes this job fail too.
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy over SSH
+        env:
+          DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh -o StrictHostKeyChecking=accept-new -i ~/.ssh/deploy_key \
+            ubuntu@"$DEPLOY_HOST" 'sudo /opt/reetrack/update.sh'

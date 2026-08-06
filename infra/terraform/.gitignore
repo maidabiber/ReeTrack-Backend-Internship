@@ -1,0 +1,15 @@
+# Terraform state may contain secrets (DB password, tokens) — never commit.
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+crash.log
+
+# Real variable values (secrets)
+terraform.tfvars
+*.auto.tfvars
+
+# SSH keypair for the box — NEVER commit the private key
+reetrack_deploy
+reetrack_deploy.pub
+*.pem
