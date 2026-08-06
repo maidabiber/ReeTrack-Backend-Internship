@@ -4,6 +4,7 @@ using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging.Abstractions;
 using ReeTrack.Application.Common.Interfaces;
 using ReeTrack.Application.Common.Models;
+using ReeTrack.Application.Common.Options;
 using ReeTrack.Infrastructure.Assistant;
 using Xunit;
 
@@ -13,18 +14,24 @@ public class AssistantServiceTests
 {
     private readonly FakeClientService _clientService = new();
     private readonly FakeProjectService _projectService = new();
+    private readonly FakeProjectTaskService _projectTaskService = new();
+    private readonly FakeTagService _tagService = new();
 
     [Fact]
-    public async Task StreamChat_ReturnsTokenEvent_WithPlainTextResponse()
+    public async Task StreamChat_StreamsTokenEventsAsTheyArrive_ThenDone()
     {
         var fakeClient = new FakeChatClient(["Hello! How can I help?"]);
         var sut = CreateSut(fakeClient);
 
         var events = await CollectEventsAsync(sut, "hi");
 
-        var token = Assert.IsType<AssistantEvent.TokenEvent>(events[0]);
-        Assert.Equal("Hello! How can I help?", token.Text);
-        Assert.IsType<AssistantEvent.DoneEvent>(events[1]);
+        var tokens = events.OfType<AssistantEvent.TokenEvent>().ToList();
+
+        // One event per streamed delta, not one buffered event at the end — the whole point is
+        // that the browser starts rendering before the model has finished.
+        Assert.True(tokens.Count > 1, $"Expected several token events, got {tokens.Count}.");
+        Assert.Equal("Hello! How can I help?", string.Concat(tokens.Select(t => t.Text)));
+        Assert.IsType<AssistantEvent.DoneEvent>(events[^1]);
     }
 
     [Fact]
@@ -198,6 +205,89 @@ public class AssistantServiceTests
         Assert.NotNull(fakeClient.ReceivedOptions);
         Assert.NotNull(fakeClient.ReceivedOptions!.Tools);
         Assert.Equal(4, fakeClient.ReceivedOptions!.Tools.Count);
+    }
+
+    [Fact]
+    public async Task StreamChat_TimeEntryMode_SendsTimeEntryPromptAndTools()
+    {
+        var fakeClient = new FakeChatClient(["OK"]);
+        var sut = CreateSut(fakeClient);
+
+        var request = new AssistantChatRequest
+        {
+            Message = "log 1 hour today",
+            Mode = AssistantMode.TimeEntry,
+            History = []
+        };
+
+        await foreach (var _ in sut.StreamChatAsync(request)) { }
+
+        var systemMessages = fakeClient.ReceivedMessages
+            .Where(m => m.Role == ChatRole.System)
+            .ToList();
+
+        Assert.Contains(systemMessages, m => m.Text != null && m.Text.Contains("time-logging assistant"));
+        Assert.Contains(systemMessages, m => m.Text != null && m.Text.Contains("SubmitTimeEntryDraft"));
+
+        Assert.NotNull(fakeClient.ReceivedOptions);
+        Assert.NotNull(fakeClient.ReceivedOptions!.Tools);
+        Assert.Equal(6, fakeClient.ReceivedOptions!.Tools.Count);
+    }
+
+    [Fact]
+    public async Task StreamChat_TimeEntryMode_IncludesCalendarAndTimezoneInSystemPrompt()
+    {
+        var fakeClient = new FakeChatClient(["OK"]);
+        var sut = CreateSut(fakeClient);
+
+        var request = new AssistantChatRequest
+        {
+            Message = "fill in next week 1 hour from 9 to 10",
+            Mode = AssistantMode.TimeEntry,
+            ReferenceDate = "2026-08-07", // Friday
+            TimeZone = "Europe/Amsterdam",
+            ReferenceDateTime = "2026-08-07T15:00",
+            History = []
+        };
+
+        await foreach (var _ in sut.StreamChatAsync(request)) { }
+
+        var prompt = fakeClient.ReceivedMessages
+            .Where(m => m.Role == ChatRole.System)
+            .Select(m => m.Text)
+            .FirstOrDefault(t => t != null && t.Contains("time-logging assistant"));
+
+        Assert.NotNull(prompt);
+        Assert.Contains("Today: Friday 2026-08-07", prompt);
+        Assert.Contains("User timezone (IANA): Europe/Amsterdam", prompt);
+        Assert.Contains("Local date-time right now: 2026-08-07T15:00", prompt);
+        Assert.Contains("Next week: Monday 2026-08-10", prompt);
+        Assert.Contains("expandWeek=next, expandDays=weekdays → 2026-08-10, 2026-08-11, 2026-08-12, 2026-08-13, 2026-08-14", prompt);
+        Assert.Contains("SubmitWeekTimeEntryDraft", prompt);
+        Assert.Contains("Never say entries were created, logged, or saved", prompt);
+        Assert.Contains("Never convert to UTC", prompt);
+        Assert.Contains("NOT Sunday–Saturday", prompt);
+    }
+
+    [Fact]
+    public async Task StreamChat_TimeEntryMode_ReturnsTimeEntryDraftEvent_WhenSubmitTimeEntryDraftToolCalled()
+    {
+        var fakeClient = new FakeChatClient(["Logged."]);
+        var sut = CreateSut(fakeClient);
+
+        var request = new AssistantChatRequest
+        {
+            Message = "log 1 hour today",
+            Mode = AssistantMode.TimeEntry,
+            History = []
+        };
+
+        var events = new List<AssistantEvent>();
+        await foreach (var evt in sut.StreamChatAsync(request))
+            events.Add(evt);
+
+        Assert.Contains(events, e => e is AssistantEvent.TokenEvent);
+        Assert.Contains(events, e => e is AssistantEvent.DoneEvent);
     }
 
     [Fact]
@@ -431,16 +521,335 @@ public class AssistantServiceTests
 
     #endregion
 
+    #region TimeEntryAssistantTools Tests
+
+    [Fact]
+    public async Task TimeEntryTools_SearchProjects_RegistersKnownIds()
+    {
+        var id = Guid.NewGuid();
+        _projectService.SearchResults["web"] = [new ProjectLookupDto(id, "Website Project", "Acme Corp", 5)];
+
+        var tools = CreateTimeEntryTools();
+        var result = await tools.SearchProjects("web");
+
+        Assert.Contains("Website Project", result);
+        Assert.Contains(id.ToString(), result);
+    }
+
+    [Fact]
+    public void TimeEntryTools_SubmitTimeEntryDraft_CapturesMultipleRows()
+    {
+        var projectId = Guid.NewGuid();
+        var tagId = Guid.NewGuid();
+        var tools = CreateTimeEntryTools();
+        tools.RegisterMention("project", projectId, "Website Redesign");
+        tools.RegisterMention("tag", tagId, "design");
+
+        var result = tools.SubmitTimeEntryDraft(
+        [
+            new TimeEntryDraftItem { EntryDate = "2026-08-03", DurationMinutes = 60, ProjectId = projectId, TagIds = [tagId] },
+            new TimeEntryDraftItem { EntryDate = "2026-08-04", DurationMinutes = 60, ProjectId = projectId, TagIds = [tagId] },
+        ]);
+
+        Assert.NotNull(tools.CapturedDraft);
+        Assert.Equal(2, tools.CapturedDraft!.Entries.Count);
+        Assert.Contains("2 entries", result);
+        Assert.All(tools.CapturedDraft.Entries, e =>
+        {
+            Assert.Equal(projectId, e.ProjectId);
+            Assert.Equal("Website Redesign", e.ProjectName);
+            Assert.Equal([tagId], e.TagIds);
+            Assert.Equal(["design"], e.TagNames);
+        });
+    }
+
+    [Fact]
+    public void TimeEntryTools_SubmitWeekTimeEntryDraft_ExpandsNextWeekdays()
+    {
+        var projectId = Guid.NewGuid();
+        var tools = CreateTimeEntryTools();
+        tools.SetReferenceDate(new DateOnly(2026, 8, 7)); // Friday
+        tools.RegisterMention("project", projectId, "Website Redesign");
+
+        var result = tools.SubmitWeekTimeEntryDraft(
+            expandWeek: "next",
+            expandDays: "weekdays",
+            startTime: "03:00",
+            endTime: "04:00",
+            durationMinutes: 60,
+            projectId: projectId,
+            isBillable: true);
+
+        Assert.Contains("5 entries", result);
+        Assert.NotNull(tools.CapturedDraft);
+        Assert.Equal(
+            ["2026-08-10", "2026-08-11", "2026-08-12", "2026-08-13", "2026-08-14"],
+            tools.CapturedDraft!.Entries.Select(e => e.EntryDate).ToList());
+        Assert.All(tools.CapturedDraft.Entries, e =>
+        {
+            Assert.Equal("03:00", e.StartTime);
+            Assert.Equal("04:00", e.EndTime);
+            Assert.Equal(projectId, e.ProjectId);
+            Assert.True(e.IsBillable);
+        });
+    }
+
+    [Fact]
+    public void TimeEntryTools_SubmitTimeEntryDraft_DiscardsUnmatchedIds()
+    {
+        var tools = CreateTimeEntryTools();
+        var unknownProjectId = Guid.NewGuid();
+
+        var result = tools.SubmitTimeEntryDraft(
+        [
+            new TimeEntryDraftItem { EntryDate = "2026-08-03", DurationMinutes = 60, ProjectId = unknownProjectId },
+        ]);
+
+        Assert.NotNull(tools.CapturedDraft);
+        Assert.Null(tools.CapturedDraft!.Entries[0].ProjectId);
+        Assert.Contains("1 entry", result);
+    }
+
+    [Fact]
+    public void TimeEntryTools_SubmitTimeEntryDraft_RangeRowStaysRange()
+    {
+        var tools = CreateTimeEntryTools();
+
+        tools.SubmitTimeEntryDraft(
+        [
+            new TimeEntryDraftItem { EntryDate = "2026-08-03", StartTime = "09:00", EndTime = "11:30" },
+        ]);
+
+        var entry = tools.CapturedDraft!.Entries[0];
+        Assert.Equal("09:00", entry.StartTime);
+        Assert.Equal("11:30", entry.EndTime);
+        Assert.Equal(150, entry.DurationMinutes);
+    }
+
+    [Fact]
+    public void TimeEntryTools_SubmitTimeEntryDraft_DurationOnlyRowHasNoTimes()
+    {
+        var tools = CreateTimeEntryTools();
+
+        tools.SubmitTimeEntryDraft(
+        [
+            new TimeEntryDraftItem { EntryDate = "2026-08-03", DurationMinutes = 120 },
+        ]);
+
+        var entry = tools.CapturedDraft!.Entries[0];
+        Assert.Null(entry.StartTime);
+        Assert.Null(entry.EndTime);
+        Assert.Equal(120, entry.DurationMinutes);
+    }
+
+    [Fact]
+    public void TimeEntryTools_SubmitTimeEntryDraft_TaskMustBelongToResolvedProject()
+    {
+        var projectId = Guid.NewGuid();
+        var otherProjectId = Guid.NewGuid();
+        var taskId = Guid.NewGuid();
+        var tools = CreateTimeEntryTools();
+        tools.RegisterMention("project", projectId, "Project A");
+        tools.RegisterMention("project", otherProjectId, "Project B");
+        // Task known to belong to otherProjectId, via SeedBaseDraft.
+        tools.SeedBaseDraft(new TimeEntryDraft
+        {
+            Entries = [new TimeEntryDraftItem
+            {
+                EntryDate = "2026-08-01",
+                DurationMinutes = 30,
+                ProjectId = otherProjectId,
+                ProjectName = "Project B",
+                ProjectTaskId = taskId,
+                TaskName = "Some Task",
+            }]
+        });
+
+        tools.SubmitTimeEntryDraft(
+        [
+            new TimeEntryDraftItem { EntryDate = "2026-08-03", DurationMinutes = 60, ProjectId = projectId, ProjectTaskId = taskId },
+        ]);
+
+        var entry = tools.CapturedDraft!.Entries[0];
+        Assert.Equal(projectId, entry.ProjectId);
+        Assert.Null(entry.ProjectTaskId);
+    }
+
+    [Fact]
+    public void TimeEntryTools_SeedBaseDraft_TrustsExistingEntryIds()
+    {
+        var projectId = Guid.NewGuid();
+        var tools = CreateTimeEntryTools();
+        tools.SeedBaseDraft(new TimeEntryDraft
+        {
+            Entries = [new TimeEntryDraftItem
+            {
+                EntryDate = "2026-08-01",
+                DurationMinutes = 30,
+                ProjectId = projectId,
+                ProjectName = "Seeded Project",
+            }]
+        });
+
+        tools.SubmitTimeEntryDraft(
+        [
+            new TimeEntryDraftItem { EntryDate = "2026-08-03", DurationMinutes = 60, ProjectId = projectId },
+        ]);
+
+        Assert.Equal(projectId, tools.CapturedDraft!.Entries[0].ProjectId);
+    }
+
+    [Fact]
+    public void TimeEntryTools_SeedBaseDraft_CarriesOverTaskAndCrossChecksItsProject()
+    {
+        // Regression: a task id carried over from the base draft (model didn't re-send it)
+        // must still resolve its name and get project-mismatch checked, not just pass through.
+        var projectId = Guid.NewGuid();
+        var otherProjectId = Guid.NewGuid();
+        var taskId = Guid.NewGuid();
+        var tools = CreateTimeEntryTools();
+        // The model must have resolved the new project via search/mention first —
+        // the hallucinated-id defence would otherwise discard an unknown id.
+        tools.RegisterMention("project", projectId, "New Project");
+        tools.SeedBaseDraft(new TimeEntryDraft
+        {
+            Entries = [new TimeEntryDraftItem
+            {
+                EntryDate = "2026-08-01",
+                DurationMinutes = 30,
+                ProjectId = otherProjectId,
+                ProjectName = "Other Project",
+                ProjectTaskId = taskId,
+                TaskName = "Carried Task",
+            }]
+        });
+
+        // Model changes only the project this turn; task id is omitted, expecting carry-over.
+        tools.SubmitTimeEntryDraft(
+        [
+            new TimeEntryDraftItem { EntryDate = "2026-08-01", DurationMinutes = 30, ProjectId = projectId },
+        ]);
+
+        var entry = tools.CapturedDraft!.Entries[0];
+        Assert.Equal(projectId, entry.ProjectId);
+        // The carried-over task belonged to a different project — it must be dropped, not kept.
+        Assert.Null(entry.ProjectTaskId);
+        Assert.Null(entry.TaskName);
+    }
+
+    [Fact]
+    public void TimeEntryTools_SubmitTimeEntryDraft_OverlaysOmittedBillableFromBaseEntry()
+    {
+        // Regression: asking the model to change only tags must not silently flip
+        // isBillable back to its true default when the model omits the field.
+        var tools = CreateTimeEntryTools();
+        tools.SeedBaseDraft(new TimeEntryDraft
+        {
+            Entries = [new TimeEntryDraftItem
+            {
+                EntryDate = "2026-08-01",
+                DurationMinutes = 30,
+                Description = "Research",
+                IsBillable = false,
+            }]
+        });
+
+        tools.SubmitTimeEntryDraft(
+        [
+            new TimeEntryDraftItem { EntryDate = "2026-08-01", DurationMinutes = 30 },
+        ]);
+
+        var entry = tools.CapturedDraft!.Entries[0];
+        Assert.False(entry.IsBillable);
+        Assert.Equal("Research", entry.Description);
+    }
+
+    [Fact]
+    public void TimeEntryTools_SubmitTimeEntryDraft_ExplicitBillableOverridesBaseEntry()
+    {
+        var tools = CreateTimeEntryTools();
+        tools.SeedBaseDraft(new TimeEntryDraft
+        {
+            Entries = [new TimeEntryDraftItem { EntryDate = "2026-08-01", DurationMinutes = 30, IsBillable = false }]
+        });
+
+        tools.SubmitTimeEntryDraft(
+        [
+            new TimeEntryDraftItem { EntryDate = "2026-08-01", DurationMinutes = 30, IsBillable = true },
+        ]);
+
+        Assert.True(tools.CapturedDraft!.Entries[0].IsBillable);
+    }
+
+    [Fact]
+    public void TimeEntryTools_SubmitTimeEntryDraft_NoBaseDraft_DefaultsBillableToTrue()
+    {
+        var tools = CreateTimeEntryTools();
+
+        tools.SubmitTimeEntryDraft([new TimeEntryDraftItem { EntryDate = "2026-08-01", DurationMinutes = 30 }]);
+
+        Assert.True(tools.CapturedDraft!.Entries[0].IsBillable);
+    }
+
+    [Fact]
+    public void TimeEntryTools_Reset_ClearsKnownIdsAndDraft()
+    {
+        var projectId = Guid.NewGuid();
+        var tools = CreateTimeEntryTools();
+        tools.RegisterMention("project", projectId, "Project A");
+        tools.SubmitTimeEntryDraft([new TimeEntryDraftItem { EntryDate = "2026-08-03", DurationMinutes = 60, ProjectId = projectId }]);
+
+        tools.Reset();
+
+        Assert.Null(tools.CapturedDraft);
+        Assert.False(tools.DraftCleared);
+
+        // Project id is no longer known after Reset — must be discarded again.
+        tools.SubmitTimeEntryDraft([new TimeEntryDraftItem { EntryDate = "2026-08-03", DurationMinutes = 60, ProjectId = projectId }]);
+        Assert.Null(tools.CapturedDraft!.Entries[0].ProjectId);
+    }
+
+    [Fact]
+    public void TimeEntryTools_ClearDraft_ResetsState()
+    {
+        var tools = CreateTimeEntryTools();
+
+        tools.SubmitTimeEntryDraft([new TimeEntryDraftItem { EntryDate = "2026-08-03", DurationMinutes = 60 }]);
+        Assert.NotNull(tools.CapturedDraft);
+
+        tools.ClearDraft();
+        Assert.Null(tools.CapturedDraft);
+        Assert.True(tools.DraftCleared);
+    }
+
+    [Fact]
+    public void TimeEntryTools_SubmitTimeEntryDraft_RejectsDurationOutOfBounds()
+    {
+        var tools = CreateTimeEntryTools();
+
+        var result = tools.SubmitTimeEntryDraft([new TimeEntryDraftItem { EntryDate = "2026-08-03", DurationMinutes = 2000 }]);
+
+        Assert.Contains("invalid duration", result);
+        Assert.Null(tools.CapturedDraft);
+    }
+
+    #endregion
+
     #region Helpers
 
     private AssistantService CreateSut(FakeChatClient fakeClient)
     {
         var tools = new AssistantTools(_clientService, _projectService);
+        var timeEntryTools = CreateTimeEntryTools();
         var logger = NullLogger<AssistantService>.Instance;
-        return new AssistantService(fakeClient, tools, logger);
+        var llmOptions = Microsoft.Extensions.Options.Options.Create(new LlmOptions());
+        return new AssistantService(fakeClient, tools, timeEntryTools, llmOptions, logger);
     }
 
     private AssistantTools CreateTools() => new(_clientService, _projectService);
+
+    private TimeEntryAssistantTools CreateTimeEntryTools() =>
+        new(_projectService, _projectTaskService, _tagService, NullLogger<TimeEntryAssistantTools>.Instance);
 
     private static async Task<List<AssistantEvent>> CollectEventsAsync(
         AssistantService sut,
@@ -580,6 +989,55 @@ public sealed class FakeProjectService : IProjectService
         => throw new NotImplementedException();
 
     public Task<ProjectDto> UpdateAsync(Guid id, UpdateProjectInput input, CancellationToken cancellationToken = default)
+        => throw new NotImplementedException();
+
+    public Task DeleteAsync(Guid id, CancellationToken cancellationToken = default)
+        => throw new NotImplementedException();
+}
+
+public sealed class FakeProjectTaskService : IProjectTaskService
+{
+    public Dictionary<string, List<ProjectTaskDto>> ListAcrossResults { get; } = [];
+    public List<string> ListAcrossCalls { get; } = [];
+
+    public Task<PagedResult<ProjectTaskDto>> ListAsync(TaskListQuery query, CancellationToken cancellationToken = default)
+        => throw new NotImplementedException();
+
+    public Task<PagedResult<ProjectTaskDto>> ListAcrossProjectsAsync(TaskListQuery query, CancellationToken cancellationToken = default)
+    {
+        var key = (query.Q ?? string.Empty).ToLowerInvariant();
+        ListAcrossCalls.Add(key);
+        var items = ListAcrossResults.TryGetValue(key, out var found) ? found : [];
+        return Task.FromResult(new PagedResult<ProjectTaskDto> { Items = items, TotalCount = items.Count, Page = 1, PageSize = query.PageSize });
+    }
+
+    public Task<ProjectTaskDto> CreateAsync(Guid projectId, CreateTaskInput input, CancellationToken cancellationToken = default)
+        => throw new NotImplementedException();
+
+    public Task<ProjectTaskDto> UpdateAsync(Guid projectId, Guid taskId, UpdateTaskInput input, CancellationToken cancellationToken = default)
+        => throw new NotImplementedException();
+
+    public Task DeleteAsync(Guid projectId, Guid taskId, CancellationToken cancellationToken = default)
+        => throw new NotImplementedException();
+}
+
+public sealed class FakeTagService : ITagService
+{
+    public Dictionary<string, List<TagDto>> ListResults { get; } = [];
+    public List<string> ListCalls { get; } = [];
+
+    public Task<PagedResult<TagDto>> ListAsync(TagListQuery query, CancellationToken cancellationToken = default)
+    {
+        var key = (query.Q ?? string.Empty).ToLowerInvariant();
+        ListCalls.Add(key);
+        var items = ListResults.TryGetValue(key, out var found) ? found : [];
+        return Task.FromResult(new PagedResult<TagDto> { Items = items, TotalCount = items.Count, Page = 1, PageSize = query.PageSize });
+    }
+
+    public Task<TagDto> CreateAsync(string? name, string? color, CancellationToken cancellationToken = default)
+        => throw new NotImplementedException();
+
+    public Task<TagDto> UpdateAsync(Guid id, string? name, string? color, CancellationToken cancellationToken = default)
         => throw new NotImplementedException();
 
     public Task DeleteAsync(Guid id, CancellationToken cancellationToken = default)

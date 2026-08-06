@@ -145,6 +145,7 @@ public static class DependencyInjection
         services.AddScoped<ITimeEntryTemplateService, TimeEntryTemplateService>();
         services.AddScoped<ISmartTimeParseService, SmartTimeParseService>();
         services.AddScoped<AssistantTools>();
+        services.AddScoped<TimeEntryAssistantTools>();
         services.AddScoped<IAssistantService, AssistantService>();
         services.AddScoped<ITimeEntrySuggestionService, TimeEntrySuggestionService>();
         services.AddScoped<IProjectService, ProjectService>();

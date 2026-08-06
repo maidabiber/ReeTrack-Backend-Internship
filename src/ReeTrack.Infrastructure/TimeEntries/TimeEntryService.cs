@@ -7,13 +7,19 @@ using ReeTrack.Application.Notifications.Events;
 using ReeTrack.Application.Overview.Events;
 using ReeTrack.Domain.Entities;
 using ReeTrack.Domain.Enums;
+using ReeTrack.Domain.Exceptions;
 using ReeTrack.Domain.ValueObjects;
+using ReeTrack.Infrastructure.Persistence;
 
 namespace ReeTrack.Infrastructure.TimeEntries;
 
 public class TimeEntryService : ITimeEntryService
 {
+    // Same object, two views of it. Almost everything here only needs the interface, but
+    // CreateBatchAsync opens a transaction and IApplicationDbContext exposes no Database
+    // property. Taking the concrete type once beats threading the same instance in twice.
     private readonly IApplicationDbContext _db;
+    private readonly AppDbContext _dbContext;
     private readonly ICurrentUserService _currentUser;
     private readonly ITimeEntryGuardService _entryGuard;
     private readonly ITimeEntryAssociationService _associations;
@@ -22,7 +28,7 @@ public class TimeEntryService : ITimeEntryService
     private readonly IDomainEventPublisher _eventPublisher;
 
     public TimeEntryService(
-        IApplicationDbContext db,
+        AppDbContext db,
         ICurrentUserService currentUser,
         ITimeEntryGuardService entryGuard,
         ITimeEntryAssociationService associations,
@@ -31,6 +37,7 @@ public class TimeEntryService : ITimeEntryService
         IDomainEventPublisher eventPublisher)
     {
         _db = db;
+        _dbContext = db;
         _currentUser = currentUser;
         _entryGuard = entryGuard;
         _associations = associations;
@@ -125,7 +132,16 @@ public class TimeEntryService : ITimeEntryService
     {
         var userId = _currentUser.UserId;
         var now = DateTime.UtcNow;
-        var entry = CreateEntity(userId, input, now);
+
+        TimeEntry entry;
+        try
+        {
+            entry = CreateEntity(userId, input, now);
+        }
+        catch (DomainException ex)
+        {
+            throw AppErrors.Validation(ex.Message);
+        }
 
         if (entry.Mode == TimeEntryMode.Timer)
         {
@@ -168,6 +184,91 @@ public class TimeEntryService : ITimeEntryService
         }
 
         return MapEntity(entry);
+    }
+
+    public async Task<BatchCreateTimeEntriesResultDto> CreateBatchAsync(
+        IReadOnlyList<TimeEntryInput> inputs,
+        bool skipOverlapping,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(inputs);
+
+        var userId = _currentUser.UserId;
+        var conflicts = new List<BatchEntryConflictDto>();
+        var accepted = new List<TimeEntryInput>(inputs.Count);
+
+        // Pass 1 — find every collision before writing anything. Rows are checked both against
+        // what is already saved and against earlier rows of this same batch; without the latter,
+        // two drafted rows that overlap each other only surface once the first one is committed.
+        var acceptedRanges = new List<(int Index, DateTime Start, DateTime End, string? Description)>();
+
+        for (var i = 0; i < inputs.Count; i++)
+        {
+            var input = inputs[i];
+
+            // Duration-only rows carry no clock range, and the overlap checker ignores them.
+            if (input.StartedAtUtc is not DateTime start || input.EndedAtUtc is not DateTime end || end <= start)
+            {
+                accepted.Add(input);
+                continue;
+            }
+
+            var saved = await _overlap.FindOverlapsAsync(userId, start, end, null, cancellationToken);
+
+            var inBatch = acceptedRanges
+                .Where(other => other.Start < end && other.End > start)
+                .Select(other => other.Index)
+                .ToList();
+
+            if (saved.Count == 0 && inBatch.Count == 0)
+            {
+                accepted.Add(input);
+                acceptedRanges.Add((i, start, end, input.Description));
+                continue;
+            }
+
+            conflicts.Add(new BatchEntryConflictDto
+            {
+                Index = i,
+                Message = BuildBatchConflictMessage(saved, inBatch),
+                OverlappingEntries = saved,
+                OverlappingEntryIndexes = inBatch,
+            });
+        }
+
+        // Nothing is written until the user has seen the conflicts and chosen to go ahead.
+        if (conflicts.Count > 0 && !skipOverlapping)
+            return new BatchCreateTimeEntriesResultDto { Conflicts = conflicts };
+
+        var created = new List<TimeEntryDto>(accepted.Count);
+
+        await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+        try
+        {
+            foreach (var input in accepted)
+                created.Add(await CreateAsync(input, cancellationToken));
+
+            await transaction.CommitAsync(cancellationToken);
+        }
+        catch
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            throw;
+        }
+
+        return new BatchCreateTimeEntriesResultDto { Created = created, Conflicts = conflicts };
+    }
+
+    private static string BuildBatchConflictMessage(
+        IReadOnlyList<OverlapEntryDto> saved,
+        IReadOnlyList<int> inBatch)
+    {
+        if (saved.Count > 0)
+            return TimeEntryOverlapChecker.BuildOverlapMessage(saved);
+
+        return inBatch.Count == 1
+            ? $"This entry overlaps entry {inBatch[0] + 1} in this batch."
+            : $"This entry overlaps entries {string.Join(", ", inBatch.Select(i => i + 1))} in this batch.";
     }
 
     public async Task<TimeEntryDto> UpdateAsync(

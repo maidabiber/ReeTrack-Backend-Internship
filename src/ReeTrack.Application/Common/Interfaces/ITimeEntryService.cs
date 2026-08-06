@@ -16,6 +16,18 @@ public interface ITimeEntryService
         TimeEntryInput input,
         CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Creates several entries as one unit. Every row is checked for overlaps up front, so a
+    /// collision on the last row can't leave the earlier ones committed. When any row conflicts
+    /// and <paramref name="skipOverlapping"/> is false, nothing is written and the conflicts are
+    /// returned for the caller to review; when it is true, the clean rows are created and the
+    /// conflicting ones are reported as skipped.
+    /// </summary>
+    Task<BatchCreateTimeEntriesResultDto> CreateBatchAsync(
+        IReadOnlyList<TimeEntryInput> inputs,
+        bool skipOverlapping,
+        CancellationToken cancellationToken = default);
+
     Task<TimeEntryDto> UpdateAsync(
         Guid entryId,
         TimeEntryInput input,

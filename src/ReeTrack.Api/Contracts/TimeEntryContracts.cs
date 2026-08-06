@@ -15,6 +15,31 @@ public sealed class TimeEntryRequest
     public List<Guid>? AssigneeUserIds { get; set; }
 }
 
+public sealed class CreateTimeEntriesBatchRequest
+{
+    public List<TimeEntryRequest> Entries { get; set; } = [];
+
+    /// <summary>
+    /// When true, create the rows that don't overlap and report the rest as skipped.
+    /// The default refuses the whole batch so the user sees the conflicts before anything lands.
+    /// </summary>
+    public bool SkipOverlapping { get; set; }
+}
+
+public sealed class BatchEntryConflictResponse
+{
+    public required int Index { get; init; }
+    public required string Message { get; init; }
+    public IReadOnlyList<OverlapEntryResponse> OverlappingEntries { get; init; } = [];
+    public IReadOnlyList<int> OverlappingEntryIndexes { get; init; } = [];
+}
+
+public sealed class CreateTimeEntriesBatchResponse
+{
+    public IReadOnlyList<TimeEntryResponse> Created { get; init; } = [];
+    public IReadOnlyList<BatchEntryConflictResponse> Conflicts { get; init; } = [];
+}
+
 public sealed class CreateSharedManualEntryResponse
 {
     public required IReadOnlyList<TimeEntryResponse> Entries { get; init; }

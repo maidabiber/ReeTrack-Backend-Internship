@@ -48,8 +48,13 @@ public class AssistantController : ControllerBase
             }).ToList(),
             CurrentDraft = request.CurrentDraft?.ToDomain(),
             Mentions = request.Mentions?
-                .Select(m => new MessageMention(m.Type, m.Id, m.Name))
+                .Select(m => new MessageMention(m.Type, m.Id, m.Name, m.ProjectId, m.ProjectName))
                 .ToList(),
+            Mode = request.ToDomainMode(),
+            CurrentTimeEntryDraft = request.CurrentTimeEntryDraft?.ToDomain(),
+            ReferenceDate = request.ReferenceDate,
+            TimeZone = request.TimeZone,
+            ReferenceDateTime = request.ReferenceDateTime,
         };
 
         await foreach (var evt in _assistantService.StreamChatAsync(domainRequest, cancellationToken))
@@ -58,6 +63,7 @@ public class AssistantController : ControllerBase
             {
                 AssistantEvent.TokenEvent token => ("token", JsonSerializer.Serialize(new { text = token.Text }, JsonOptions)),
                 AssistantEvent.DraftEvent draft => ("draft", JsonSerializer.Serialize(new { draft = ProjectDraftDto.FromDomain(draft.Draft) }, JsonOptions)),
+                AssistantEvent.TimeEntryDraftEvent timeEntryDraft => ("time_entry_draft", JsonSerializer.Serialize(new { draft = TimeEntryDraftDto.FromDomain(timeEntryDraft.Draft) }, JsonOptions)),
                 AssistantEvent.DoneEvent done => ("done", JsonSerializer.Serialize(new { conversationId = done.ConversationId, draftCleared = done.DraftCleared }, JsonOptions)),
                 AssistantEvent.ErrorEvent error => ("error", JsonSerializer.Serialize(new { message = error.Message }, JsonOptions)),
                 _ => ("unknown", "{}"),

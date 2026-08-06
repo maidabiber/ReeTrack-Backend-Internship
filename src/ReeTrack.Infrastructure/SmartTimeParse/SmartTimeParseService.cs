@@ -2,24 +2,18 @@ using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using System.Text.RegularExpressions;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 using ReeTrack.Application.Common.Exceptions;
 using ReeTrack.Application.Common.Interfaces;
 using ReeTrack.Application.Common.Models;
+using ReeTrack.Infrastructure.Common;
 
 namespace ReeTrack.Infrastructure.SmartTimeParse;
 
 public sealed class SmartTimeParseService : ISmartTimeParseService
 {
     private const string SchemaName = "parsed_time_entry";
-    private static readonly Regex TimeOfDayPattern = new(
-        @"^(?:[01]\d|2[0-3]):[0-5]\d$",
-        RegexOptions.Compiled);
-    private static readonly Regex IsoDatePattern = new(
-        @"^\d{4}-\d{2}-\d{2}$",
-        RegexOptions.Compiled);
 
     private static readonly JsonElement ResponseSchema = JsonSerializer.SerializeToElement(new
     {
@@ -238,9 +232,9 @@ public sealed class SmartTimeParseService : ISmartTimeParseService
     private ParsedTimeEntryDto Normalize(LlmParsedTimeEntry raw, SmartTimeParseCatalog catalog)
     {
         var description = (raw.Description ?? string.Empty).Trim();
-        var duration = Math.Max(0, ParseInt(raw.DurationMinutes));
-        var confidence = Math.Clamp(ParseDouble(raw.ConfidenceScore), 0.0, 1.0);
-        var isBillable = ParseBool(raw.IsBillable, defaultValue: true);
+        var duration = Math.Max(0, LlmValueParser.ParseInt(raw.DurationMinutes));
+        var confidence = Math.Clamp(LlmValueParser.ParseDouble(raw.ConfidenceScore), 0.0, 1.0);
+        var isBillable = LlmValueParser.ParseBool(raw.IsBillable, defaultValue: true);
 
         Guid? matchedProjectId = null;
         if (!string.IsNullOrWhiteSpace(raw.MatchedProjectId)
@@ -286,9 +280,9 @@ public sealed class SmartTimeParseService : ISmartTimeParseService
             }
         }
 
-        var startTime = NormalizeTime(raw.StartTime);
-        var endTime = NormalizeTime(raw.EndTime);
-        var entryDate = NormalizeDate(raw.EntryDate);
+        var startTime = LlmValueParser.NormalizeTime(raw.StartTime);
+        var endTime = LlmValueParser.NormalizeTime(raw.EndTime);
+        var entryDate = LlmValueParser.NormalizeDate(raw.EntryDate);
 
         if (duration == 0 && startTime is not null && endTime is not null
             && TimeOnly.TryParseExact(startTime, "HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out var start)
@@ -314,70 +308,6 @@ public sealed class SmartTimeParseService : ISmartTimeParseService
             EntryDate = entryDate,
             ConfidenceScore = confidence
         };
-    }
-
-    private static int ParseInt(string? value)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-            return 0;
-
-        if (int.TryParse(value.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var i))
-            return i;
-
-        if (double.TryParse(value.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out var d))
-            return (int)Math.Round(d);
-
-        return 0;
-    }
-
-    private static double ParseDouble(string? value)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-            return 0;
-
-        return double.TryParse(value.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out var d)
-            ? d
-            : 0;
-    }
-
-    private static bool ParseBool(string? value, bool defaultValue)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-            return defaultValue;
-
-        var trimmed = value.Trim();
-        if (bool.TryParse(trimmed, out var b))
-            return b;
-
-        return trimmed.ToLowerInvariant() switch
-        {
-            "1" or "yes" or "y" => true,
-            "0" or "no" or "n" => false,
-            _ => defaultValue
-        };
-    }
-
-    private static string? NormalizeTime(string? value)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-            return null;
-
-        var trimmed = value.Trim();
-        return TimeOfDayPattern.IsMatch(trimmed) ? trimmed : null;
-    }
-
-    private static string? NormalizeDate(string? value)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-            return null;
-
-        var trimmed = value.Trim();
-        if (!IsoDatePattern.IsMatch(trimmed))
-            return null;
-
-        return DateOnly.TryParseExact(trimmed, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out _)
-            ? trimmed
-            : null;
     }
 
     private sealed class LlmParsedTimeEntry
