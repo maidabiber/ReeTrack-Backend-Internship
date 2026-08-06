@@ -397,14 +397,14 @@ public class TimeEntryService : ITimeEntryService
         foreach (var entry in pendingEntries)
         {
             var assignee = resolvedAssignees.First(a => a.Id == entry.UserId);
-            await _eventPublisher.PublishAsync(new TimeEntrySharedNotification
+            _ = _eventPublisher.PublishAsync(new TimeEntrySharedNotification
             {
                 EntryId = entry.Id,
                 AssigneeUserId = assignee.Id,
                 AssigneeName = assignee.DisplayName?.Trim() ?? assignee.Email,
                 SubmitterName = submitter.DisplayName?.Trim() ?? submitter.Email,
                 Description = entry.Description
-            }, cancellationToken);
+            });
         }
 
         return MapEntity(source, assigneeDisplayName: submitter.DisplayName ?? submitter.Email);

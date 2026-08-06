@@ -13,4 +13,10 @@ public static class NotificationTypeRules
         type is NotificationType.TimeEntryShared
             or NotificationType.TimesheetDecision
             or NotificationType.ProjectThresholdAlert;
+
+    /// <summary>
+    /// Email is treated as enabled when the user has no Email preference row for the type.
+    /// An explicit <c>IsEnabled = false</c> row opts out.
+    /// </summary>
+    public static bool IsEmailDefaultEnabled(NotificationType _) => true;
 }

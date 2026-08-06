@@ -42,6 +42,37 @@ public class User : BaseEntity, IAuditable
         return rate;
     }
 
+    /// <summary>
+    /// Seeds Email delivery as enabled for every <see cref="NotificationType"/>.
+    /// Idempotent for pairs already present on the collection.
+    /// </summary>
+    public void EnsureDefaultEmailNotificationPreferences(DateTime utcNow)
+    {
+        if (Id == Guid.Empty)
+            Id = Guid.NewGuid();
+
+        foreach (var notificationType in Enum.GetValues<NotificationType>())
+        {
+            var alreadySeeded = NotificationPreferences.Any(p =>
+                p.NotificationType == notificationType &&
+                p.DeliveryChannel == DeliveryChannel.Email);
+
+            if (alreadySeeded)
+                continue;
+
+            NotificationPreferences.Add(new NotificationPreference
+            {
+                Id = Guid.NewGuid(),
+                UserId = Id,
+                NotificationType = notificationType,
+                DeliveryChannel = DeliveryChannel.Email,
+                IsEnabled = true,
+                CreatedAtUtc = utcNow,
+                UpdatedAtUtc = utcNow
+            });
+        }
+    }
+
     public UserHourlyRate ChangeHourlyRate(Money newRate, DateOnly validFrom)
     {
         if (newRate.Amount <= 0)

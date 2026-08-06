@@ -43,6 +43,10 @@ public sealed class NotificationDispatcher : INotificationDispatcher
         if (NotificationTypeRules.IsInAppMandatory(notificationType))
             enabledChannels.Add(DeliveryChannel.InApp);
 
+        var hasEmailPreference = preferences.Any(p => p.DeliveryChannel == DeliveryChannel.Email);
+        if (!hasEmailPreference && NotificationTypeRules.IsEmailDefaultEnabled(notificationType))
+            enabledChannels.Add(DeliveryChannel.Email);
+
         if (enabledChannels.Count == 0)
         {
             // Could be logged

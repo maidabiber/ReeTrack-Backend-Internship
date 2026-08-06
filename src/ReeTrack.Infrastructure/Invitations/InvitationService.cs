@@ -104,6 +104,7 @@ public class InvitationService : IInvitationService
                     UpdatedAtUtc = now
                 };
                 user.AssignInitialHourlyRate(DateOnly.FromDateTime(now));
+                user.EnsureDefaultEmailNotificationPreferences(now);
                 _db.Users.Add(user);
             }
             else
