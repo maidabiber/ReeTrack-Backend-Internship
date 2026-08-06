@@ -3,13 +3,14 @@ using Microsoft.AspNetCore.Mvc;
 using ReeTrack.Api.Contracts;
 using ReeTrack.Application.Common.Exceptions;
 using ReeTrack.Application.Common.Interfaces;
+using ReeTrack.Application.Common.Constants;
 using ReeTrack.Application.Common.Models;
 
 namespace ReeTrack.Api.Controllers;
 
 [ApiController]
 [Route("api/projects")]
-[Authorize]
+[Authorize(Policy = Permissions.Policies.ProjectsManage)]
 public class ProjectCostController : ControllerBase
 {
     private readonly IProjectCostService _projectCostService;
