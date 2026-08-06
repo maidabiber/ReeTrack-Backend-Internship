@@ -1,9 +1,8 @@
-using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ReeTrack.Api.Contracts;
 using ReeTrack.Application.Calendar;
+using ReeTrack.Application.Common.Interfaces;
 using ReeTrack.Application.Integrations.Calendar;
 using ReeTrack.Application.Integrations.Calendar.Models;
 
@@ -16,15 +15,18 @@ public class CalendarEventsController : ControllerBase
 {
     private readonly ICalendarIntegrationService _calendarIntegrationService;
     private readonly ICalendarViewService _calendarViewService;
+    private readonly ICurrentUserService _currentUser;
     private readonly IServiceScopeFactory _scopeFactory;
 
     public CalendarEventsController(
         ICalendarIntegrationService calendarIntegrationService,
         ICalendarViewService calendarViewService,
+        ICurrentUserService currentUser,
         IServiceScopeFactory scopeFactory)
     {
         _calendarIntegrationService = calendarIntegrationService;
         _calendarViewService = calendarViewService;
+        _currentUser = currentUser;
         _scopeFactory = scopeFactory;
     }
 
@@ -34,12 +36,9 @@ public class CalendarEventsController : ControllerBase
         [FromQuery] DateTime? to,
         CancellationToken cancellationToken)
     {
-        if (!TryGetUserId(out var userId))
-            return Unauthorized();
+        _ = TriggerStaleSyncAsync(_currentUser.UserId);
 
-        _ = TriggerStaleSyncAsync(userId);
-
-        var view = await _calendarViewService.GetViewAsync(userId, from, to, cancellationToken);
+        var view = await _calendarViewService.GetViewAsync(_currentUser.UserId, from, to, cancellationToken);
 
         return Ok(new CalendarViewResponse
         {
@@ -54,12 +53,9 @@ public class CalendarEventsController : ControllerBase
         [FromQuery] DateTime? to,
         CancellationToken cancellationToken)
     {
-        if (!TryGetUserId(out var userId))
-            return Unauthorized();
+        _ = TriggerStaleSyncAsync(_currentUser.UserId);
 
-        _ = TriggerStaleSyncAsync(userId);
-
-        var events = await _calendarIntegrationService.GetEventsAsync(userId, from, to, cancellationToken);
+        var events = await _calendarIntegrationService.GetEventsAsync(_currentUser.UserId, from, to, cancellationToken);
         return Ok(events);
     }
 
@@ -77,14 +73,6 @@ public class CalendarEventsController : ControllerBase
         }
     }
 
-    private bool TryGetUserId(out Guid userId)
-    {
-        var claim =
-            User.FindFirstValue(ClaimTypes.NameIdentifier) ??
-            User.FindFirstValue(JwtRegisteredClaimNames.Sub);
-
-        return Guid.TryParse(claim, out userId);
-    }
 }
 
 public sealed class CalendarViewResponse

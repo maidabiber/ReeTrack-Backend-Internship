@@ -15,6 +15,7 @@ public class User : BaseEntity, IAuditable
     public UserStatus Status { get; set; }
     public bool EmailVerified { get; set; }
     public DateTime? LastLoginAtUtc { get; set; }
+    public bool HasCompletedOnboarding { get; set; }
 
     public ICollection<UserRole> UserRoles { get; set; } = [];
     public ICollection<UserRole> AssignedRoles { get; set; } = [];

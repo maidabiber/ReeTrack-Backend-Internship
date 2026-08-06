@@ -45,6 +45,11 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(u => u.LastLoginAtUtc)
             .HasColumnName("last_login_at_utc");
 
+        builder.Property(u => u.HasCompletedOnboarding)
+            .HasColumnName("has_completed_onboarding")
+            .HasDefaultValue(false)
+            .IsRequired();
+
         builder.Property(u => u.CreatedAtUtc)
             .HasColumnName("created_at_utc")
             .IsRequired();

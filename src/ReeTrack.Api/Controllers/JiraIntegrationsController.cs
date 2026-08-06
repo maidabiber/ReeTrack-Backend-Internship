@@ -1,8 +1,7 @@
-using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ReeTrack.Api.Contracts;
+using ReeTrack.Application.Common.Interfaces;
 using ReeTrack.Application.Integrations.Jira;
 using ReeTrack.Application.Integrations.Jira.Models;
 
@@ -14,10 +13,12 @@ namespace ReeTrack.Api.Controllers;
 public class JiraIntegrationsController : ControllerBase
 {
     private readonly IJiraIntegrationService _jira;
+    private readonly ICurrentUserService _currentUser;
 
-    public JiraIntegrationsController(IJiraIntegrationService jira)
+    public JiraIntegrationsController(IJiraIntegrationService jira, ICurrentUserService currentUser)
     {
         _jira = jira;
+        _currentUser = currentUser;
     }
 
     [HttpGet]
@@ -40,12 +41,9 @@ public class JiraIntegrationsController : ControllerBase
         [FromBody] IntegrateJiraProjectRequest request,
         CancellationToken cancellationToken)
     {
-        if (!TryGetUserId(out var userId))
-            return Unauthorized();
-
         var result = await _jira.IntegrateProjectAsync(
             new IntegrateJiraProjectInput(request.JiraProjectId, request.ClientId),
-            userId,
+            _currentUser.UserId,
             cancellationToken);
 
         return Ok(MapIntegrateResult(result));
@@ -58,15 +56,6 @@ public class JiraIntegrationsController : ControllerBase
     {
         var result = await _jira.SyncProjectAsync(projectId, cancellationToken);
         return Ok(MapIntegrateResult(result));
-    }
-
-    private bool TryGetUserId(out Guid userId)
-    {
-        var claim =
-            User.FindFirstValue(ClaimTypes.NameIdentifier) ??
-            User.FindFirstValue(JwtRegisteredClaimNames.Sub);
-
-        return Guid.TryParse(claim, out userId);
     }
 
     private static JiraConnectionResponse MapConnection(JiraConnectionDto connection) =>

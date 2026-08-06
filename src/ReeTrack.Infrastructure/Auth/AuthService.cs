@@ -153,6 +153,7 @@ public class AuthService : IAuthService
             AvatarUrl = googleUser.Picture,
             Status = UserStatus.Active,
             EmailVerified = googleUser.EmailVerified,
+            HasCompletedOnboarding = true,
             LastLoginAtUtc = now,
             CreatedAtUtc = now,
             UpdatedAtUtc = now,
@@ -223,7 +224,25 @@ public class AuthService : IAuthService
             DisplayName = user.DisplayName,
             AvatarUrl = user.AvatarUrl,
             Roles = roles,
-            Permissions = PermissionMatrix.PermissionsForRoles(roles)
+            Permissions = PermissionMatrix.PermissionsForRoles(roles),
+            HasCompletedOnboarding = user.HasCompletedOnboarding
         };
+    }
+
+    public async Task MarkOnboardingCompleteAsync(
+        Guid userId,
+        CancellationToken cancellationToken = default)
+    {
+        var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == userId, cancellationToken);
+
+        if (user is null)
+            throw new AuthException("User not found.", 401, ErrorCode.Unauthorized);
+
+        if (user.HasCompletedOnboarding)
+            return;
+
+        user.HasCompletedOnboarding = true;
+        user.UpdatedAtUtc = DateTime.UtcNow;
+        await _db.SaveChangesAsync(cancellationToken);
     }
 }

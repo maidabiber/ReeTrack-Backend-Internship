@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using ReeTrack.Infrastructure.Persistence;
@@ -11,9 +12,11 @@ using ReeTrack.Infrastructure.Persistence;
 namespace ReeTrack.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260731130605_AddUserHasCompletedOnboarding")]
+    partial class AddUserHasCompletedOnboarding
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -112,76 +115,6 @@ namespace ReeTrack.Infrastructure.Persistence.Migrations
                             Name = "Euro",
                             UpdatedAtUtc = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         });
-                });
-
-            modelBuilder.Entity("ReeTrack.Domain.Entities.CustomReportDefinition", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id")
-                        .HasDefaultValueSql("gen_random_uuid()");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at_utc");
-
-                    b.Property<Guid>("CreatedByUserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("created_by_user_id");
-
-                    b.Property<DateTime?>("DeletedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("deleted_at_utc");
-
-                    b.Property<Guid?>("DeletedByUserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("deleted_by_user_id");
-
-                    b.Property<string>("Description")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)")
-                        .HasColumnName("description");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(120)
-                        .HasColumnType("character varying(120)")
-                        .HasColumnName("name");
-
-                    b.Property<string>("NormalizedName")
-                        .IsRequired()
-                        .HasMaxLength(120)
-                        .HasColumnType("character varying(120)")
-                        .HasColumnName("normalized_name");
-
-                    b.Property<int>("SchemaVersion")
-                        .HasColumnType("integer")
-                        .HasColumnName("schema_version");
-
-                    b.Property<string>("SpecJson")
-                        .IsRequired()
-                        .HasColumnType("jsonb")
-                        .HasColumnName("spec_json");
-
-                    b.Property<DateTime>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at_utc");
-
-                    b.Property<string>("Visibility")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasColumnName("visibility");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CreatedByUserId", "NormalizedName")
-                        .IsUnique()
-                        .HasDatabaseName("ux_custom_report_definitions_owner_normalized_name")
-                        .HasFilter("deleted_at_utc IS NULL");
-
-                    b.ToTable("custom_report_definitions", (string)null);
                 });
 
             modelBuilder.Entity("ReeTrack.Domain.Entities.Holiday", b =>
@@ -421,163 +354,6 @@ namespace ReeTrack.Infrastructure.Persistence.Migrations
                     b.ToTable("invitations", (string)null);
                 });
 
-            modelBuilder.Entity("ReeTrack.Domain.Entities.Invoice", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id")
-                        .HasDefaultValueSql("gen_random_uuid()");
-
-                    b.Property<Guid>("ClientId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("client_id");
-
-                    b.Property<string>("ClientName")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("client_name");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at_utc");
-
-                    b.Property<string>("CurrencyCode")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(3)
-                        .HasColumnType("character(3)")
-                        .HasDefaultValue("EUR")
-                        .HasColumnName("currency_code")
-                        .IsFixedLength();
-
-                    b.Property<DateTime?>("DeletedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("deleted_at_utc");
-
-                    b.Property<Guid?>("DeletedByUserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("deleted_by_user_id");
-
-                    b.Property<Guid>("GeneratedByUserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("generated_by_user_id");
-
-                    b.Property<string>("Number")
-                        .IsRequired()
-                        .HasMaxLength(40)
-                        .HasColumnType("character varying(40)")
-                        .HasColumnName("number");
-
-                    b.Property<DateOnly>("PeriodFrom")
-                        .HasColumnType("date")
-                        .HasColumnName("period_from");
-
-                    b.Property<DateOnly>("PeriodTo")
-                        .HasColumnType("date")
-                        .HasColumnName("period_to");
-
-                    b.Property<short>("Status")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("smallint")
-                        .HasDefaultValue((short)0)
-                        .HasColumnName("status");
-
-                    b.Property<decimal>("Subtotal")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)")
-                        .HasColumnName("subtotal");
-
-                    b.Property<DateTime>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at_utc");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ClientId")
-                        .HasDatabaseName("ix_invoices_client_id");
-
-                    b.HasIndex("GeneratedByUserId");
-
-                    b.HasIndex("Number")
-                        .IsUnique()
-                        .HasDatabaseName("ux_invoices_number")
-                        .HasFilter("deleted_at_utc IS NULL");
-
-                    b.HasIndex("Status")
-                        .HasDatabaseName("ix_invoices_status");
-
-                    b.HasIndex("PeriodFrom", "PeriodTo")
-                        .HasDatabaseName("ix_invoices_period");
-
-                    b.ToTable("invoices", (string)null);
-                });
-
-            modelBuilder.Entity("ReeTrack.Domain.Entities.InvoiceLineItem", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id")
-                        .HasDefaultValueSql("gen_random_uuid()");
-
-                    b.Property<decimal>("Amount")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)")
-                        .HasColumnName("amount");
-
-                    b.Property<short>("BillingModel")
-                        .HasColumnType("smallint")
-                        .HasColumnName("billing_model");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at_utc");
-
-                    b.Property<string>("Description")
-                        .IsRequired()
-                        .HasMaxLength(400)
-                        .HasColumnType("character varying(400)")
-                        .HasColumnName("description");
-
-                    b.Property<Guid>("InvoiceId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("invoice_id");
-
-                    b.Property<Guid?>("ProjectId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("project_id");
-
-                    b.Property<decimal>("Quantity")
-                        .HasPrecision(18, 4)
-                        .HasColumnType("numeric(18,4)")
-                        .HasColumnName("quantity");
-
-                    b.Property<int>("SortOrder")
-                        .HasColumnType("integer")
-                        .HasColumnName("sort_order");
-
-                    b.Property<decimal>("UnitPrice")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)")
-                        .HasColumnName("unit_price");
-
-                    b.Property<DateTime>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at_utc");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("InvoiceId")
-                        .HasDatabaseName("ix_invoice_line_items_invoice_id");
-
-                    b.HasIndex("ProjectId")
-                        .HasDatabaseName("ix_invoice_line_items_project_id");
-
-                    b.ToTable("invoice_line_items", (string)null);
-                });
-
             modelBuilder.Entity("ReeTrack.Domain.Entities.NotificationPreference", b =>
                 {
                     b.Property<Guid>("Id")
@@ -617,137 +393,6 @@ namespace ReeTrack.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_notification_preferences_user_type_channel");
 
                     b.ToTable("notification_preferences", (string)null);
-                });
-
-            modelBuilder.Entity("ReeTrack.Domain.Entities.JiraWebhookSettings", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at_utc");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_active");
-
-                    b.Property<DateTime?>("LastReceivedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("last_received_at_utc");
-
-                    b.Property<short>("SingletonKey")
-                        .HasColumnType("smallint")
-                        .HasColumnName("singleton_key");
-
-                    b.Property<DateTime>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at_utc");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("SingletonKey")
-                        .IsUnique()
-                        .HasDatabaseName("ix_jira_webhook_settings_singleton_key");
-
-                    b.ToTable("jira_webhook_settings", (string)null);
-                });
-
-            modelBuilder.Entity("ReeTrack.Domain.Entities.PendingProjectAlert", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id")
-                        .HasDefaultValueSql("gen_random_uuid()");
-
-                    b.Property<decimal>("ActualHours")
-                        .HasPrecision(10, 2)
-                        .HasColumnType("numeric(10,2)")
-                        .HasColumnName("actual_hours");
-
-                    b.Property<decimal>("CalculatedCost")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)")
-                        .HasColumnName("calculated_cost");
-
-                    b.Property<decimal>("CostPercentage")
-                        .HasPrecision(8, 2)
-                        .HasColumnType("numeric(8,2)")
-                        .HasColumnName("cost_percentage");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at_utc");
-
-                    b.Property<string>("CurrencyCode")
-                        .IsRequired()
-                        .HasMaxLength(3)
-                        .HasColumnType("character varying(3)")
-                        .HasColumnName("currency_code");
-
-                    b.Property<DateTime>("DeliverAfterUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("deliver_after_utc");
-
-                    b.Property<DateTime?>("DeliveredAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("delivered_at_utc");
-
-                    b.Property<decimal>("FixedFeeAmount")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)")
-                        .HasColumnName("fixed_fee_amount");
-
-                    b.Property<decimal>("HoursPercentage")
-                        .HasPrecision(8, 2)
-                        .HasColumnType("numeric(8,2)")
-                        .HasColumnName("hours_percentage");
-
-                    b.Property<short>("MetricType")
-                        .HasColumnType("smallint")
-                        .HasColumnName("metric_type");
-
-                    b.Property<Guid>("ProjectId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("project_id");
-
-                    b.Property<string>("ProjectName")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("project_name");
-
-                    b.Property<Guid>("ThresholdId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("threshold_id");
-
-                    b.Property<decimal>("ThresholdPercentage")
-                        .HasPrecision(5, 2)
-                        .HasColumnType("numeric(5,2)")
-                        .HasColumnName("threshold_percentage");
-
-                    b.Property<decimal>("TimeEstimateHours")
-                        .HasPrecision(10, 2)
-                        .HasColumnType("numeric(10,2)")
-                        .HasColumnName("time_estimate_hours");
-
-                    b.Property<DateTime>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at_utc");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ProjectId");
-
-                    b.HasIndex("ThresholdId");
-
-                    b.HasIndex("DeliveredAtUtc", "DeliverAfterUtc")
-                        .HasDatabaseName("ix_pending_project_alerts_delivered_deliver_after");
-
-                    b.ToTable("pending_project_alerts", (string)null);
                 });
 
             modelBuilder.Entity("ReeTrack.Domain.Entities.Project", b =>
@@ -1051,48 +696,6 @@ namespace ReeTrack.Infrastructure.Persistence.Migrations
                     b.ToTable("project_task_cost_snapshots", (string)null);
                 });
 
-            modelBuilder.Entity("ReeTrack.Domain.Entities.ProjectThreshold", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id")
-                        .HasDefaultValueSql("gen_random_uuid()");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at_utc");
-
-                    b.Property<bool>("IsTriggered")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_triggered");
-
-                    b.Property<short>("MetricType")
-                        .HasColumnType("smallint")
-                        .HasColumnName("metric_type");
-
-                    b.Property<Guid>("ProjectId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("project_id");
-
-                    b.Property<decimal>("ThresholdPercentage")
-                        .HasPrecision(5, 2)
-                        .HasColumnType("numeric(5,2)")
-                        .HasColumnName("threshold_percentage");
-
-                    b.Property<DateTime>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at_utc");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ProjectId", "MetricType", "ThresholdPercentage")
-                        .IsUnique()
-                        .HasDatabaseName("ix_project_thresholds_project_id_metric_type_threshold_percentage");
-
-                    b.ToTable("project_thresholds", (string)null);
-                });
-
             modelBuilder.Entity("ReeTrack.Domain.Entities.RateMultiplierSettings", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1196,108 +799,6 @@ namespace ReeTrack.Infrastructure.Persistence.Migrations
                     b.ToTable("report_filter_sets", (string)null);
                 });
 
-            modelBuilder.Entity("ReeTrack.Domain.Entities.ReportShareLink", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id")
-                        .HasDefaultValueSql("gen_random_uuid()");
-
-                    b.Property<short>("AccessLevel")
-                        .HasColumnType("smallint")
-                        .HasColumnName("access_level");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at_utc");
-
-                    b.Property<Guid>("CreatedByUserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("created_by_user_id");
-
-                    b.Property<bool>("IsActive")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(true)
-                        .HasColumnName("is_active");
-
-                    b.Property<string>("QueryJson")
-                        .HasMaxLength(8000)
-                        .HasColumnType("character varying(8000)")
-                        .HasColumnName("query_json");
-
-                    b.Property<Guid?>("ReportId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("report_id");
-
-                    b.Property<short>("ReportType")
-                        .HasColumnType("smallint")
-                        .HasColumnName("report_type");
-
-                    b.Property<string>("SpecJson")
-                        .HasColumnType("text")
-                        .HasColumnName("spec_json");
-
-                    b.Property<string>("Token")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)")
-                        .HasColumnName("token");
-
-                    b.Property<DateTime>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at_utc");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CreatedByUserId");
-
-                    b.HasIndex("ReportType")
-                        .HasDatabaseName("ix_report_share_links_report_type");
-
-                    b.HasIndex("Token")
-                        .IsUnique()
-                        .HasDatabaseName("ux_report_share_links_token");
-
-                    b.ToTable("report_share_links", (string)null);
-                });
-
-            modelBuilder.Entity("ReeTrack.Domain.Entities.ReportShareRecipient", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id")
-                        .HasDefaultValueSql("gen_random_uuid()");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at_utc");
-
-                    b.Property<Guid>("ShareLinkId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("share_link_id");
-
-                    b.Property<DateTime>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at_utc");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("user_id");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("UserId");
-
-                    b.HasIndex("ShareLinkId", "UserId")
-                        .IsUnique()
-                        .HasDatabaseName("ux_report_share_recipients_link_user");
-
-                    b.ToTable("report_share_recipients", (string)null);
-                });
-
             modelBuilder.Entity("ReeTrack.Domain.Entities.Role", b =>
                 {
                     b.Property<short>("Id")
@@ -1346,14 +847,6 @@ namespace ReeTrack.Infrastructure.Persistence.Migrations
                             CreatedAtUtc = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             Description = "Standard user access",
                             Name = "Member",
-                            UpdatedAtUtc = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
-                        },
-                        new
-                        {
-                            Id = (short)3,
-                            CreatedAtUtc = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            Description = "Project and team oversight access",
-                            Name = "ProjectManager",
                             UpdatedAtUtc = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         });
                 });
@@ -1990,39 +1483,6 @@ namespace ReeTrack.Infrastructure.Persistence.Migrations
                     b.ToTable("user_roles", (string)null);
                 });
 
-            modelBuilder.Entity("ReeTrack.Domain.Entities.WeeklyTargetCheckInRun", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id")
-                        .HasDefaultValueSql("gen_random_uuid()");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at_utc");
-
-                    b.Property<DateTime>("RanAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("ran_at_utc");
-
-                    b.Property<DateTime>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at_utc");
-
-                    b.Property<DateOnly>("WeekStartDate")
-                        .HasColumnType("date")
-                        .HasColumnName("week_start_date");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("WeekStartDate")
-                        .IsUnique()
-                        .HasDatabaseName("ux_weekly_target_check_in_runs_week_start_date");
-
-                    b.ToTable("weekly_target_check_in_runs", (string)null);
-                });
-
             modelBuilder.Entity("ReeTrack.Infrastructure.Auditing.AuditLog", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2076,17 +1536,6 @@ namespace ReeTrack.Infrastructure.Persistence.Migrations
                     b.ToTable("audit_logs", (string)null);
                 });
 
-            modelBuilder.Entity("ReeTrack.Domain.Entities.CustomReportDefinition", b =>
-                {
-                    b.HasOne("ReeTrack.Domain.Entities.User", "CreatedByUser")
-                        .WithMany()
-                        .HasForeignKey("CreatedByUserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("CreatedByUser");
-                });
-
             modelBuilder.Entity("ReeTrack.Domain.Entities.InAppNotification", b =>
                 {
                     b.HasOne("ReeTrack.Domain.Entities.User", "User")
@@ -2124,43 +1573,6 @@ namespace ReeTrack.Infrastructure.Persistence.Migrations
                     b.Navigation("Role");
                 });
 
-            modelBuilder.Entity("ReeTrack.Domain.Entities.Invoice", b =>
-                {
-                    b.HasOne("ReeTrack.Domain.Entities.Client", "Client")
-                        .WithMany("Invoices")
-                        .HasForeignKey("ClientId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("ReeTrack.Domain.Entities.User", "GeneratedByUser")
-                        .WithMany()
-                        .HasForeignKey("GeneratedByUserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("Client");
-
-                    b.Navigation("GeneratedByUser");
-                });
-
-            modelBuilder.Entity("ReeTrack.Domain.Entities.InvoiceLineItem", b =>
-                {
-                    b.HasOne("ReeTrack.Domain.Entities.Invoice", "Invoice")
-                        .WithMany("LineItems")
-                        .HasForeignKey("InvoiceId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("ReeTrack.Domain.Entities.Project", "Project")
-                        .WithMany()
-                        .HasForeignKey("ProjectId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.Navigation("Invoice");
-
-                    b.Navigation("Project");
-                });
-
             modelBuilder.Entity("ReeTrack.Domain.Entities.NotificationPreference", b =>
                 {
                     b.HasOne("ReeTrack.Domain.Entities.User", "User")
@@ -2170,25 +1582,6 @@ namespace ReeTrack.Infrastructure.Persistence.Migrations
                         .IsRequired();
 
                     b.Navigation("User");
-                });
-
-            modelBuilder.Entity("ReeTrack.Domain.Entities.PendingProjectAlert", b =>
-                {
-                    b.HasOne("ReeTrack.Domain.Entities.Project", "Project")
-                        .WithMany()
-                        .HasForeignKey("ProjectId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("ReeTrack.Domain.Entities.ProjectThreshold", "Threshold")
-                        .WithMany()
-                        .HasForeignKey("ThresholdId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Project");
-
-                    b.Navigation("Threshold");
                 });
 
             modelBuilder.Entity("ReeTrack.Domain.Entities.Project", b =>
@@ -2250,17 +1643,6 @@ namespace ReeTrack.Infrastructure.Persistence.Migrations
                     b.Navigation("ProjectTask");
                 });
 
-            modelBuilder.Entity("ReeTrack.Domain.Entities.ProjectThreshold", b =>
-                {
-                    b.HasOne("ReeTrack.Domain.Entities.Project", "Project")
-                        .WithMany("Thresholds")
-                        .HasForeignKey("ProjectId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Project");
-                });
-
             modelBuilder.Entity("ReeTrack.Domain.Entities.ReportFilterSet", b =>
                 {
                     b.HasOne("ReeTrack.Domain.Entities.User", "User")
@@ -2268,36 +1650,6 @@ namespace ReeTrack.Infrastructure.Persistence.Migrations
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-
-                    b.Navigation("User");
-                });
-
-            modelBuilder.Entity("ReeTrack.Domain.Entities.ReportShareLink", b =>
-                {
-                    b.HasOne("ReeTrack.Domain.Entities.User", "CreatedByUser")
-                        .WithMany()
-                        .HasForeignKey("CreatedByUserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("CreatedByUser");
-                });
-
-            modelBuilder.Entity("ReeTrack.Domain.Entities.ReportShareRecipient", b =>
-                {
-                    b.HasOne("ReeTrack.Domain.Entities.ReportShareLink", "ShareLink")
-                        .WithMany("Recipients")
-                        .HasForeignKey("ShareLinkId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("ReeTrack.Domain.Entities.User", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("ShareLink");
 
                     b.Navigation("User");
                 });
@@ -2530,14 +1882,7 @@ namespace ReeTrack.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("ReeTrack.Domain.Entities.Client", b =>
                 {
-                    b.Navigation("Invoices");
-
                     b.Navigation("Projects");
-                });
-
-            modelBuilder.Entity("ReeTrack.Domain.Entities.Invoice", b =>
-                {
-                    b.Navigation("LineItems");
                 });
 
             modelBuilder.Entity("ReeTrack.Domain.Entities.Project", b =>
@@ -2545,18 +1890,11 @@ namespace ReeTrack.Infrastructure.Persistence.Migrations
                     b.Navigation("CostSnapshots");
 
                     b.Navigation("Tasks");
-
-                    b.Navigation("Thresholds");
                 });
 
             modelBuilder.Entity("ReeTrack.Domain.Entities.ProjectCostSnapshot", b =>
                 {
                     b.Navigation("TaskCosts");
-                });
-
-            modelBuilder.Entity("ReeTrack.Domain.Entities.ReportShareLink", b =>
-                {
-                    b.Navigation("Recipients");
                 });
 
             modelBuilder.Entity("ReeTrack.Domain.Entities.Role", b =>

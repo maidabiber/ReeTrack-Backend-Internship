@@ -1,5 +1,3 @@
-using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.WebUtilities;
@@ -11,22 +9,26 @@ using ReeTrack.Application.Common.Models;
 namespace ReeTrack.Api.Controllers;
 
 [ApiController]
+[Authorize]
 [Route("api/auth")]
 public class AuthController : ControllerBase
 {
     private readonly IAuthService _authService;
     private readonly IGoogleOAuthService _googleOAuthService;
+    private readonly ICurrentUserService _currentUser;
     private readonly IWebHostEnvironment _environment;
     private readonly ILogger<AuthController> _logger;
 
     public AuthController(
         IAuthService authService,
         IGoogleOAuthService googleOAuthService,
+        ICurrentUserService currentUser,
         IWebHostEnvironment environment,
         ILogger<AuthController> logger)
     {
         _authService = authService;
         _googleOAuthService = googleOAuthService;
+        _currentUser = currentUser;
         _environment = environment;
         _logger = logger;
     }
@@ -94,17 +96,27 @@ public class AuthController : ControllerBase
         }
     }
 
-    [Authorize]
     [HttpGet("me")]
     public async Task<ActionResult<AuthenticatedUser>> GetCurrentUser(CancellationToken cancellationToken)
     {
-        if (!TryGetUserId(out var userId))
-            return Unauthorized();
-
         try
         {
-            var user = await _authService.GetCurrentUserAsync(userId, cancellationToken);
+            var user = await _authService.GetCurrentUserAsync(_currentUser.UserId, cancellationToken);
             return Ok(user);
+        }
+        catch (AuthException ex)
+        {
+            throw new AppException(ex.Message, ex.StatusCode, ex.Code);
+        }
+    }
+
+    [HttpPost("onboarding-complete")]
+    public async Task<IActionResult> CompleteOnboarding(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _authService.MarkOnboardingCompleteAsync(_currentUser.UserId, cancellationToken);
+            return NoContent();
         }
         catch (AuthException ex)
         {
@@ -118,15 +130,6 @@ public class AuthController : ControllerBase
     {
         AuthCookies.ClearSessionCookie(Response, UseSecureCookies());
         return Ok(new { message = "Signed out successfully." });
-    }
-
-    private bool TryGetUserId(out Guid userId)
-    {
-        var claim =
-            User.FindFirstValue(ClaimTypes.NameIdentifier) ??
-            User.FindFirstValue(JwtRegisteredClaimNames.Sub);
-
-        return Guid.TryParse(claim, out userId);
     }
 
     private RedirectResult RedirectWithAuthError(string returnUrl, string message)

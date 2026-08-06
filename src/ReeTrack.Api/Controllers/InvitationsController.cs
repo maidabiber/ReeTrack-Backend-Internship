@@ -8,6 +8,7 @@ namespace ReeTrack.Api.Controllers;
 
 [ApiController]
 [Route("api/invitations")]
+[Authorize(Policy = Permissions.Policies.InvitationsManage)]
 public class InvitationsController : ControllerBase
 {
     private readonly IInvitationService _invitationService;
@@ -17,7 +18,6 @@ public class InvitationsController : ControllerBase
         _invitationService = invitationService;
     }
 
-    [Authorize(Policy = Permissions.Policies.InvitationsManage)]
     [HttpPost]
     public async Task<ActionResult<CreateInvitationResponse>> Create(
         [FromBody] CreateInvitationRequest request,
@@ -32,7 +32,6 @@ public class InvitationsController : ControllerBase
         });
     }
 
-    [Authorize(Policy = Permissions.Policies.InvitationsManage)]
     [HttpPost("batch")]
     public async Task<ActionResult<BatchInvitationResponse>> CreateBatch(
         [FromBody] BatchInvitationRequest request,
@@ -55,7 +54,6 @@ public class InvitationsController : ControllerBase
         });
     }
 
-    [Authorize(Policy = Permissions.Policies.InvitationsManage)]
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<InvitationListItemResponse>>> List(
         CancellationToken cancellationToken)
@@ -76,7 +74,6 @@ public class InvitationsController : ControllerBase
         }).ToList());
     }
 
-    [Authorize(Policy = Permissions.Policies.InvitationsManage)]
     [HttpPost("{id:guid}/revoke")]
     public async Task<ActionResult<RevokeInvitationResponse>> Revoke(
         Guid id,
@@ -91,7 +88,6 @@ public class InvitationsController : ControllerBase
         });
     }
 
-    [Authorize(Policy = Permissions.Policies.InvitationsManage)]
     [HttpPost("{id:guid}/resend")]
     public async Task<ActionResult<InvitationResponse>> Resend(
         Guid id,
@@ -101,7 +97,6 @@ public class InvitationsController : ControllerBase
         return Ok(MapInvitation(invitation));
     }
 
-    [Authorize(Policy = Permissions.Policies.InvitationsManage)]
     [HttpGet("allowed-domains")]
     public ActionResult<AllowedDomainsResponse> AllowedDomains() =>
         Ok(new AllowedDomainsResponse { Domains = _invitationService.GetAllowedDomains() });

@@ -8,6 +8,8 @@ public interface IAuthService
     Task<AuthResult> SignInWithGoogleAsync(string code, CancellationToken cancellationToken = default);
 
     Task<AuthenticatedUser> GetCurrentUserAsync(Guid userId, CancellationToken cancellationToken = default);
+
+    Task MarkOnboardingCompleteAsync(Guid userId, CancellationToken cancellationToken = default);
 }
 
 public sealed class AuthResult

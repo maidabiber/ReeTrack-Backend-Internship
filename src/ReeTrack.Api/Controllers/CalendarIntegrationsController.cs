@@ -1,10 +1,9 @@
-using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.WebUtilities;
 using ReeTrack.Api.Auth;
 using ReeTrack.Application.Common.Exceptions;
+using ReeTrack.Application.Common.Interfaces;
 using ReeTrack.Application.Integrations.Calendar;
 using ReeTrack.Domain.Enums;
 
@@ -12,49 +11,45 @@ namespace ReeTrack.Api.Controllers;
 
 [ApiController]
 [Route("api/integrations/calendar")]
+[Authorize]
 public class CalendarIntegrationsController : ControllerBase
 {
     private readonly ICalendarIntegrationService _calendarIntegrationService;
     private readonly ICalendarSyncService _calendarSyncService;
+    private readonly ICurrentUserService _currentUser;
     private readonly IWebHostEnvironment _environment;
     private readonly ILogger<CalendarIntegrationsController> _logger;
 
     public CalendarIntegrationsController(
         ICalendarIntegrationService calendarIntegrationService,
         ICalendarSyncService calendarSyncService,
+        ICurrentUserService currentUser,
         IWebHostEnvironment environment,
         ILogger<CalendarIntegrationsController> logger)
     {
         _calendarIntegrationService = calendarIntegrationService;
         _calendarSyncService = calendarSyncService;
+        _currentUser = currentUser;
         _environment = environment;
         _logger = logger;
     }
 
-    [Authorize]
     [HttpGet]
     public async Task<IActionResult> ListConnections(CancellationToken cancellationToken)
     {
-        if (!TryGetUserId(out var userId))
-            return Unauthorized();
-
-        var connections = await _calendarIntegrationService.ListConnectionsAsync(userId, cancellationToken);
+        var connections = await _calendarIntegrationService.ListConnectionsAsync(_currentUser.UserId, cancellationToken);
         return Ok(connections);
     }
 
-    [Authorize]
     [HttpGet("google/connect")]
     public IActionResult StartGoogleConnect([FromQuery] string? returnUrl)
     {
-        if (!TryGetUserId(out var userId))
-            return Unauthorized();
-
         try
         {
             var validatedReturnUrl = _calendarIntegrationService.ValidateReturnUrl(returnUrl);
             var state = _calendarIntegrationService.GenerateState();
 
-            IntegrationOAuthCookies.SetOAuthCookies(Response, state, validatedReturnUrl, userId, UseSecureCookies());
+            IntegrationOAuthCookies.SetOAuthCookies(Response, state, validatedReturnUrl, _currentUser.UserId, UseSecureCookies());
 
             var authorizationUrl = _calendarIntegrationService.BuildConnectUrl(CalendarProviderType.Google, state);
             return Redirect(authorizationUrl);
@@ -115,16 +110,12 @@ public class CalendarIntegrationsController : ControllerBase
         }
     }
 
-    [Authorize]
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Disconnect(Guid id, CancellationToken cancellationToken)
     {
-        if (!TryGetUserId(out var userId))
-            return Unauthorized();
-
         try
         {
-            await _calendarIntegrationService.DisconnectAsync(userId, id, cancellationToken);
+            await _calendarIntegrationService.DisconnectAsync(_currentUser.UserId, id, cancellationToken);
             return NoContent();
         }
         catch (CalendarIntegrationException ex)
@@ -133,14 +124,10 @@ public class CalendarIntegrationsController : ControllerBase
         }
     }
 
-    [Authorize]
     [HttpPost("{id:guid}/sync")]
     public async Task<IActionResult> Sync(Guid id, CancellationToken cancellationToken)
     {
-        if (!TryGetUserId(out var userId))
-            return Unauthorized();
-
-        var connections = await _calendarIntegrationService.ListConnectionsAsync(userId, cancellationToken);
+        var connections = await _calendarIntegrationService.ListConnectionsAsync(_currentUser.UserId, cancellationToken);
         if (connections.All(c => c.Id != id))
             throw AppErrors.NotFound("Calendar connection");
 
@@ -153,15 +140,6 @@ public class CalendarIntegrationsController : ControllerBase
         {
             throw new AppException(ex.Message, ex.StatusCode, ex.Code);
         }
-    }
-
-    private bool TryGetUserId(out Guid userId)
-    {
-        var claim =
-            User.FindFirstValue(ClaimTypes.NameIdentifier) ??
-            User.FindFirstValue(JwtRegisteredClaimNames.Sub);
-
-        return Guid.TryParse(claim, out userId);
     }
 
     private RedirectResult RedirectWithIntegrationError(string returnUrl, string message)

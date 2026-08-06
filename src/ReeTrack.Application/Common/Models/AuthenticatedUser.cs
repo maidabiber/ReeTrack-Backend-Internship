@@ -7,5 +7,6 @@ public sealed class AuthenticatedUser
     public string? DisplayName { get; init; }
     public string? AvatarUrl { get; init; }
     public required IReadOnlyList<string> Roles { get; init; }
+    public required bool HasCompletedOnboarding { get; init; }
     public required IReadOnlyList<string> Permissions { get; init; }
 }
