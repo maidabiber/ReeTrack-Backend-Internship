@@ -36,6 +36,8 @@ public interface IApplicationDbContext
     DbSet<InAppNotification> InAppNotifications { get; }
     DbSet<Invoice> Invoices { get; }
     DbSet<InvoiceLineItem> InvoiceLineItems { get; }
+    DbSet<ReportShareLink> ReportShareLinks { get; }
+    DbSet<ReportShareRecipient> ReportShareRecipients { get; }
     DbSet<ProjectThreshold> ProjectThresholds { get; }
     DbSet<PendingProjectAlert> PendingProjectAlerts { get; }
 

@@ -179,6 +179,7 @@ public static class DependencyInjection
         services.AddScoped<IReportWriter<ProfitabilityReportDto>, ExcelProfitabilityReportWriter>();
         services.AddScoped<IReportWriter<ProfitabilityReportDto>, PdfProfitabilityReportWriter>();
         services.AddScoped<IReportExportService, ReportExportService>();
+        services.AddScoped<IReportShareService, ReportShareService>();
         services.AddScoped<IRateMultiplierSettingsService, RateMultiplierSettingsService>();
         services.AddScoped<IRateMultiplierConfigProvider, RateMultiplierConfigProvider>();
         services.AddScoped<IHourTargetSettingsService, HourTargetSettingsService>();

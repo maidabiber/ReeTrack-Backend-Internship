@@ -42,9 +42,10 @@ public class AppDbContext : DbContext, IApplicationDbContext
     public DbSet<InAppNotification> InAppNotifications => Set<InAppNotification>();
     public DbSet<Invoice> Invoices => Set<Invoice>();
     public DbSet<InvoiceLineItem> InvoiceLineItems => Set<InvoiceLineItem>();
+    public DbSet<ReportShareLink> ReportShareLinks => Set<ReportShareLink>();
+    public DbSet<ReportShareRecipient> ReportShareRecipients => Set<ReportShareRecipient>();
     public DbSet<ProjectThreshold> ProjectThresholds => Set<ProjectThreshold>();
     public DbSet<PendingProjectAlert> PendingProjectAlerts => Set<PendingProjectAlert>();
-
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);

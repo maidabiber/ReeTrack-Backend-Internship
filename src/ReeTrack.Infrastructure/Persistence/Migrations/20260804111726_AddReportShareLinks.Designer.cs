@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using ReeTrack.Infrastructure.Persistence;
@@ -11,9 +12,11 @@ using ReeTrack.Infrastructure.Persistence;
 namespace ReeTrack.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260804111726_AddReportShareLinks")]
+    partial class AddReportShareLinks
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -112,76 +115,6 @@ namespace ReeTrack.Infrastructure.Persistence.Migrations
                             Name = "Euro",
                             UpdatedAtUtc = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         });
-                });
-
-            modelBuilder.Entity("ReeTrack.Domain.Entities.CustomReportDefinition", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id")
-                        .HasDefaultValueSql("gen_random_uuid()");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at_utc");
-
-                    b.Property<Guid>("CreatedByUserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("created_by_user_id");
-
-                    b.Property<DateTime?>("DeletedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("deleted_at_utc");
-
-                    b.Property<Guid?>("DeletedByUserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("deleted_by_user_id");
-
-                    b.Property<string>("Description")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)")
-                        .HasColumnName("description");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(120)
-                        .HasColumnType("character varying(120)")
-                        .HasColumnName("name");
-
-                    b.Property<string>("NormalizedName")
-                        .IsRequired()
-                        .HasMaxLength(120)
-                        .HasColumnType("character varying(120)")
-                        .HasColumnName("normalized_name");
-
-                    b.Property<int>("SchemaVersion")
-                        .HasColumnType("integer")
-                        .HasColumnName("schema_version");
-
-                    b.Property<string>("SpecJson")
-                        .IsRequired()
-                        .HasColumnType("jsonb")
-                        .HasColumnName("spec_json");
-
-                    b.Property<DateTime>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at_utc");
-
-                    b.Property<string>("Visibility")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasColumnName("visibility");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CreatedByUserId", "NormalizedName")
-                        .IsUnique()
-                        .HasDatabaseName("ux_custom_report_definitions_owner_normalized_name")
-                        .HasFilter("deleted_at_utc IS NULL");
-
-                    b.ToTable("custom_report_definitions", (string)null);
                 });
 
             modelBuilder.Entity("ReeTrack.Domain.Entities.Holiday", b =>
@@ -619,137 +552,6 @@ namespace ReeTrack.Infrastructure.Persistence.Migrations
                     b.ToTable("notification_preferences", (string)null);
                 });
 
-            modelBuilder.Entity("ReeTrack.Domain.Entities.JiraWebhookSettings", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at_utc");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_active");
-
-                    b.Property<DateTime?>("LastReceivedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("last_received_at_utc");
-
-                    b.Property<short>("SingletonKey")
-                        .HasColumnType("smallint")
-                        .HasColumnName("singleton_key");
-
-                    b.Property<DateTime>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at_utc");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("SingletonKey")
-                        .IsUnique()
-                        .HasDatabaseName("ix_jira_webhook_settings_singleton_key");
-
-                    b.ToTable("jira_webhook_settings", (string)null);
-                });
-
-            modelBuilder.Entity("ReeTrack.Domain.Entities.PendingProjectAlert", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id")
-                        .HasDefaultValueSql("gen_random_uuid()");
-
-                    b.Property<decimal>("ActualHours")
-                        .HasPrecision(10, 2)
-                        .HasColumnType("numeric(10,2)")
-                        .HasColumnName("actual_hours");
-
-                    b.Property<decimal>("CalculatedCost")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)")
-                        .HasColumnName("calculated_cost");
-
-                    b.Property<decimal>("CostPercentage")
-                        .HasPrecision(8, 2)
-                        .HasColumnType("numeric(8,2)")
-                        .HasColumnName("cost_percentage");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at_utc");
-
-                    b.Property<string>("CurrencyCode")
-                        .IsRequired()
-                        .HasMaxLength(3)
-                        .HasColumnType("character varying(3)")
-                        .HasColumnName("currency_code");
-
-                    b.Property<DateTime>("DeliverAfterUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("deliver_after_utc");
-
-                    b.Property<DateTime?>("DeliveredAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("delivered_at_utc");
-
-                    b.Property<decimal>("FixedFeeAmount")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)")
-                        .HasColumnName("fixed_fee_amount");
-
-                    b.Property<decimal>("HoursPercentage")
-                        .HasPrecision(8, 2)
-                        .HasColumnType("numeric(8,2)")
-                        .HasColumnName("hours_percentage");
-
-                    b.Property<short>("MetricType")
-                        .HasColumnType("smallint")
-                        .HasColumnName("metric_type");
-
-                    b.Property<Guid>("ProjectId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("project_id");
-
-                    b.Property<string>("ProjectName")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("project_name");
-
-                    b.Property<Guid>("ThresholdId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("threshold_id");
-
-                    b.Property<decimal>("ThresholdPercentage")
-                        .HasPrecision(5, 2)
-                        .HasColumnType("numeric(5,2)")
-                        .HasColumnName("threshold_percentage");
-
-                    b.Property<decimal>("TimeEstimateHours")
-                        .HasPrecision(10, 2)
-                        .HasColumnType("numeric(10,2)")
-                        .HasColumnName("time_estimate_hours");
-
-                    b.Property<DateTime>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at_utc");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ProjectId");
-
-                    b.HasIndex("ThresholdId");
-
-                    b.HasIndex("DeliveredAtUtc", "DeliverAfterUtc")
-                        .HasDatabaseName("ix_pending_project_alerts_delivered_deliver_after");
-
-                    b.ToTable("pending_project_alerts", (string)null);
-                });
-
             modelBuilder.Entity("ReeTrack.Domain.Entities.Project", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1049,48 +851,6 @@ namespace ReeTrack.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_project_task_cost_snapshots_project_task_id");
 
                     b.ToTable("project_task_cost_snapshots", (string)null);
-                });
-
-            modelBuilder.Entity("ReeTrack.Domain.Entities.ProjectThreshold", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id")
-                        .HasDefaultValueSql("gen_random_uuid()");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at_utc");
-
-                    b.Property<bool>("IsTriggered")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_triggered");
-
-                    b.Property<short>("MetricType")
-                        .HasColumnType("smallint")
-                        .HasColumnName("metric_type");
-
-                    b.Property<Guid>("ProjectId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("project_id");
-
-                    b.Property<decimal>("ThresholdPercentage")
-                        .HasPrecision(5, 2)
-                        .HasColumnType("numeric(5,2)")
-                        .HasColumnName("threshold_percentage");
-
-                    b.Property<DateTime>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at_utc");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ProjectId", "MetricType", "ThresholdPercentage")
-                        .IsUnique()
-                        .HasDatabaseName("ix_project_thresholds_project_id_metric_type_threshold_percentage");
-
-                    b.ToTable("project_thresholds", (string)null);
                 });
 
             modelBuilder.Entity("ReeTrack.Domain.Entities.RateMultiplierSettings", b =>
@@ -2070,17 +1830,6 @@ namespace ReeTrack.Infrastructure.Persistence.Migrations
                     b.ToTable("audit_logs", (string)null);
                 });
 
-            modelBuilder.Entity("ReeTrack.Domain.Entities.CustomReportDefinition", b =>
-                {
-                    b.HasOne("ReeTrack.Domain.Entities.User", "CreatedByUser")
-                        .WithMany()
-                        .HasForeignKey("CreatedByUserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("CreatedByUser");
-                });
-
             modelBuilder.Entity("ReeTrack.Domain.Entities.InAppNotification", b =>
                 {
                     b.HasOne("ReeTrack.Domain.Entities.User", "User")
@@ -2166,25 +1915,6 @@ namespace ReeTrack.Infrastructure.Persistence.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("ReeTrack.Domain.Entities.PendingProjectAlert", b =>
-                {
-                    b.HasOne("ReeTrack.Domain.Entities.Project", "Project")
-                        .WithMany()
-                        .HasForeignKey("ProjectId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("ReeTrack.Domain.Entities.ProjectThreshold", "Threshold")
-                        .WithMany()
-                        .HasForeignKey("ThresholdId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Project");
-
-                    b.Navigation("Threshold");
-                });
-
             modelBuilder.Entity("ReeTrack.Domain.Entities.Project", b =>
                 {
                     b.HasOne("ReeTrack.Domain.Entities.Client", "Client")
@@ -2242,17 +1972,6 @@ namespace ReeTrack.Infrastructure.Persistence.Migrations
                     b.Navigation("ProjectCostSnapshot");
 
                     b.Navigation("ProjectTask");
-                });
-
-            modelBuilder.Entity("ReeTrack.Domain.Entities.ProjectThreshold", b =>
-                {
-                    b.HasOne("ReeTrack.Domain.Entities.Project", "Project")
-                        .WithMany("Thresholds")
-                        .HasForeignKey("ProjectId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Project");
                 });
 
             modelBuilder.Entity("ReeTrack.Domain.Entities.ReportFilterSet", b =>
@@ -2539,8 +2258,6 @@ namespace ReeTrack.Infrastructure.Persistence.Migrations
                     b.Navigation("CostSnapshots");
 
                     b.Navigation("Tasks");
-
-                    b.Navigation("Thresholds");
                 });
 
             modelBuilder.Entity("ReeTrack.Domain.Entities.ProjectCostSnapshot", b =>
