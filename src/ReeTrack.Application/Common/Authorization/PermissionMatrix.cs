@@ -12,9 +12,8 @@ public static class PermissionMatrix
             [RoleNames.ProjectManager] =
             [
                 Permissions.ReportsView,
-                Permissions.TimesheetReview,
+                Permissions.MembersView,
                 Permissions.ProjectsManage,
-                Permissions.BillableRatesManage,
                 Permissions.InvoicesManage
             ],
             [RoleNames.Admin] = Permissions.All.ToHashSet()

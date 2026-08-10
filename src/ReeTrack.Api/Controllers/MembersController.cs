@@ -69,6 +69,7 @@ public class MembersController : ControllerBase
     }
 
     private bool CanViewMembers() =>
+        _permissions.HasPermission(Permissions.MembersView) ||
         _permissions.HasPermission(Permissions.MembersManage) ||
         _permissions.HasPermission(Permissions.BillableRatesManage);
 

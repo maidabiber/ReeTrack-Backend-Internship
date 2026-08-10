@@ -11,12 +11,13 @@ public class PermissionMatrixTests
     [InlineData(RoleNames.ProjectManager, Permissions.ReportsView, true)]
     [InlineData(RoleNames.Admin, Permissions.ReportsView, true)]
     [InlineData(RoleNames.Member, Permissions.TimesheetReview, false)]
-    [InlineData(RoleNames.ProjectManager, Permissions.TimesheetReview, true)]
+    [InlineData(RoleNames.ProjectManager, Permissions.TimesheetReview, false)]
     [InlineData(RoleNames.ProjectManager, Permissions.MembersManage, false)]
     [InlineData(RoleNames.Admin, Permissions.MembersManage, true)]
     [InlineData(RoleNames.ProjectManager, Permissions.ProjectsManage, true)]
     [InlineData(RoleNames.Member, Permissions.ProjectsManage, false)]
-    [InlineData(RoleNames.ProjectManager, Permissions.BillableRatesManage, true)]
+    [InlineData(RoleNames.ProjectManager, Permissions.BillableRatesManage, false)]
+    [InlineData(RoleNames.ProjectManager, Permissions.MembersView, true)]
     [InlineData(RoleNames.Member, Permissions.BillableRatesManage, false)]
     [InlineData(RoleNames.ProjectManager, Permissions.InvoicesManage, true)]
     [InlineData(RoleNames.Member, Permissions.InvoicesManage, false)]
@@ -41,11 +42,10 @@ public class PermissionMatrixTests
         Assert.Equal(
             new[]
             {
-                Permissions.BillableRatesManage,
-                Permissions.InvoicesManage,
-                Permissions.ProjectsManage,
-                Permissions.ReportsView,
-                Permissions.TimesheetReview
+Permissions.MembersView,
+            Permissions.InvoicesManage,
+            Permissions.ProjectsManage,
+            Permissions.ReportsView
             }.OrderBy(p => p).ToList(),
             permissions);
     }
