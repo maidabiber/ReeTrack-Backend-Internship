@@ -141,7 +141,7 @@ public sealed class ReportShareService : IReportShareService
                 throw AppErrors.Forbidden("You do not have access to this report.");
 
             var userId = _currentUser.UserId;
-            if (!link.Recipients.Any(r => r.UserId == userId))
+            if (link.CreatedByUserId != userId && !link.Recipients.Any(r => r.UserId == userId))
                 throw AppErrors.Forbidden("You do not have access to this report.");
         }
 
