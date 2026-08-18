@@ -1,6 +1,46 @@
-# ReeTrack API
+## About
 
-ASP.NET Core backend for **ReeTrack** — a single-tenant time tracking app (still under active development). This repo is the API + data layer. The SPA lives in [`reetrack-frontend`](https://github.com/reeinvent/reetrack-frontend).
+ReeTrack is a time-tracking platform: people record what they work on,
+their hours flow through a weekly review cycle, and the data turns into
+reports, invoices and insights. This repo is the **backend** — an ASP.NET
+Core API that owns all the data and business rules. The browser UI lives in
+the companion `ReeTrack-Frontend-Internship` repo.
+
+### What the API does
+
+- **Identity** — sign in with Google; the first user becomes admin, everyone
+  else joins via invite. Users hold one of three roles — **Admin**,
+  **Project Manager** or **Member** — and each role brings its own set of
+  permissions, so admins decide who can manage members, rates and invoices,
+  and who can only view reports.
+- **Time entries** — a running timer, manual entries, duration-based entries,
+  and entries created by dragging Google Calendar events onto the timesheet.
+- **Timesheet flow** — entries lock into weekly timesheets; members submit or
+  withdraw them, and the week-lock guard prevents edits to already-approved
+  periods. Admins get a review queue with approve / reject / send-back
+  actions and decision emails.
+- **AI assistant** — a chat assistant (LLM-backed, streaming) that turns a
+  plain-language description of work into a draft time entry — or a whole
+  week — resolving projects, tasks and tags along the way. Drafts stay drafts:
+  the user confirms them in the UI before anything is saved. A second mode
+  drafts new projects from a description.
+- **NLP: smart parsing** — part of the NLP layer, a single free-form line of
+  text gets parsed into structured entry fields (duration, project, task,
+  tags, billable, times, date) with a confidence score, ready to drop into an
+  entry form.
+- **Workspace model** — clients, projects (with tasks, cost tracking and
+  budget thresholds), tags and team members.
+- **Rates & billing** — per-member billable rates with configurable
+  multipliers, holiday handling, and invoice generation.
+- **Reports** — portfolio summary, detailed, and workload/profitability
+  reports with filtering and CSV/Excel/PDF export.
+- **Custom reports** — a builder for user-defined reports, saved definitions,
+  period comparison, AI-generated insights, and shareable report links.
+- **Integrations** — Google Calendar sync and Jira (issue import plus
+  webhook-driven updates).
+- **Realtime** — SignalR hubs push updates to the UI as data changes.
+- **Audit & safety** — full write/read history and soft delete on core
+  entities, so nothing is ever permanently lost.
 
 ---
 
