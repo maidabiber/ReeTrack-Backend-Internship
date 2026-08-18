@@ -38,7 +38,7 @@ jobs:
           context: .
           file: ./Dockerfile
           platforms: linux/amd64
-          push: true
+          push: false
           tags: |
             ${{ env.IMAGE }}:latest
             ${{ env.IMAGE }}:${{ github.sha }}
@@ -50,18 +50,18 @@ jobs:
   #   Variable  DEPLOY_HOST     = the elastic_ip terraform output (the box's public IP)
   #   Secret    DEPLOY_SSH_KEY  = the PRIVATE key matching terraform's ssh_public_key
   # update.sh runs with `set -euo pipefail`, so a failed deploy makes this job fail too.
-  deploy:
-    needs: build-and-push
-    runs-on: ubuntu-latest
-    steps:
-      - name: Deploy over SSH
-        env:
-          DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
-          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
-        run: |
-          set -euo pipefail
-          mkdir -p ~/.ssh
-          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
-          ssh -o StrictHostKeyChecking=accept-new -i ~/.ssh/deploy_key \
-            ubuntu@"$DEPLOY_HOST" 'sudo /opt/reetrack/update.sh'
+  # deploy:
+  #   needs: build-and-push
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Deploy over SSH
+  #       env:
+  #         DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+  #         DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+  #       run: |
+  #         set -euo pipefail
+  #         mkdir -p ~/.ssh
+  #         printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
+  #         chmod 600 ~/.ssh/deploy_key
+  #         ssh -o StrictHostKeyChecking=accept-new -i ~/.ssh/deploy_key \
+  #           ubuntu@"$DEPLOY_HOST" 'sudo /opt/reetrack/update.sh'
