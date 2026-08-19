@@ -11,8 +11,7 @@ the companion `ReeTrack-Frontend-Internship` repo.
 - **Identity** — sign in with Google; the first user becomes admin, everyone
   else joins via invite. Users hold one of three roles — **Admin**,
   **Project Manager** or **Member** — and each role brings its own set of
-  permissions, so admins decide who can manage members, rates and invoices,
-  and who can only view reports.
+  permissions.
 - **Time entries** — a running timer, manual entries, duration-based entries,
   and entries created by dragging Google Calendar events onto the timesheet.
 - **Timesheet flow** — entries lock into weekly timesheets; members submit or
